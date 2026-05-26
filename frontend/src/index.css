@@ -2,14 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Dark theme (default) ──────────────────────────────────────────────── */
+:root {
+  --c-dark:   10 10 15;
+  --c-card:   18 18 26;
+  --c-border: 30 30 46;
+  --c-text:   224 224 224;
+  --c-muted:  102 102 128;
+  --c-green:  0 255 135;
+  --c-gold:   255 215 0;
+  color-scheme: dark;
+}
+
+/* ─── Light theme ────────────────────────────────────────────────────────── */
+html.light {
+  --c-dark:   240 242 245;
+  --c-card:   255 255 255;
+  --c-border: 214 219 228;
+  --c-text:   18 18 40;
+  --c-muted:  100 108 130;
+  --c-green:  0 168 107;
+  --c-gold:   184 134 11;
+  color-scheme: light;
+}
+
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
   body {
     @apply bg-stadium-dark text-stadium-text font-display;
     min-height: 100vh;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  /* In light mode, text-white reads the CSS text variable */
+  html.light .text-white {
+    color: rgb(var(--c-text));
+  }
+  html.light .text-gray-400 {
+    color: rgb(var(--c-muted));
   }
 
   :root {
@@ -19,19 +50,19 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-stadium-green text-stadium-dark font-semibold px-6 py-3 rounded-xl
+    @apply bg-stadium-green text-stadium-dark font-semibold px-6 py-3
            hover:brightness-110 active:scale-95 transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-secondary {
-    @apply border border-stadium-border text-stadium-text font-medium px-6 py-3 rounded-xl
+    @apply border border-stadium-border text-stadium-text font-medium px-6 py-3
            hover:border-stadium-green hover:text-stadium-green transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .card {
-    @apply bg-stadium-card border border-stadium-border rounded-2xl p-6;
+    @apply bg-stadium-card border border-stadium-border p-6;
   }
 
   .card-hover {
@@ -39,7 +70,7 @@
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium;
   }
 
   .badge-green {
@@ -55,7 +86,7 @@
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-white;
+    @apply text-2xl font-bold text-stadium-text;
   }
 
   .stat-label {
@@ -63,12 +94,12 @@
   }
 
   .input-field {
-    @apply bg-stadium-dark border border-stadium-border rounded-xl px-4 py-3 text-white
+    @apply bg-stadium-dark border border-stadium-border px-4 py-3 text-stadium-text
            focus:outline-none focus:border-stadium-green/60 transition-colors w-full;
   }
 
   .section-title {
-    @apply text-2xl font-bold text-white mb-1;
+    @apply text-2xl font-bold text-stadium-text mb-1;
   }
 
   .section-subtitle {
@@ -76,28 +107,28 @@
   }
 }
 
-/* Scrollbar */
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0a0a0f; }
-::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #00ff87; }
+::-webkit-scrollbar-track { background: rgb(var(--c-dark)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--c-border)); }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-green)); }
 
-/* Green glow on focus */
+/* ─── Green glow on focus ────────────────────────────────────────────────── */
 input:focus, textarea:focus, select:focus {
-  box-shadow: 0 0 0 1px rgba(0, 255, 135, 0.3);
+  box-shadow: 0 0 0 1px rgba(var(--c-green) / 0.3);
 }
 
-/* Animated border for active positions */
+/* ─── Animated border for active positions ───────────────────────────────── */
 .active-position {
   animation: border-pulse 2s ease-in-out infinite;
 }
 
 @keyframes border-pulse {
-  0%, 100% { border-color: rgba(0, 255, 135, 0.3); }
-  50% { border-color: rgba(0, 255, 135, 0.8); }
+  0%, 100% { border-color: rgba(var(--c-green) / 0.3); }
+  50%       { border-color: rgba(var(--c-green) / 0.8); }
 }
 
-/* Trophy shimmer */
+/* ─── Trophy shimmer ─────────────────────────────────────────────────────── */
 .trophy-shimmer {
   background: linear-gradient(90deg, #FFD700 0%, #FFF8DC 50%, #FFD700 100%);
   background-size: 200%;
@@ -107,6 +138,6 @@ input:focus, textarea:focus, select:focus {
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
 }

@@ -4,17 +4,18 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         stadium: {
-          green: '#00ff87',
-          gold: '#FFD700',
-          dark: '#0a0a0f',
-          card: '#12121a',
-          border: '#1e1e2e',
-          text: '#e0e0e0',
-          muted: '#666680',
+          green:  'rgb(var(--c-green)  / <alpha-value>)',
+          gold:   'rgb(var(--c-gold)   / <alpha-value>)',
+          dark:   'rgb(var(--c-dark)   / <alpha-value>)',
+          card:   'rgb(var(--c-card)   / <alpha-value>)',
+          border: 'rgb(var(--c-border) / <alpha-value>)',
+          text:   'rgb(var(--c-text)   / <alpha-value>)',
+          muted:  'rgb(var(--c-muted)  / <alpha-value>)',
         }
       },
       fontFamily: {
@@ -27,8 +28,8 @@ export default {
       },
       keyframes: {
         glow: {
-          '0%': { boxShadow: '0 0 5px #00ff87, 0 0 10px #00ff87' },
-          '100%': { boxShadow: '0 0 20px #00ff87, 0 0 40px #00ff87' },
+          '0%':   { boxShadow: '0 0 5px rgb(var(--c-green)), 0 0 10px rgb(var(--c-green))' },
+          '100%': { boxShadow: '0 0 20px rgb(var(--c-green)), 0 0 40px rgb(var(--c-green))' },
         }
       }
     },
