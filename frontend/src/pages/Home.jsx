@@ -4,205 +4,344 @@ import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useTotalAliveConvictionLocked, useChampionPoolBalance } from '../hooks/useContracts'
 import { formatUSDC } from '../utils/contracts'
-import {
-  IconBall, IconChart, IconTrophy, IconCoins,
-  IconUsers, IconCheck, IconArrow,
-} from '../components/Icons'
 
-const FEATURES = [
-  {
-    Icon: IconBall,
-    title: 'CONVICTION',
-    tagline: 'Back your team long-term',
-    description: 'Deposit USDC behind your World Cup team. Earn Survivor Yield every time a rival team is eliminated. Get 100% back if your team lifts the trophy.',
-    cta: 'Back a Team',
-    href: '/conviction',
-    color: 'stadium-green',
-  },
-  {
-    Icon: IconChart,
-    title: 'VAR',
-    tagline: 'Predict in-match events',
-    description: 'Place predictions on match outcomes, first goals, red cards and extra time. Conviction holders get a 1.5× bonus on correct predictions.',
-    cta: 'Place Predictions',
-    href: '/var',
-    color: 'blue-400',
-  },
-  {
-    Icon: IconTrophy,
-    title: 'Champion Pool',
-    tagline: 'Winner takes the pot',
-    description: "A portion of every eliminated team's losses flows into the Champion Pool. When the final whistle blows, champion backers split the entire pool.",
-    cta: 'View Pool',
-    href: '/leaderboard',
-    color: 'stadium-gold',
-  },
-]
+/* ─── Football pitch SVG background ──────────────────────────────────────── */
+function PitchBackground() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+      <svg
+        className="absolute top-0 left-0 w-full h-full text-stadium-green"
+        viewBox="0 0 1200 560"
+        preserveAspectRatio="xMidYMid slice"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        opacity="0.07"
+      >
+        {/* Field outline */}
+        <rect x="40" y="20" width="1120" height="520" />
+        {/* Center line */}
+        <line x1="600" y1="20" x2="600" y2="540" />
+        {/* Center circle */}
+        <circle cx="600" cy="280" r="80" />
+        {/* Center spot */}
+        <circle cx="600" cy="280" r="5" fill="currentColor" />
+        {/* Left penalty box */}
+        <rect x="40" y="140" width="180" height="280" />
+        {/* Left 6-yard box */}
+        <rect x="40" y="210" width="60" height="140" />
+        {/* Left penalty spot */}
+        <circle cx="152" cy="280" r="4" fill="currentColor" />
+        {/* Left penalty arc */}
+        <path d="M 220 195 A 80 80 0 0 1 220 365" />
+        {/* Right penalty box */}
+        <rect x="980" y="140" width="180" height="280" />
+        {/* Right 6-yard box */}
+        <rect x="1100" y="210" width="60" height="140" />
+        {/* Right penalty spot */}
+        <circle cx="1048" cy="280" r="4" fill="currentColor" />
+        {/* Right penalty arc */}
+        <path d="M 980 195 A 80 80 0 0 0 980 365" />
+        {/* Corner arcs */}
+        <path d="M 40 37 A 18 18 0 0 1 57 20" />
+        <path d="M 1143 20 A 18 18 0 0 1 1160 37" />
+        <path d="M 57 540 A 18 18 0 0 1 40 523" />
+        <path d="M 1160 523 A 18 18 0 0 1 1143 540" />
+      </svg>
+      {/* Horizontal fade */}
+      <div className="absolute inset-0 pitch-fade-x" />
+      {/* Vertical fade */}
+      <div className="absolute inset-0 pitch-fade-y" />
+    </div>
+  )
+}
 
-const HOW_IT_WORKS = [
-  { step: '01', title: 'Connect Wallet',      desc: 'Connect your wallet on X Layer Testnet and claim free USDC from the faucet.' },
-  { step: '02', title: 'Back Your Team',      desc: 'Choose a World Cup team and deposit USDC into their CONVICTION pool.' },
-  { step: '03', title: 'Earn as Others Fall', desc: "Every elimination redistributes 10% of the loser's pool to all alive backers automatically." },
-  { step: '04', title: 'Predict Matches',     desc: 'Use VAR to bet on individual match outcomes and score bonus multipliers with your CONVICTION.' },
-  { step: '05', title: 'Win the Tournament',  desc: 'Champion backers receive 100% principal + all yield + their share of the Champion Pool + a Champion NFT.' },
-]
+/* ─── Live stats ticker ───────────────────────────────────────────────────── */
+function StatsTicker({ totalLocked, champPool }) {
+  const items = [
+    `$${formatUSDC(totalLocked || 0)} TOTAL LOCKED`,
+    '32 TEAMS COMPETING',
+    `$${formatUSDC(champPool || 0)} CHAMPION POOL`,
+    '10% SURVIVOR YIELD RATE',
+    'UNISWAP V4 HOOKS',
+    'X LAYER TESTNET',
+    '$0 MIN. DEPOSIT',
+    'WORLD CUP 2026',
+  ]
+  const doubled = [...items, ...items]
 
+  return (
+    <div className="border-y border-stadium-border bg-stadium-card/50 ticker-track">
+      <div className="ticker-inner py-3">
+        {doubled.map((item, i) => (
+          <span key={i} className="flex items-center">
+            <span className="text-xs font-mono font-bold text-stadium-muted uppercase tracking-widest whitespace-nowrap px-8">
+              {item}
+            </span>
+            <span className="text-stadium-green text-xs">·</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function Home() {
   const { isConnected } = useAccount()
   const { data: totalLocked } = useTotalAliveConvictionLocked()
   const { data: champPool }   = useChampionPoolBalance()
 
   return (
-    <div className="space-y-20">
-      {/* Hero */}
-      <section className="text-center pt-10 pb-4">
-        <div className="inline-flex items-center gap-2 badge-green mb-6 text-sm px-4 py-1.5">
-          <span className="w-2 h-2 bg-stadium-green animate-pulse" />
-          Live on X Layer Testnet
-        </div>
-        <h1 className="text-5xl md:text-7xl font-bold text-stadium-text mb-6 leading-tight">
-          Back Your Team.{' '}
-          <span className="text-stadium-green">Earn While</span>
-          <br />They Win.
-        </h1>
-        <p className="text-stadium-muted text-xl max-w-2xl mx-auto mb-10">
-          STADIUM combines long-term liquidity conviction with in-match prediction markets,
-          powered by Uniswap V4 Hooks on X Layer.
-        </p>
+    <div>
 
-        {!isConnected ? (
-          <div className="flex flex-col items-center gap-4">
-            <ConnectButton label="Connect to Play" />
-            <p className="text-stadium-muted text-sm">Chain ID 195 · Native gas: OKB</p>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/conviction" className="btn-primary text-lg px-8 py-4 flex items-center gap-2">
-              <IconBall size={18} /> Back a Team
-            </Link>
-            <Link to="/var" className="btn-secondary text-lg px-8 py-4 flex items-center gap-2">
-              <IconChart size={18} /> Predict a Match
-            </Link>
-          </div>
-        )}
-      </section>
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <section className="relative min-h-[88vh] -mx-4 -mt-8 flex items-center border-b border-stadium-border overflow-hidden">
+        <PitchBackground />
 
-      {/* Live Stats */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Conviction Locked', value: `$${formatUSDC(totalLocked || 0)}`, Icon: IconCoins  },
-          { label: 'Champion Pool',           value: `$${formatUSDC(champPool  || 0)}`, Icon: IconTrophy },
-          { label: 'Teams Remaining',         value: '32',                               Icon: IconBall   },
-          { label: 'Active Backers',          value: '—',                                Icon: IconUsers  },
-        ].map(stat => (
-          <div key={stat.label} className="card text-center">
-            <div className="flex justify-center mb-2 text-stadium-green">
-              <stat.Icon size={28} />
-            </div>
-            <div className="stat-value">{stat.value}</div>
-            <div className="stat-label">{stat.label}</div>
-          </div>
-        ))}
-      </section>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full py-20">
+          <div className="grid lg:grid-cols-5 gap-12 items-center">
 
-      {/* Feature Cards */}
-      <section>
-        <h2 className="section-title text-center mb-2">Two Ways to Win</h2>
-        <p className="section-subtitle text-center mb-8">CONVICTION is the long game. VAR is the short game. Combine them for maximum edge.</p>
-        <div className="grid md:grid-cols-3 gap-6">
-          {FEATURES.map(({ Icon, title, tagline, description, cta, href, color }) => (
-            <div key={title} className="card-hover group flex flex-col">
-              <div className={`mb-4 text-${color}`}>
-                <Icon size={36} />
+            {/* Left: Typography */}
+            <div className="lg:col-span-3">
+              <div className="rule-label mb-8">
+                <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+                World Cup 2026 — Powered by Uniswap V4 on X Layer
               </div>
-              <div className={`text-xs font-semibold uppercase tracking-widest text-${color} mb-2`}>
-                {tagline}
+
+              <h1>
+                <div className="text-display text-stadium-text">BACK YOUR</div>
+                <div className="text-display text-stadium-green">TEAM.</div>
+              </h1>
+
+              <div className="mt-6 mb-10 max-w-xl">
+                <div className="h-px w-full bg-stadium-border mb-6" />
+                <p className="text-stadium-muted text-lg leading-relaxed">
+                  Lock conviction behind your World Cup team. Earn Survivor Yield as rivals fall.
+                  Win the Champion Pool when the final whistle blows.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-stadium-text mb-3">{title}</h3>
-              <p className="text-stadium-muted text-sm flex-1 mb-6">{description}</p>
-              <Link
-                to={href}
-                className="btn-secondary group-hover:border-stadium-green group-hover:text-stadium-green text-center flex items-center justify-center gap-2"
-              >
-                {cta} <IconArrow size={14} />
-              </Link>
+
+              {!isConnected ? (
+                <div className="flex flex-col items-start gap-4">
+                  <ConnectButton label="Connect Wallet to Play" />
+                  <p className="text-stadium-muted text-xs font-mono">Chain ID 195 · Native gas: OKB</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/conviction" className="btn-primary px-10 py-4 text-sm">
+                    Start Backing
+                  </Link>
+                  <Link to="/var" className="btn-secondary px-10 py-4 text-sm">
+                    Predict Matches
+                  </Link>
+                </div>
+              )}
             </div>
-          ))}
+
+            {/* Right: Live stats */}
+            <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+              {[
+                { label: 'Total Conviction Locked',  value: `$${formatUSDC(totalLocked || 0)}`, accent: 'border-l-stadium-green' },
+                { label: 'Champion Pool',            value: `$${formatUSDC(champPool  || 0)}`,  accent: 'border-l-stadium-gold'  },
+                { label: 'Teams Remaining',          value: '32',                                accent: 'border-l-stadium-green' },
+                { label: 'Survivor Yield Rate',      value: '10%',                               accent: 'border-l-stadium-gold'  },
+              ].map(s => (
+                <div key={s.label} className={`card border-l-2 ${s.accent} pl-5`}>
+                  <div className="text-3xl font-black text-stadium-text tracking-tight">{s.value}</div>
+                  <div className="text-xs text-stadium-muted uppercase tracking-widest mt-2 font-medium leading-tight">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* How it Works */}
-      <section className="card">
-        <h2 className="section-title mb-2">How It Works</h2>
-        <p className="section-subtitle mb-8">Five steps from wallet to winning.</p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          {HOW_IT_WORKS.map(item => (
-            <div key={item.step} className="flex flex-col">
-              <div className="text-stadium-green font-mono text-sm font-bold mb-3">{item.step}</div>
-              <h4 className="font-semibold text-stadium-text mb-2">{item.title}</h4>
-              <p className="text-stadium-muted text-sm">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ── Ticker ────────────────────────────────────────────────────────── */}
+      <div className="-mx-4">
+        <StatsTicker totalLocked={totalLocked} champPool={champPool} />
+      </div>
 
-      {/* Yield Mechanics */}
-      <section>
-        <h2 className="section-title text-center mb-2">Survivor Yield Mechanics</h2>
-        <p className="section-subtitle text-center mb-8">The longer your team survives, the more you earn.</p>
-        <div className="card">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="font-semibold text-stadium-text mb-4">When a team is eliminated:</h3>
-              <div className="space-y-3">
+      <div className="space-y-24 mt-20">
+
+        {/* ── Two Ways to Win ───────────────────────────────────────────── */}
+        <section>
+          <div className="rule-label mb-12">
+            <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+            Two Mechanics. One Tournament.
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-px bg-stadium-border">
+            {/* CONVICTION */}
+            <div className="bg-stadium-dark p-10 flex flex-col">
+              <div className="text-xs font-mono text-stadium-green uppercase tracking-widest mb-4">Long-term strategy</div>
+              <div className="text-6xl font-black text-stadium-text uppercase tracking-tight leading-none mb-6">
+                CONVICTION
+              </div>
+              <p className="text-stadium-muted text-sm leading-relaxed mb-8 flex-1">
+                Deposit USDC behind your World Cup team. Every time a rival team is eliminated,
+                10% of their locked funds flows to surviving backers as yield — proportional to your stake.
+                Reach the final and earn the Champion Pool too.
+              </p>
+              <div className="space-y-2 mb-8 font-mono text-sm">
                 {[
-                  { pct: '50%', label: 'Returned to backers',                color: 'text-stadium-muted' },
-                  { pct: '10%', label: 'Survivor Yield → all alive backers', color: 'text-stadium-green' },
-                  { pct: '25%', label: 'Champion Pool accumulates',           color: 'text-stadium-gold'  },
-                  { pct: '15%', label: 'Protocol Treasury',                   color: 'text-blue-400'      },
-                ].map(item => (
-                  <div key={item.pct} className="flex items-center gap-4">
-                    <span className={`text-2xl font-bold font-mono ${item.color} w-16`}>{item.pct}</span>
-                    <span className="text-stadium-muted text-sm">{item.label}</span>
+                  ['50%', 'Returned to eliminated backers'],
+                  ['10%', 'Survivor Yield → alive backers'],
+                  ['25%', 'Flows to Champion Pool'],
+                  ['15%', 'Protocol Treasury'],
+                ].map(([pct, label]) => (
+                  <div key={pct} className="flex items-center gap-4">
+                    <span className="text-stadium-green font-bold w-10">{pct}</span>
+                    <span className="text-stadium-muted text-xs">{label}</span>
                   </div>
                 ))}
               </div>
+              <Link to="/conviction" className="btn-primary text-center">
+                Back a Team
+              </Link>
             </div>
-            <div>
-              <h3 className="font-semibold text-stadium-text mb-4">Yield formula per elimination:</h3>
-              <div className="bg-stadium-dark p-4 font-mono text-sm text-stadium-green border border-stadium-border">
-                <div className="text-stadium-muted mb-2">// Your survivor yield share</div>
-                <div>userYield =</div>
-                <div className="ml-4 text-stadium-text">(deposit / totalAlive)</div>
-                <div className="ml-4">× (eliminatedTotal × 0.50 × 0.10)</div>
+
+            {/* VAR */}
+            <div className="bg-stadium-card p-10 flex flex-col">
+              <div className="text-xs font-mono text-blue-400 uppercase tracking-widest mb-4">Match-by-match action</div>
+              <div className="text-6xl font-black text-stadium-text uppercase tracking-tight leading-none mb-6">
+                VAR
               </div>
-              <p className="text-stadium-muted text-sm mt-4">
-                As more teams fall, your yield rate increases because the
-                numerator grows while fewer competing backers remain.
+              <p className="text-stadium-muted text-sm leading-relaxed mb-8 flex-1">
+                Four prediction markets open for every match: Match Winner, First Goal,
+                Red Card, and Extra Time. Conviction holders earn a 1.5× weighted bonus on correct calls
+                without creating new money — just a larger share of the same pool.
               </p>
+              <div className="space-y-2 mb-8 font-mono text-sm">
+                {[
+                  ['45%', 'To winning pool (weighted by conviction)'],
+                  ['25%', 'Flows to Champion Pool'],
+                  ['10%', 'Refunded to each loser'],
+                  ['20%', 'Protocol Treasury'],
+                ].map(([pct, label]) => (
+                  <div key={pct} className="flex items-center gap-4">
+                    <span className="text-blue-400 font-bold w-10">{pct}</span>
+                    <span className="text-stadium-muted text-xs">{label}</span>
+                  </div>
+                ))}
+              </div>
+              <Link to="/var" className="btn-secondary text-center">
+                Predict a Match
+              </Link>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA Banner */}
-      <section className="card border-stadium-green/30 bg-stadium-green/5 text-center py-12">
-        <div className="flex justify-center mb-4 text-stadium-gold">
-          <IconTrophy size={48} />
-        </div>
-        <h2 className="text-3xl font-bold text-stadium-text mb-2">Ready to back your team?</h2>
-        <p className="text-stadium-muted mb-8 max-w-lg mx-auto">
-          World Cup 2026 is coming. Lock in your conviction before the tournament starts
-          and ride every elimination to the final.
-        </p>
-        {!isConnected ? (
-          <ConnectButton label="Connect & Start Backing" />
-        ) : (
-          <Link to="/conviction" className="btn-primary text-lg px-10 py-4 inline-flex items-center gap-2">
-            <IconBall size={18} /> Choose Your Team
-          </Link>
-        )}
-      </section>
+        {/* ── How It Works ──────────────────────────────────────────────── */}
+        <section>
+          <div className="rule-label mb-12">
+            <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+            How it works
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-0 border border-stadium-border divide-y sm:divide-y-0 sm:divide-x divide-stadium-border">
+            {[
+              { n: '01', title: 'Connect Wallet',      desc: 'Connect on X Layer Testnet. Claim free USDC from the faucet.' },
+              { n: '02', title: 'Back Your Team',       desc: 'Deposit USDC into any of the 32 World Cup team conviction pools.' },
+              { n: '03', title: 'Earn as Teams Fall',   desc: 'Every elimination auto-distributes 10% of lost deposits to you.' },
+              { n: '04', title: 'Predict Matches',      desc: 'Use VAR markets. Your conviction stake earns a 1.5× bonus.' },
+              { n: '05', title: 'Win Everything',       desc: 'Champion backers get 100% principal + all yield + Champion Pool + NFT.' },
+            ].map(step => (
+              <div key={step.n} className="relative p-8 overflow-hidden group hover:bg-stadium-card transition-colors">
+                <div className="absolute -top-4 -left-2 text-[7rem] font-black text-stadium-green/5 leading-none select-none">
+                  {step.n}
+                </div>
+                <div className="relative">
+                  <div className="text-stadium-green font-mono text-xs font-bold mb-3">{step.n}</div>
+                  <div className="font-black text-stadium-text text-sm uppercase tracking-tight mb-2 leading-tight">{step.title}</div>
+                  <p className="text-stadium-muted text-xs leading-relaxed">{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Survivor Yield Formula ────────────────────────────────────── */}
+        <section className="grid md:grid-cols-2 gap-12 items-start">
+          <div>
+            <div className="rule-label mb-6">
+              <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+              Survivor Yield Mechanics
+            </div>
+            <h2 className="text-3xl font-black text-stadium-text uppercase tracking-tight mb-4 leading-tight">
+              The longer your team survives, the more you earn.
+            </h2>
+            <p className="text-stadium-muted text-sm leading-relaxed mb-6">
+              Yield accrues automatically on every elimination — no claiming needed until you want it.
+              As the tournament progresses and fewer teams remain, each elimination represents
+              a larger share of a shrinking competitor pool.
+            </p>
+            <p className="text-stadium-muted text-sm leading-relaxed">
+              Conviction multipliers on VAR markets mean your long-term backing also
+              boosts your short-term prediction returns — the two mechanics compound.
+            </p>
+          </div>
+          <div>
+            <div className="bg-stadium-dark border border-stadium-border p-6 font-mono text-sm">
+              <div className="text-stadium-muted text-xs mb-4 uppercase tracking-widest">// Survivor yield formula</div>
+              <div className="space-y-1">
+                <div className="text-stadium-green">userYield =</div>
+                <div className="ml-6 text-stadium-text">(yourDeposit / totalAliveDeposits)</div>
+                <div className="ml-6 text-stadium-muted">× (eliminatedTotal × 0.50 × 0.10)</div>
+              </div>
+              <div className="border-t border-stadium-border mt-6 pt-6 space-y-1">
+                <div className="text-stadium-muted text-xs uppercase tracking-widest mb-3">// VAR conviction multiplier</div>
+                <div className="text-stadium-green">weightedShare =</div>
+                <div className="ml-6 text-stadium-text">(betAmount × multiplier) / 100</div>
+                <div className="ml-6 text-stadium-muted">÷ totalWeightedWinning</div>
+                <div className="ml-6 text-stadium-text">× toWinnersPool</div>
+              </div>
+              <div className="border-t border-stadium-border mt-6 pt-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-stadium-muted">No conviction</span>
+                  <span className="text-stadium-text font-bold">1.0× multiplier</span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span className="text-stadium-muted">CONVICTION holder</span>
+                  <span className="text-stadium-green font-bold">1.5× multiplier</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── CTA ───────────────────────────────────────────────────────── */}
+        <section className="relative -mx-4 border-t border-stadium-border overflow-hidden">
+          <PitchBackground />
+          <div className="relative z-10 text-center py-24 px-4">
+            <div className="rule-label justify-center mb-8">
+              <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+              The tournament starts soon
+              <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+            </div>
+            <h2 className="text-display text-stadium-text mb-6">
+              WHO WINS?
+            </h2>
+            <p className="text-stadium-muted text-lg mb-10 max-w-lg mx-auto leading-relaxed">
+              32 teams. One champion. Your USDC earns every step of the way.
+              Lock your conviction before the opening whistle.
+            </p>
+            {!isConnected ? (
+              <ConnectButton label="Connect & Start Backing" />
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link to="/conviction" className="btn-primary px-12 py-4">
+                  Choose Your Team
+                </Link>
+                <Link to="/leaderboard" className="btn-secondary px-12 py-4">
+                  View Leaderboard
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+
+      </div>
     </div>
   )
 }

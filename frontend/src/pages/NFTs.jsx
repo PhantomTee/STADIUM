@@ -4,7 +4,6 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useReadContract } from 'wagmi'
 import { ADDRESSES } from '../utils/contracts'
 import { StadiumNFT_ABI } from '../abis'
-import { IconMedal, IconTrophy, IconShield, IconBall, IconStar, IconChart } from '../components/Icons'
 
 export default function NFTs() {
   const { address, isConnected } = useAccount()
@@ -25,116 +24,119 @@ export default function NFTs() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <IconMedal size={28} className="text-stadium-gold" />
-          <div>
-            <h1 className="section-title">STADIUM NFTs</h1>
-            <p className="section-subtitle">On-chain collectibles earned through your World Cup journey.</p>
-          </div>
+      <div className="page-header flex items-end justify-between">
+        <div>
+          <h1 className="section-title">STADIUM NFTs</h1>
+          <p className="section-subtitle">On-chain collectibles earned through your World Cup journey.</p>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-bold text-stadium-text">{totalSupply?.toString() || '0'}</div>
-          <div className="text-xs text-stadium-muted">Total Minted</div>
+          <div className="text-2xl font-black text-stadium-text">{totalSupply?.toString() || '0'}</div>
+          <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest">Total Minted</div>
         </div>
       </div>
 
       {/* NFT Types */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="card border-stadium-gold/30 bg-stadium-gold/5">
-          <div className="mb-4 text-stadium-gold"><IconTrophy size={36} /></div>
-          <h2 className="font-bold text-xl text-stadium-gold mb-2">Champion NFT</h2>
-          <p className="text-stadium-muted text-sm mb-4">
-            Minted only to backers of the World Cup champion. The rarest collectible in the protocol.
-            Features on-chain SVG with gold & black design, your team name, deposit amount, and total earnings.
+      <div className="grid md:grid-cols-2 gap-px bg-stadium-border">
+        <div className="bg-stadium-card p-8 border-t-2 border-t-stadium-gold">
+          <div className="text-xs font-mono text-stadium-gold uppercase tracking-widest mb-4">Rarest · Champions only</div>
+          <div className="text-4xl font-black text-stadium-gold uppercase tracking-tight leading-none mb-4">
+            Champion NFT
+          </div>
+          <p className="text-stadium-muted text-sm leading-relaxed mb-6">
+            Minted only to backers of the World Cup champion. Features on-chain SVG with gold design,
+            your team name, deposit amount, and total earnings.
           </p>
-          <div className="space-y-1 text-xs text-stadium-muted">
-            <div>• Dynamic SVG — fully on-chain, no IPFS</div>
-            <div>• Shows: team, deposit, total earned, mint date</div>
-            <div>• Gold trophy icon with shimmer effect</div>
-            <div>• Text: "STADIUM World Cup 2026 Champion Backer"</div>
+          <div className="space-y-1">
+            {[
+              'Dynamic SVG — fully on-chain, no IPFS',
+              'Shows: team, deposit, total earned, mint date',
+              'Gold design with shimmer effect',
+              'Text: "STADIUM World Cup 2026 Champion Backer"',
+            ].map(item => (
+              <div key={item} className="text-xs font-mono text-stadium-muted flex gap-2">
+                <span className="text-stadium-gold">—</span>{item}
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="card border-stadium-border">
-          <div className="mb-4 text-stadium-muted"><IconShield size={36} /></div>
-          <h2 className="font-bold text-xl text-stadium-text mb-2">Elimination Badge</h2>
-          <p className="text-stadium-muted text-sm mb-4">
-            Minted when your team is eliminated. A permanent record of your conviction and the loyalty
-            you showed before the final whistle.
+        <div className="bg-stadium-card p-8 border-t-2 border-t-stadium-border">
+          <div className="text-xs font-mono text-stadium-muted uppercase tracking-widest mb-4">Awarded on elimination</div>
+          <div className="text-4xl font-black text-stadium-text uppercase tracking-tight leading-none mb-4">
+            Elimination Badge
+          </div>
+          <p className="text-stadium-muted text-sm leading-relaxed mb-6">
+            Minted when your team is eliminated. A permanent record of your conviction and the
+            loyalty you showed before the final whistle.
           </p>
-          <div className="space-y-1 text-xs text-stadium-muted">
-            <div>• Grey & dark color scheme</div>
-            <div>• Shows: team, amount deposited, amount recovered (50%)</div>
-            <div>• Shield icon with elimination mark</div>
-            <div>• Text: "Eliminated — but you believed."</div>
+          <div className="space-y-1">
+            {[
+              'Grey & dark color scheme',
+              'Shows: team, amount deposited, amount recovered (50%)',
+              'Shield design with elimination mark',
+              'Text: "Eliminated — but you believed."',
+            ].map(item => (
+              <div key={item} className="text-xs font-mono text-stadium-muted flex gap-2">
+                <span className="text-stadium-muted">—</span>{item}
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* User's NFTs */}
       {!isConnected ? (
-        <div className="card text-center py-12">
-          <div className="flex justify-center mb-4 text-stadium-muted"><IconMedal size={40} /></div>
-          <p className="text-stadium-muted mb-4">Connect your wallet to see your NFTs</p>
+        <div className="card text-center py-12 space-y-4">
+          <div className="text-xs font-mono text-stadium-muted uppercase tracking-widest">Your Collection</div>
+          <p className="text-stadium-muted text-sm">Connect your wallet to see your NFTs</p>
           <ConnectButton />
         </div>
       ) : !balance || balance === 0n ? (
         <div className="card text-center py-12">
-          <div className="flex justify-center mb-4 text-stadium-muted"><IconBall size={40} /></div>
-          <p className="text-stadium-text font-semibold mb-2">No NFTs yet</p>
-          <p className="text-stadium-muted text-sm">
+          <div className="text-xs font-mono text-stadium-muted uppercase tracking-widest mb-3">Your Collection</div>
+          <p className="text-stadium-text font-bold mb-2">No NFTs yet</p>
+          <p className="text-stadium-muted text-sm max-w-sm mx-auto">
             Back a team and play through the tournament to earn NFTs.
             Elimination Badges are minted automatically when your team falls.
-            Champion NFTs are reserved for the tournament winner.
           </p>
         </div>
       ) : (
         <div>
-          <h2 className="font-semibold text-stadium-text mb-4">Your Collection ({balance?.toString()})</h2>
+          <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-4">
+            Your Collection ({balance?.toString()})
+          </div>
           <UserNFTGrid address={address} balance={balance} />
         </div>
       )}
 
       {/* How to Earn */}
-      <div className="card">
-        <h2 className="font-semibold text-stadium-text mb-4">How to Earn STADIUM NFTs</h2>
-        <div className="grid sm:grid-cols-2 gap-4 text-sm">
-          <div className="space-y-4">
-            {[
-              { Icon: IconBall,   color: 'text-stadium-muted',  title: '1. Back any team',          desc: 'Deposit USDC via CONVICTION' },
-              { Icon: IconShield, color: 'text-stadium-muted',  title: '2. Team gets eliminated',   desc: 'Elimination Badge auto-minted to your wallet' },
-            ].map(({ Icon, color, title, desc }) => (
-              <div key={title} className="flex gap-3">
-                <Icon size={22} className={`${color} flex-shrink-0 mt-0.5`} />
-                <div>
-                  <div className="font-medium text-stadium-text">{title}</div>
-                  <div className="text-stadium-muted text-xs">{desc}</div>
-                </div>
+      <div>
+        <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-4">How to Earn STADIUM NFTs</div>
+        <div className="grid sm:grid-cols-2 gap-px bg-stadium-border">
+          {[
+            { n: '01', title: 'Back any team',          desc: 'Deposit USDC via CONVICTION', color: 'text-stadium-muted' },
+            { n: '02', title: 'Team gets eliminated',   desc: 'Elimination Badge auto-minted to your wallet', color: 'text-stadium-muted' },
+            { n: '03', title: 'Team wins the World Cup', desc: 'Champion NFT minted — the rarest badge', color: 'text-stadium-gold' },
+            { n: '04', title: 'All NFTs fully on-chain', desc: 'SVG metadata stored in contract, no IPFS dependency', color: 'text-stadium-muted' },
+          ].map(step => (
+            <div key={step.n} className="bg-stadium-card p-6 relative overflow-hidden">
+              <div className="absolute -top-4 -left-2 text-[5rem] font-black text-stadium-green/5 leading-none select-none">
+                {step.n}
               </div>
-            ))}
-          </div>
-          <div className="space-y-4">
-            {[
-              { Icon: IconStar,   color: 'text-stadium-gold',  title: 'Team wins the World Cup',   desc: 'Champion NFT minted — the rarest badge' },
-              { Icon: IconChart,  color: 'text-stadium-muted', title: 'All NFTs are fully on-chain', desc: 'SVG metadata stored in contract, no IPFS dependency' },
-            ].map(({ Icon, color, title, desc }) => (
-              <div key={title} className="flex gap-3">
-                <Icon size={22} className={`${color} flex-shrink-0 mt-0.5`} />
-                <div>
-                  <div className="font-medium text-stadium-text">{title}</div>
-                  <div className="text-stadium-muted text-xs">{desc}</div>
-                </div>
+              <div className="relative">
+                <div className={`font-mono text-xs font-bold mb-2 ${step.color}`}>{step.n}</div>
+                <div className="font-black text-stadium-text text-sm uppercase tracking-tight mb-1">{step.title}</div>
+                <div className="text-stadium-muted text-xs font-mono">{step.desc}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* NFT Preview */}
-      <div className="card">
-        <h2 className="font-semibold text-stadium-text mb-4">Preview</h2>
-        <div className="grid md:grid-cols-2 gap-6">
+      <div>
+        <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-4">Preview</div>
+        <div className="grid md:grid-cols-2 gap-px bg-stadium-border">
           <NFTPreview type="champion" />
           <NFTPreview type="elimination" />
         </div>
@@ -146,7 +148,7 @@ export default function NFTs() {
 function UserNFTGrid({ address, balance }) {
   const tokenIds = Array.from({ length: Number(balance) }, (_, i) => i + 1)
   return (
-    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-px bg-stadium-border">
       {tokenIds.map(id => <NFTCard key={id} tokenId={id} />)}
     </div>
   )
@@ -169,7 +171,7 @@ function NFTCard({ tokenId }) {
   }
 
   return (
-    <div className="card p-3 text-center">
+    <div className="bg-stadium-card p-3 text-center">
       {metadata?.image ? (
         <img
           src={metadata.image}
@@ -177,12 +179,14 @@ function NFTCard({ tokenId }) {
           className="w-full aspect-square mb-3 object-cover"
         />
       ) : (
-        <div className="w-full aspect-square mb-3 bg-stadium-dark border border-stadium-border flex items-center justify-center text-stadium-muted">
-          <IconMedal size={40} />
+        <div className="w-full aspect-square mb-3 bg-stadium-dark border border-stadium-border flex items-center justify-center">
+          <span className="text-stadium-muted font-mono text-xs">#{tokenId}</span>
         </div>
       )}
-      <div className="text-sm font-medium text-stadium-text truncate">{metadata?.name || `Token #${tokenId}`}</div>
-      <div className="text-xs text-stadium-muted mt-1">#{tokenId}</div>
+      <div className="text-sm font-bold text-stadium-text uppercase tracking-tight truncate">
+        {metadata?.name || `Token #${tokenId}`}
+      </div>
+      <div className="text-xs text-stadium-muted font-mono mt-1">#{tokenId}</div>
     </div>
   )
 }
@@ -214,8 +218,8 @@ function NFTPreview({ type }) {
           <text x="200" y="375" fontFamily="Arial,sans-serif" fontSize="10" fill="#888" textAnchor="middle">STADIUM Protocol</text>
         </svg>
         <div className="p-3 text-center border-t border-stadium-gold/20">
-          <div className="text-stadium-gold font-semibold text-sm">Champion NFT</div>
-          <div className="text-stadium-muted text-xs">On-chain SVG · No IPFS</div>
+          <div className="text-stadium-gold font-bold text-xs uppercase tracking-widest">Champion NFT</div>
+          <div className="text-stadium-muted text-xs font-mono">On-chain SVG · No IPFS</div>
         </div>
       </div>
     )
@@ -242,8 +246,8 @@ function NFTPreview({ type }) {
         <text x="200" y="375" fontFamily="Arial,sans-serif" fontSize="10" fill="#444" textAnchor="middle">STADIUM Protocol</text>
       </svg>
       <div className="p-3 text-center border-t border-stadium-border">
-        <div className="text-stadium-muted font-semibold text-sm">Elimination Badge</div>
-        <div className="text-stadium-muted text-xs opacity-60">On-chain SVG · No IPFS</div>
+        <div className="text-stadium-muted font-bold text-xs uppercase tracking-widest">Elimination Badge</div>
+        <div className="text-stadium-muted text-xs font-mono opacity-60">On-chain SVG · No IPFS</div>
       </div>
     </div>
   )

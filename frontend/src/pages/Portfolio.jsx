@@ -10,7 +10,6 @@ import {
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ADDRESSES } from '../utils/contracts'
 import { ConvictionHook_ABI } from '../abis'
-import { IconBriefcase, IconBolt } from '../components/Icons'
 
 export default function Portfolio() {
   const { address, isConnected } = useAccount()
@@ -18,7 +17,6 @@ export default function Portfolio() {
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-6">
-        <IconBriefcase size={52} className="text-stadium-muted" />
         <h1 className="text-2xl font-bold text-stadium-text">Your Portfolio</h1>
         <p className="text-stadium-muted">Connect your wallet to see your positions</p>
         <ConnectButton />
@@ -28,12 +26,9 @@ export default function Portfolio() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-3">
-        <IconBriefcase size={28} className="text-stadium-green" />
-        <div>
-          <h1 className="section-title">Your Portfolio</h1>
-          <p className="section-subtitle">Track all your CONVICTION positions and VAR bets in one place.</p>
-        </div>
+      <div className="page-header">
+        <h1 className="section-title">Your Portfolio</h1>
+        <p className="section-subtitle">Track all your CONVICTION positions and VAR bets in one place.</p>
       </div>
 
       <PortfolioSummary address={address} />
@@ -129,9 +124,7 @@ function ConvictionPositionCard({ team, address }) {
             ? <span className="badge-green">Active</span>
             : <span className="badge-red">Eliminated</span>}
           {hasBonus && isAlive && (
-            <span className="badge-gold flex items-center gap-1">
-              <IconBolt size={10} /> 1.5× VAR
-            </span>
+            <span className="badge-gold">1.5× VAR</span>
           )}
         </div>
       </div>

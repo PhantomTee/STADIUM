@@ -35,28 +35,21 @@ html.light {
     transition: background-color 0.2s, color 0.2s;
   }
 
-  /* In light mode, text-white reads the CSS text variable */
-  html.light .text-white {
-    color: rgb(var(--c-text));
-  }
-  html.light .text-gray-400 {
-    color: rgb(var(--c-muted));
-  }
+  html.light .text-white { color: rgb(var(--c-text)); }
+  html.light .text-gray-400 { color: rgb(var(--c-muted)); }
 
-  :root {
-    --toastify-color-dark: #12121a;
-  }
+  :root { --toastify-color-dark: #12121a; }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-stadium-green text-stadium-dark font-semibold px-6 py-3
-           hover:brightness-110 active:scale-95 transition-all duration-150
+    @apply bg-stadium-green text-stadium-dark font-bold px-6 py-3 uppercase tracking-widest text-sm
+           hover:brightness-110 active:scale-[0.98] transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
   .btn-secondary {
-    @apply border border-stadium-border text-stadium-text font-medium px-6 py-3
+    @apply border border-stadium-border text-stadium-text font-bold px-6 py-3 uppercase tracking-widest text-sm
            hover:border-stadium-green hover:text-stadium-green transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
@@ -66,11 +59,11 @@ html.light {
   }
 
   .card-hover {
-    @apply card hover:border-stadium-green/40 transition-all duration-200 cursor-pointer;
+    @apply card hover:border-stadium-green/50 transition-all duration-200 cursor-pointer;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold uppercase tracking-wider;
   }
 
   .badge-green {
@@ -86,11 +79,11 @@ html.light {
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-stadium-text;
+    @apply text-2xl font-black text-stadium-text tracking-tight;
   }
 
   .stat-label {
-    @apply text-xs text-stadium-muted uppercase tracking-wider mt-1;
+    @apply text-xs text-stadium-muted uppercase tracking-widest mt-1 font-medium;
   }
 
   .input-field {
@@ -99,16 +92,33 @@ html.light {
   }
 
   .section-title {
-    @apply text-2xl font-bold text-stadium-text mb-1;
+    @apply text-2xl font-black text-stadium-text mb-1 uppercase tracking-tight;
   }
 
   .section-subtitle {
     @apply text-stadium-muted text-sm;
   }
+
+  .page-header {
+    @apply border-b border-stadium-border pb-6 mb-8;
+  }
+
+  .rule-label {
+    @apply flex items-center gap-4 text-xs font-mono text-stadium-muted uppercase tracking-widest;
+  }
+}
+
+/* ─── Display typography ─────────────────────────────────────────────────── */
+.text-display {
+  font-size: clamp(3.5rem, 10vw, 9.5rem);
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: rgb(var(--c-dark)); }
 ::-webkit-scrollbar-thumb { background: rgb(var(--c-border)); }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-green)); }
@@ -119,9 +129,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ─── Animated border for active positions ───────────────────────────────── */
-.active-position {
-  animation: border-pulse 2s ease-in-out infinite;
-}
+.active-position { animation: border-pulse 2s ease-in-out infinite; }
 
 @keyframes border-pulse {
   0%, 100% { border-color: rgba(var(--c-green) / 0.3); }
@@ -140,4 +148,36 @@ input:focus, textarea:focus, select:focus {
 @keyframes shimmer {
   0%   { background-position: -200% center; }
   100% { background-position:  200% center; }
+}
+
+/* ─── Stats ticker ───────────────────────────────────────────────────────── */
+.ticker-track { overflow: hidden; }
+.ticker-inner {
+  display: flex;
+  width: max-content;
+  animation: ticker 30s linear infinite;
+}
+.ticker-inner:hover { animation-play-state: paused; }
+
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ─── Pitch fade overlay ─────────────────────────────────────────────────── */
+.pitch-fade-x {
+  background: linear-gradient(to right,
+    rgb(var(--c-dark)) 0%,
+    transparent 20%,
+    transparent 80%,
+    rgb(var(--c-dark)) 100%
+  );
+}
+.pitch-fade-y {
+  background: linear-gradient(to bottom,
+    rgba(var(--c-dark) / 0.6) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgb(var(--c-dark)) 100%
+  );
 }

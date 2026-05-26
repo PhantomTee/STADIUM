@@ -4,7 +4,6 @@ import {
   useTotalConvictionLocked, useBackerCount, useTeamEliminated,
   useTotalAliveConvictionLocked, useChampionPoolData,
 } from '../hooks/useContracts'
-import { IconTrophy, IconClose } from '../components/Icons'
 
 const TABS = ['Teams', 'Champion Pool']
 
@@ -13,24 +12,21 @@ export default function Leaderboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-3">
-        <IconTrophy size={28} className="text-stadium-gold" />
-        <div>
-          <h1 className="section-title">Leaderboard</h1>
-          <p className="section-subtitle">Live standings by conviction locked. The most-backed team earns its supporters the most yield.</p>
-        </div>
+      <div className="page-header">
+        <h1 className="section-title">Leaderboard</h1>
+        <p className="section-subtitle">Live standings by conviction locked. The most-backed team earns its supporters the most yield.</p>
       </div>
 
       {/* Tab Nav */}
-      <div className="flex gap-2 border-b border-stadium-border">
+      <div className="grid grid-cols-2 gap-px bg-stadium-border">
         {TABS.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`py-3 text-xs font-bold uppercase tracking-widest transition-colors ${
               activeTab === tab
-                ? 'border-stadium-green text-stadium-green'
-                : 'border-transparent text-stadium-muted hover:text-stadium-text'
+                ? 'bg-stadium-green/10 text-stadium-green'
+                : 'bg-stadium-card text-stadium-muted hover:text-stadium-text hover:bg-stadium-dark'
             }`}
           >
             {tab}
@@ -38,7 +34,7 @@ export default function Leaderboard() {
         ))}
       </div>
 
-      {activeTab === 'Teams'        && <TeamsLeaderboard />}
+      {activeTab === 'Teams'         && <TeamsLeaderboard />}
       {activeTab === 'Champion Pool' && <ChampionPoolView />}
     </div>
   )
@@ -50,19 +46,19 @@ function TeamsLeaderboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-stadium-muted">
-          Total alive locked: <span className="text-stadium-text font-semibold">${formatUSDC(totalAlive)}</span>
+      <div className="flex items-center justify-between mb-6">
+        <div className="text-xs font-mono text-stadium-muted">
+          Total alive locked: <span className="text-stadium-text font-bold">${formatUSDC(totalAlive)}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-px bg-stadium-border">
           {['locked', 'backers'].map(s => (
             <button
               key={s}
               onClick={() => setSortBy(s)}
-              className={`text-xs px-3 py-1 transition-colors ${
+              className={`text-xs px-4 py-2 font-bold uppercase tracking-wider transition-colors ${
                 sortBy === s
-                  ? 'bg-stadium-green text-stadium-dark font-semibold'
-                  : 'text-stadium-muted border border-stadium-border'
+                  ? 'bg-stadium-green text-stadium-dark'
+                  : 'bg-stadium-card text-stadium-muted hover:text-stadium-text'
               }`}
             >
               {s === 'locked' ? 'By Locked' : 'By Backers'}
@@ -71,7 +67,15 @@ function TeamsLeaderboard() {
         </div>
       </div>
 
-      <div className="space-y-2">
+      {/* Table header */}
+      <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-mono text-stadium-muted uppercase tracking-widest border-b border-stadium-border mb-px">
+        <div className="col-span-1">#</div>
+        <div className="col-span-5">Team</div>
+        <div className="col-span-3 text-right">Locked</div>
+        <div className="col-span-3 text-right">Share</div>
+      </div>
+
+      <div className="space-y-px bg-stadium-border">
         {WORLD_CUP_TEAMS.map((team, i) => (
           <TeamLeaderboardRow key={team.name} team={team} rank={i + 1} totalAlive={totalAlive} />
         ))}
@@ -90,29 +94,36 @@ function TeamLeaderboardRow({ team, rank, totalAlive }) {
     : 0
 
   return (
-    <div className={`card flex items-center gap-4 py-3 ${eliminated ? 'opacity-40' : ''}`}>
-      <div className="text-stadium-muted font-mono text-sm w-6 text-center">
-        {eliminated
-          ? <IconClose size={14} className="text-stadium-muted mx-auto" />
-          : rank}
+    <div className={`bg-stadium-card grid grid-cols-12 gap-4 items-center px-4 py-3 border-l-2 transition-colors ${
+      eliminated
+        ? 'border-l-transparent opacity-40'
+        : 'border-l-transparent hover:border-l-stadium-green/40 hover:bg-stadium-dark'
+    }`}>
+      <div className="col-span-1 text-stadium-muted font-mono text-xs text-center">
+        {eliminated ? '×' : rank}
       </div>
-      <span className="text-xl">{team.flag}</span>
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="font-semibold text-stadium-text text-sm">{team.name}</span>
-          {eliminated && <span className="badge-red text-xs">Eliminated</span>}
+      <div className="col-span-5 flex items-center gap-2">
+        <span className="text-lg">{team.flag}</span>
+        <div>
+          <div className="font-bold text-stadium-text text-sm uppercase tracking-tight leading-none">{team.name}</div>
+          <div className="text-xs text-stadium-muted font-mono mt-0.5">
+            {eliminated ? 'Eliminated' : `Group ${team.group}`}
+          </div>
         </div>
-        {/* Progress bar — sharp, no rounding */}
-        <div className="w-full bg-stadium-border h-1.5">
+      </div>
+      <div className="col-span-3">
+        {/* Progress bar */}
+        <div className="w-full bg-stadium-border h-1 mb-1">
           <div
-            className={`h-1.5 transition-all ${eliminated ? 'bg-stadium-muted' : 'bg-stadium-green'}`}
+            className={`h-1 transition-all ${eliminated ? 'bg-stadium-muted' : 'bg-stadium-green'}`}
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
         </div>
+        <div className="text-xs text-stadium-muted font-mono text-right">{backers?.toString() || 0} backers</div>
       </div>
-      <div className="text-right">
-        <div className="font-semibold text-stadium-text text-sm">${formatUSDC(locked)}</div>
-        <div className="text-xs text-stadium-muted">{backers?.toString() || 0} backers · {pct.toFixed(1)}%</div>
+      <div className="col-span-3 text-right">
+        <div className="font-bold text-stadium-text text-sm font-mono">${formatUSDC(locked)}</div>
+        <div className="text-xs text-stadium-muted font-mono">{pct.toFixed(1)}%</div>
       </div>
     </div>
   )
@@ -129,53 +140,53 @@ function ChampionPoolView() {
   return (
     <div className="space-y-6">
       {/* Pool Size */}
-      <div className="card border-stadium-gold/30 bg-stadium-gold/5 text-center py-8">
-        <div className="flex justify-center mb-4 text-stadium-gold">
-          <IconTrophy size={48} />
-        </div>
-        <div className="text-4xl font-bold text-stadium-gold mb-2">
+      <div className="bg-stadium-card border border-stadium-gold/30 p-10 text-center">
+        <div className="text-xs font-mono text-stadium-gold uppercase tracking-widest mb-3">Current Balance</div>
+        <div className="text-display text-stadium-gold" style={{ fontSize: 'clamp(3rem, 8vw, 6rem)' }}>
           ${formatUSDC(balance)}
         </div>
-        <div className="text-stadium-muted">Current Champion Pool Balance</div>
+        <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest mt-3">Champion Pool</div>
         {champion && (
-          <div className="mt-4 badge-gold text-sm mx-auto w-fit">Champion: {champion}</div>
+          <div className="mt-6 inline-block badge-gold text-sm">Champion: {champion}</div>
         )}
       </div>
 
       {/* How it accumulates */}
-      <div className="card">
-        <h2 className="font-semibold text-stadium-text mb-4">How the Pool Grows</h2>
-        <div className="space-y-3">
+      <div>
+        <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">How the Pool Grows</div>
+        <div className="grid gap-px bg-stadium-border">
           {CONTRIBUTIONS.map(c => (
-            <div key={c.source} className="flex items-start gap-4 p-3 bg-stadium-dark border border-stadium-border">
-              <div className="text-2xl font-bold text-stadium-gold font-mono w-12">{c.pct}</div>
+            <div key={c.source} className="flex items-center gap-5 p-4 bg-stadium-card">
+              <div className="text-2xl font-black text-stadium-gold font-mono w-12 flex-shrink-0">{c.pct}</div>
               <div>
-                <div className="font-medium text-stadium-text text-sm">{c.source}</div>
-                <div className="text-xs text-stadium-muted mt-0.5">{c.desc}</div>
+                <div className="font-bold text-stadium-text text-sm uppercase tracking-tight">{c.source}</div>
+                <div className="text-xs text-stadium-muted font-mono mt-0.5">{c.desc}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Distribution */}
-      <div className="card">
-        <h2 className="font-semibold text-stadium-text mb-4">Distribution at Tournament End</h2>
-        <div className="text-stadium-muted text-sm space-y-3">
-          <p>When the oracle posts the World Cup champion, the full pool is distributed proportionally
-          to all CONVICTION holders who backed the winning team, weighted by deposit size.</p>
-          <div className="bg-stadium-dark p-4 font-mono text-xs text-stadium-green border border-stadium-border">
-            <div className="text-stadium-muted mb-1">// Your champion pool share</div>
-            <div>share = (yourDeposit / totalChampDeposits) × championPoolBalance</div>
+      {/* Distribution formula */}
+      <div>
+        <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">Distribution at Tournament End</div>
+        <div className="bg-stadium-dark border border-stadium-border p-5 font-mono text-sm">
+          <div className="text-stadium-muted text-xs mb-3 uppercase tracking-widest">// Your champion pool share</div>
+          <div className="space-y-1">
+            <div className="text-stadium-green">share =</div>
+            <div className="ml-6 text-stadium-text">(yourDeposit / totalChampDeposits)</div>
+            <div className="ml-6 text-stadium-muted">× championPoolBalance</div>
           </div>
-          <p>The larger your CONVICTION stake on the champion, the larger your share of the pool.</p>
+        </div>
+        <div className="text-stadium-muted text-xs font-mono mt-3 leading-relaxed">
+          The larger your CONVICTION stake on the champion, the larger your share. Distributed automatically when the oracle posts the final result.
         </div>
       </div>
 
-      {/* Top Team Preview */}
-      <div className="card">
-        <h2 className="font-semibold text-stadium-text mb-4">Tournament Favorites</h2>
-        <div className="space-y-2">
+      {/* Favorites */}
+      <div>
+        <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">Tournament Favorites</div>
+        <div className="space-y-px bg-stadium-border">
           {WORLD_CUP_TEAMS.slice(0, 8).map(team => (
             <FavoriteRow key={team.name} team={team} />
           ))}
@@ -191,15 +202,15 @@ function FavoriteRow({ team }) {
   const { data: eliminated } = useTeamEliminated(team.name)
 
   return (
-    <div className={`flex items-center gap-3 p-3 ${eliminated ? 'opacity-30' : 'bg-stadium-dark border border-stadium-border'}`}>
+    <div className={`flex items-center gap-3 p-4 bg-stadium-card border-l-2 border-l-transparent hover:border-l-stadium-gold/50 transition-colors ${eliminated ? 'opacity-30' : ''}`}>
       <span className="text-xl">{team.flag}</span>
       <div className="flex-1">
-        <span className="text-sm font-medium text-stadium-text">{team.name}</span>
-        {eliminated && <span className="text-xs text-red-400 ml-2">(out)</span>}
+        <span className="text-sm font-bold text-stadium-text uppercase tracking-tight">{team.name}</span>
+        {eliminated && <span className="text-xs text-red-400 font-mono ml-2">(eliminated)</span>}
       </div>
-      <div className="text-right text-xs text-stadium-muted">
-        <div className="text-stadium-text font-medium">${formatUSDC(locked)}</div>
-        <div>{backers?.toString() || 0} backers</div>
+      <div className="text-right font-mono">
+        <div className="text-stadium-text font-bold text-sm">${formatUSDC(locked)}</div>
+        <div className="text-xs text-stadium-muted">{backers?.toString() || 0} backers</div>
       </div>
     </div>
   )
