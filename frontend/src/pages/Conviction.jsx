@@ -9,7 +9,7 @@ import {
   useBackerCount, useTotalAliveConvictionLocked,
 } from '../hooks/useContracts'
 
-const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
 export default function Conviction() {
   const { address, isConnected } = useAccount()
@@ -84,7 +84,7 @@ export default function Conviction() {
       <div className="grid grid-cols-3 gap-px bg-stadium-border text-sm">
         {[
           { label: 'Total Locked',       value: `$${formatUSDC(totalAlive)}`, accent: 'text-stadium-green' },
-          { label: 'Teams Competing',    value: '32',                          accent: 'text-stadium-text'  },
+          { label: 'Teams Competing',    value: '48',                          accent: 'text-stadium-text'  },
           { label: 'Survivor Yield Rate', value: '10%',                        accent: 'text-stadium-gold'  },
         ].map(s => (
           <div key={s.label} className="bg-stadium-card p-5 text-center">
@@ -99,12 +99,12 @@ export default function Conviction() {
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold text-stadium-text uppercase tracking-widest">Select Your Team</div>
-            <div className="flex items-center gap-px bg-stadium-border">
+            <div className="flex flex-wrap gap-px bg-stadium-border">
               {['ALL', ...GROUPS].map(g => (
                 <button
                   key={g}
                   onClick={() => setFilterGroup(g)}
-                  className={`text-xs px-3 py-2 font-mono font-bold transition-colors ${
+                  className={`text-xs px-2.5 py-1.5 font-mono font-bold transition-colors ${
                     filterGroup === g
                       ? 'bg-stadium-green text-stadium-dark'
                       : 'bg-stadium-card text-stadium-muted hover:text-stadium-text'

@@ -60,7 +60,7 @@ function PitchBackground() {
 function StatsTicker({ totalLocked, champPool }) {
   const items = [
     `$${formatUSDC(totalLocked || 0)} TOTAL LOCKED`,
-    '32 TEAMS COMPETING',
+    '48 TEAMS COMPETING',
     `$${formatUSDC(champPool || 0)} CHAMPION POOL`,
     '10% SURVIVOR YIELD RATE',
     'UNISWAP V4 HOOKS',
@@ -144,7 +144,7 @@ export default function Home() {
               {[
                 { label: 'Total Conviction Locked',  value: `$${formatUSDC(totalLocked || 0)}`, accent: 'border-l-stadium-green' },
                 { label: 'Champion Pool',            value: `$${formatUSDC(champPool  || 0)}`,  accent: 'border-l-stadium-gold'  },
-                { label: 'Teams Remaining',          value: '32',                                accent: 'border-l-stadium-green' },
+                { label: 'Teams Remaining',          value: '48',                                accent: 'border-l-stadium-green' },
                 { label: 'Survivor Yield Rate',      value: '10%',                               accent: 'border-l-stadium-gold'  },
               ].map(s => (
                 <div key={s.label} className={`card border-l-2 ${s.accent} pl-5`}>
@@ -242,7 +242,7 @@ export default function Home() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-0 border border-stadium-border divide-y sm:divide-y-0 sm:divide-x divide-stadium-border">
             {[
               { n: '01', title: 'Connect Wallet',      desc: 'Connect on X Layer Testnet. Claim free USDC from the faucet.' },
-              { n: '02', title: 'Back Your Team',       desc: 'Deposit USDC into any of the 32 World Cup team conviction pools.' },
+              { n: '02', title: 'Back Your Team',       desc: 'Deposit USDC into any of the 48 World Cup team conviction pools.' },
               { n: '03', title: 'Earn as Teams Fall',   desc: 'Every elimination auto-distributes 10% of lost deposits to you.' },
               { n: '04', title: 'Predict Matches',      desc: 'Use VAR markets. Your conviction stake earns a 1.5× bonus.' },
               { n: '05', title: 'Win Everything',       desc: 'Champion backers get 100% principal + all yield + Champion Pool + NFT.' },
@@ -323,7 +323,7 @@ export default function Home() {
               WHO WINS?
             </h2>
             <p className="text-stadium-muted text-lg mb-10 max-w-lg mx-auto leading-relaxed">
-              32 teams. One champion. Your USDC earns every step of the way.
+              48 teams. One champion. Your USDC earns every step of the way.
               Lock your conviction before the opening whistle.
             </p>
             {!isConnected ? (
