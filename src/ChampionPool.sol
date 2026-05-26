@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IConvictionHook {
     function getTeamBackers(string memory team) external view returns (address[] memory);
@@ -10,8 +12,10 @@ interface IConvictionHook {
     function totalConvictionLocked(string memory team) external view returns (uint256);
 }
 
-/// @notice Accumulates losses and distributes to champion backers at tournament end
-contract ChampionPool is ReentrancyGuard {
+/// @notice Accumulates USDC losses and distributes to World Cup champion backers
+contract ChampionPool is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     IERC20 public immutable usdc;
 
     address public convictionHook;
@@ -39,38 +43,37 @@ contract ChampionPool is ReentrancyGuard {
         _;
     }
 
-    constructor(address _usdc) {
+    constructor(address _usdc, address initialOwner) Ownable(initialOwner) {
+        require(_usdc != address(0), "ChampionPool: zero usdc");
         usdc = IERC20(_usdc);
     }
 
-    function setAddresses(address _convictionHook, address _varMarket, address _oracle) external {
+    /// @notice One-time address wiring, owner only
+    function setAddresses(address _convictionHook, address _varMarket, address _oracle) external onlyOwner {
         require(oracle == address(0), "ChampionPool: already set");
+        require(_convictionHook != address(0), "ChampionPool: zero hook");
+        require(_varMarket != address(0), "ChampionPool: zero market");
+        require(_oracle != address(0), "ChampionPool: zero oracle");
         convictionHook = _convictionHook;
         varMarket = _varMarket;
         oracle = _oracle;
     }
 
-    /// @notice Called by ConvictionHook or VARMarket to accumulate funds
-    function deposit(uint256 amount) external onlyAuthorized {
-        require(usdc.transferFrom(msg.sender, address(this), amount), "ChampionPool: transfer failed");
-        totalAccumulated += amount;
-        emit Deposited(msg.sender, amount);
-    }
-
-    /// @notice Internal deposit that assumes tokens are already sent
+    /// @notice Tokens are transferred directly; this call just updates the accounting counter
     function recordDeposit(uint256 amount) external onlyAuthorized {
         totalAccumulated += amount;
         emit Deposited(msg.sender, amount);
     }
 
-    /// @notice Oracle triggers distribution to champion backers
+    /// @notice Oracle triggers proportional distribution to champion backers.
+    ///         Must be called BEFORE ConvictionHook.settleChampion() so deposits are still non-zero.
     function distribute(string memory winningTeam) external onlyOracle nonReentrant {
         require(!distributionComplete, "ChampionPool: already distributed");
-        distributionComplete = true;
-        champion = winningTeam;
 
         uint256 balance = usdc.balanceOf(address(this));
         if (balance == 0) {
+            distributionComplete = true;
+            champion = winningTeam;
             emit Distributed(winningTeam, 0);
             return;
         }
@@ -79,6 +82,8 @@ contract ChampionPool is ReentrancyGuard {
         uint256 teamTotal = IConvictionHook(convictionHook).totalConvictionLocked(winningTeam);
 
         if (backers.length == 0 || teamTotal == 0) {
+            distributionComplete = true;
+            champion = winningTeam;
             emit Distributed(winningTeam, 0);
             return;
         }
@@ -86,16 +91,19 @@ contract ChampionPool is ReentrancyGuard {
         uint256 distributed = 0;
         for (uint256 i = 0; i < backers.length; i++) {
             address backer = backers[i];
-            uint256 deposit_ = IConvictionHook(convictionHook).convictionDeposit(backer, winningTeam);
-            if (deposit_ == 0) continue;
-            uint256 share = (deposit_ * balance) / teamTotal;
+            uint256 backerDeposit = IConvictionHook(convictionHook).convictionDeposit(backer, winningTeam);
+            if (backerDeposit == 0) continue;
+            uint256 share = (backerDeposit * balance) / teamTotal;
             if (share > 0) {
-                usdc.transfer(backer, share);
+                usdc.safeTransfer(backer, share);
                 distributed += share;
                 emit BackerPaid(backer, share);
             }
         }
 
+        // Mark complete only after all transfers succeed
+        distributionComplete = true;
+        champion = winningTeam;
         emit Distributed(winningTeam, distributed);
     }
 

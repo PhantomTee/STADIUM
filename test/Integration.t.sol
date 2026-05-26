@@ -39,7 +39,7 @@ contract IntegrationTest is Test {
 
         poolManager = new PoolManager(deployer);
         usdc = new MockUSDC();
-        champPool = new ChampionPool(address(usdc));
+        champPool = new ChampionPool(address(usdc), deployer);
         nft = new StadiumNFT(deployer);
         oracle = new MatchOracle(deployer, treasury);
         hook = new ConvictionHook(IPoolManager(address(poolManager)), address(usdc), treasury, deployer);

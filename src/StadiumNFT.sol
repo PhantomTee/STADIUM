@@ -35,6 +35,7 @@ contract StadiumNFT is ERC721, Ownable {
     constructor(address initialOwner) ERC721("STADIUM NFT", "STDM") Ownable(initialOwner) {}
 
     function setConvictionHook(address _hook) external onlyOwner {
+        require(_hook != address(0), "StadiumNFT: zero hook");
         convictionHook = _hook;
     }
 

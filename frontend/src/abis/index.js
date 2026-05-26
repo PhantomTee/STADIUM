@@ -134,6 +134,7 @@ export const VARMarket_ABI = [
         { name: "correctOutcome", type: "string" },
         { name: "totalYesPool", type: "uint256" },
         { name: "totalNoPool", type: "uint256" },
+        { name: "totalDrawPool", type: "uint256" },
       ],
       name: "",
       type: "tuple",
@@ -144,7 +145,7 @@ export const VARMarket_ABI = [
   {
     inputs: [{ name: "matchId", type: "uint256" }, { name: "marketType", type: "uint8" }, { name: "user", type: "address" }],
     name: "getUserBet",
-    outputs: [{ name: "yes", type: "uint256" }, { name: "no", type: "uint256" }],
+    outputs: [{ name: "yes", type: "uint256" }, { name: "no", type: "uint256" }, { name: "draw", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },

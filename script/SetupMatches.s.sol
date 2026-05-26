@@ -75,6 +75,7 @@ contract SetupMatches is Script {
         console.log("\nGroup Stage matches created (IDs 1-16)");
 
         // Open VAR windows for first 2 matches (for demo)
+        // openVARWindow internally calls VARMarket.openMarketsWithTeams to record team names
         oracle.openVARWindow(1);
         oracle.openVARWindow(2);
         console.log("VAR windows opened for matches 1 and 2");

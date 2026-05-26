@@ -15,30 +15,32 @@ import {VARMarket} from "../src/VARMarket.sol";
 contract Deploy is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        address deployer   = vm.addr(deployerPrivateKey);
         address treasuryAddr = vm.envAddress("TREASURY_ADDRESS");
+
+        require(treasuryAddr != address(0), "Deploy: treasury not set");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy Uniswap V4 PoolManager
+        // 1. Deploy Uniswap V4 PoolManager (self-hosted for X Layer Testnet)
         PoolManager poolManager = new PoolManager(deployer);
-        console.log("PoolManager deployed:", address(poolManager));
+        console.log("PoolManager:", address(poolManager));
 
         // 2. Deploy MockUSDC
         MockUSDC usdc = new MockUSDC();
-        console.log("MockUSDC deployed:", address(usdc));
+        console.log("MockUSDC:", address(usdc));
 
-        // 3. Deploy ChampionPool
-        ChampionPool champPool = new ChampionPool(address(usdc));
-        console.log("ChampionPool deployed:", address(champPool));
+        // 3. Deploy ChampionPool (needs deployer as Ownable owner)
+        ChampionPool champPool = new ChampionPool(address(usdc), deployer);
+        console.log("ChampionPool:", address(champPool));
 
         // 4. Deploy StadiumNFT
         StadiumNFT nft = new StadiumNFT(deployer);
-        console.log("StadiumNFT deployed:", address(nft));
+        console.log("StadiumNFT:", address(nft));
 
         // 5. Deploy MatchOracle
         MatchOracle oracle = new MatchOracle(deployer, treasuryAddr);
-        console.log("MatchOracle deployed:", address(oracle));
+        console.log("MatchOracle:", address(oracle));
 
         // 6. Deploy ConvictionHook
         ConvictionHook hook = new ConvictionHook(
@@ -47,7 +49,7 @@ contract Deploy is Script {
             treasuryAddr,
             deployer
         );
-        console.log("ConvictionHook deployed:", address(hook));
+        console.log("ConvictionHook:", address(hook));
 
         // 7. Deploy VARMarket
         VARMarket varMarket = new VARMarket(
@@ -57,31 +59,27 @@ contract Deploy is Script {
             treasuryAddr,
             address(champPool)
         );
-        console.log("VARMarket deployed:", address(varMarket));
+        console.log("VARMarket:", address(varMarket));
 
-        // 8. Wire up all contract addresses
+        // 8. Wire up addresses
         hook.setOracle(address(oracle));
         hook.setChampionPool(address(champPool));
         hook.setVarMarket(address(varMarket));
         hook.setStadiumNFT(address(nft));
 
         oracle.setAddresses(address(hook), address(varMarket), address(champPool));
-
         champPool.setAddresses(address(hook), address(varMarket), address(oracle));
-
         nft.setConvictionHook(address(hook));
 
-        // 9. Mint initial USDC for testing (10M USDC)
+        // 9. Mint initial faucet supply for testing
         usdc.mint(deployer, 10_000_000 * 1e6);
 
         vm.stopBroadcast();
 
-        // Print deployment summary
         console.log("\n=== STADIUM DEPLOYMENT SUMMARY ===");
-        console.log("Chain ID: 195 (X Layer Testnet)");
-        console.log("Deployer:", deployer);
-        console.log("Treasury:", treasuryAddr);
-        console.log("---");
+        console.log("Chain: X Layer Testnet (ID 195)");
+        console.log("Deployer:      ", deployer);
+        console.log("Treasury:      ", treasuryAddr);
         console.log("PoolManager:   ", address(poolManager));
         console.log("MockUSDC:      ", address(usdc));
         console.log("ChampionPool:  ", address(champPool));
@@ -89,22 +87,20 @@ contract Deploy is Script {
         console.log("MatchOracle:   ", address(oracle));
         console.log("ConvictionHook:", address(hook));
         console.log("VARMarket:     ", address(varMarket));
-        console.log("===================================\n");
 
-        // Save addresses to file for frontend
-        string memory addressesJson = string.concat(
+        string memory json = string.concat(
             '{\n',
             '  "chainId": 195,\n',
-            '  "poolManager": "', vm.toString(address(poolManager)), '",\n',
-            '  "mockUSDC": "', vm.toString(address(usdc)), '",\n',
-            '  "championPool": "', vm.toString(address(champPool)), '",\n',
-            '  "stadiumNFT": "', vm.toString(address(nft)), '",\n',
-            '  "matchOracle": "', vm.toString(address(oracle)), '",\n',
-            '  "convictionHook": "', vm.toString(address(hook)), '",\n',
-            '  "varMarket": "', vm.toString(address(varMarket)), '"\n',
+            '  "poolManager": "',    vm.toString(address(poolManager)), '",\n',
+            '  "mockUSDC": "',       vm.toString(address(usdc)),        '",\n',
+            '  "championPool": "',   vm.toString(address(champPool)),   '",\n',
+            '  "stadiumNFT": "',     vm.toString(address(nft)),         '",\n',
+            '  "matchOracle": "',    vm.toString(address(oracle)),      '",\n',
+            '  "convictionHook": "', vm.toString(address(hook)),        '",\n',
+            '  "varMarket": "',      vm.toString(address(varMarket)),   '"\n',
             '}'
         );
-        vm.writeFile("./deployments.json", addressesJson);
-        console.log("Addresses written to deployments.json");
+        vm.writeFile("./deployments.json", json);
+        console.log("\nAddresses written to deployments.json");
     }
 }

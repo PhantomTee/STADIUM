@@ -250,9 +250,10 @@ function VARMatchBets({ matchId, match, address, markets }) {
 function SingleBetCell({ matchId, marketType, marketName, address, match }) {
   const { data: bet } = useUserBet(matchId, marketType, address)
 
-  const yes = bet?.[0] || 0n
-  const no = bet?.[1] || 0n
-  const total = yes + no
+  const yes  = bet?.[0] || 0n
+  const no   = bet?.[1] || 0n
+  const draw = bet?.[2] || 0n
+  const total = yes + no + draw
 
   if (total === 0n) {
     return (
@@ -263,7 +264,7 @@ function SingleBetCell({ matchId, marketType, marketName, address, match }) {
     )
   }
 
-  const side = yes > no ? 'YES/A' : 'NO/B'
+  const side = yes >= no && yes >= draw ? 'YES/A' : no >= draw ? 'NO/B' : 'DRAW'
 
   return (
     <div className="text-center p-2 rounded-lg bg-stadium-green/10 border border-stadium-green/20 text-xs">
