@@ -102,7 +102,7 @@ export default function Layout({ children }) {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <BallIcon />
-            <span className="text-stadium-text group-hover:text-stadium-green transition-colors" style={{ fontFamily: "'Anton', sans-serif", fontSize: 22, letterSpacing: '-0.02em' }}>
+            <span className="group-hover:text-stadium-green transition-colors" style={{ fontFamily: "'Anton', sans-serif", fontSize: 24, letterSpacing: '-0.02em', color: '#ffffff' }}>
               11°
             </span>
             <span className="hidden sm:inline text-stadium-muted text-xs ml-1 font-mono">/ World Cup DeFi</span>
@@ -178,7 +178,7 @@ export default function Layout({ children }) {
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <BallIcon />
-            <span className="text-stadium-text" style={{ fontFamily: "'Anton', sans-serif", fontSize: 20, letterSpacing: '-0.02em' }}>11°</span>
+            <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 20, letterSpacing: '-0.02em', color: '#ffffff' }}>11°</span>
             <span className="text-stadium-muted text-xs font-mono ml-2">— Back Your Team. Trade The Match. Win The Cup.</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-stadium-muted font-mono">
