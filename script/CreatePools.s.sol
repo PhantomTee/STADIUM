@@ -184,13 +184,16 @@ contract CreatePools is Script {
         string[] memory names,
         string[] memory syms
     ) internal {
+        // Split into two concat calls to stay within the 16-slot Yul stack limit
         string memory header = string.concat(
-            '{\n',
-            '  "chainId": ', vm.toString(block.chainid), ',\n',
-            '  "hook": "', vm.toString(hookAddr), '",\n',
-            '  "tickSpacing": ', vm.toString(uint256(uint24(int24(TICK_SPACING)))), ',\n',
-            '  "sqrtPriceX96": "', vm.toString(uint256(SQRT_PRICE_1_1)), '",\n',
-            '  "pools": [\n'
+            '{\n  "chainId": ', vm.toString(block.chainid),
+            ',\n  "hook": "',   vm.toString(hookAddr), '",\n'
+        );
+        header = string.concat(
+            header,
+            '  "tickSpacing": ', vm.toString(uint256(uint24(int24(TICK_SPACING)))),
+            ',\n  "sqrtPriceX96": "', vm.toString(uint256(SQRT_PRICE_1_1)),
+            '",\n  "pools": [\n'
         );
 
         bytes memory entries;
@@ -213,11 +216,14 @@ contract CreatePools is Script {
     ) internal view returns (string memory) {
         bytes32 pid   = factory.teamPoolId(teamId);
         address token = factory.teamToken(teamId);
+        // Split into two concat calls to stay within the 16-slot Yul stack limit
         string memory entry = string.concat(
             '    {"teamId":', vm.toString(uint256(teamId)),
-            ',"name":"', name,
-            '","symbol":"', symbol,
-            '","token":"', vm.toString(token),
+            ',"name":"', name, '","symbol":"', symbol, '"'
+        );
+        entry = string.concat(
+            entry,
+            ',"token":"', vm.toString(token),
             '","poolId":"', vm.toString(pid), '"}'
         );
         return comma ? string.concat(entry, ',\n') : string.concat(entry, '\n');
