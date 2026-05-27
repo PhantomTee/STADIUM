@@ -23,26 +23,6 @@ export default function StadiumHero() {
         position: 'relative',
       }}
     >
-      {/* Ghost 11° — decorative, top-right */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: '-4%',
-          right: 'clamp(-20px, -1vw, 20px)',
-          fontFamily: "'Anton', sans-serif",
-          fontSize: 'clamp(180px, 38vw, 560px)',
-          color: 'rgba(255,255,255,0.038)',
-          lineHeight: 0.85,
-          letterSpacing: '-0.04em',
-          userSelect: 'none',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      >
-        11°
-      </div>
-
       {/* Content */}
       <div style={{ position: 'relative', zIndex: 1 }}>
 

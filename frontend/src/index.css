@@ -30,7 +30,7 @@ html.light {
   * { box-sizing: border-box; }
 
   html {
-    /* Pitch stripes — vertical bands, fixed so they stay as you scroll */
+    /* Pitch stripes — vertical bands */
     background-color: #080e08;
     background-image: repeating-linear-gradient(
       90deg,
@@ -39,7 +39,6 @@ html.light {
       #0c1b0c  110px,
       #0c1b0c  220px
     );
-    background-attachment: fixed;
     min-height: 100%;
   }
 

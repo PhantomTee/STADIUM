@@ -25,26 +25,29 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 gap-px bg-stadium-border">
             {/* CONVICTION */}
-            <div className="bg-stadium-dark p-10 flex flex-col">
+            <div className="bg-stadium-dark p-6 md:p-10 flex flex-col overflow-hidden">
               <div className="text-xs font-mono text-stadium-green uppercase tracking-widest mb-4">Long-term strategy</div>
-              <div className="text-6xl font-black text-stadium-text uppercase tracking-tight leading-none mb-6">
+              <div
+                className="font-black text-stadium-text uppercase leading-none mb-6"
+                style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(36px, 8vw, 60px)' }}
+              >
                 CONVICTION
               </div>
-              <p className="text-stadium-muted text-sm leading-relaxed mb-8 flex-1">
+              <p className="text-stadium-muted text-sm leading-relaxed mb-6 flex-1">
                 Deposit USDC behind your World Cup team. Every time a rival team is eliminated,
                 10% of their locked funds flows to surviving backers as yield — proportional to your stake.
                 Reach the final and earn the Champion Pool too.
               </p>
-              <div className="space-y-2 mb-8 font-mono text-sm">
+              <div className="space-y-3 mb-8">
                 {[
                   ['50%', 'Returned to eliminated backers'],
                   ['10%', 'Survivor Yield → alive backers'],
                   ['25%', 'Flows to Champion Pool'],
                   ['15%', 'Protocol Treasury'],
                 ].map(([pct, label]) => (
-                  <div key={pct} className="flex items-center gap-4">
-                    <span className="text-stadium-green font-bold w-10">{pct}</span>
-                    <span className="text-stadium-muted text-xs">{label}</span>
+                  <div key={pct} className="flex items-start gap-3">
+                    <span className="text-stadium-green font-bold font-mono text-sm w-10 flex-shrink-0">{pct}</span>
+                    <span className="text-stadium-muted text-xs leading-relaxed">{label}</span>
                   </div>
                 ))}
               </div>
@@ -54,26 +57,29 @@ export default function Home() {
             </div>
 
             {/* VAR */}
-            <div className="bg-stadium-card p-10 flex flex-col">
+            <div className="bg-stadium-card p-6 md:p-10 flex flex-col overflow-hidden">
               <div className="text-xs font-mono text-blue-400 uppercase tracking-widest mb-4">Match-by-match action</div>
-              <div className="text-6xl font-black text-stadium-text uppercase tracking-tight leading-none mb-6">
+              <div
+                className="font-black text-stadium-text uppercase leading-none mb-6"
+                style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(36px, 8vw, 60px)' }}
+              >
                 VAR
               </div>
-              <p className="text-stadium-muted text-sm leading-relaxed mb-8 flex-1">
+              <p className="text-stadium-muted text-sm leading-relaxed mb-6 flex-1">
                 Four prediction markets open for every match: Match Winner, First Goal,
                 Red Card, and Extra Time. Conviction holders earn a 1.5× weighted bonus on correct calls
                 without creating new money — just a larger share of the same pool.
               </p>
-              <div className="space-y-2 mb-8 font-mono text-sm">
+              <div className="space-y-3 mb-8">
                 {[
                   ['45%', 'To winning pool (weighted by conviction)'],
                   ['25%', 'Flows to Champion Pool'],
                   ['10%', 'Refunded to each loser'],
                   ['20%', 'Protocol Treasury'],
                 ].map(([pct, label]) => (
-                  <div key={pct} className="flex items-center gap-4">
-                    <span className="text-blue-400 font-bold w-10">{pct}</span>
-                    <span className="text-stadium-muted text-xs">{label}</span>
+                  <div key={pct} className="flex items-start gap-3">
+                    <span className="text-blue-400 font-bold font-mono text-sm w-10 flex-shrink-0">{pct}</span>
+                    <span className="text-stadium-muted text-xs leading-relaxed">{label}</span>
                   </div>
                 ))}
               </div>
