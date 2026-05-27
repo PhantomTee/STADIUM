@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS, formatUSDC, parseUSDC } from '../utils/contracts'
@@ -18,9 +18,8 @@ export default function Conviction() {
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [filterGroup, setFilterGroup]   = useState('ALL')
 
-  const { data: usdcBalance }    = useUSDCBalance(address)
-  const { data: allowance }      = useUSDCAllowance(address, ADDRESSES.convictionVault)
-  const { data: totalAlive }     = useTotalAliveDeposits()
+  const { data: usdcBalance } = useUSDCBalance(address)
+  const { data: totalAlive }  = useTotalAliveDeposits()
   const { data: closeTime }      = useConvictionCloseTime()
   const { data: lastFaucetTime } = useFaucetCooldown(address)
 
@@ -55,7 +54,7 @@ export default function Conviction() {
     setSelectedTeam(prev => prev?.id === team.id ? null : team)
   }
 
-  const depositFormProps = { usdcBalance, allowance, userAddress: address, convictionOpen }
+  const depositFormProps = { usdcBalance, userAddress: address, convictionOpen }
 
   return (
     <div className="space-y-8">
@@ -261,9 +260,12 @@ function TeamCard({ team, isSelected, onSelect, userAddress }) {
 // Owns all its own tx hooks so state never leaks from other actions.
 // Parent keys this by team.id — remounts on team change, clearing tx history.
 
-function DepositForm({ team, usdcBalance, allowance, userAddress, convictionOpen }) {
+function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
   const [amount, setAmount]             = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
+
+  // Allowance lives here so we can refetch immediately after approval confirms
+  const { data: allowance, refetch: refetchAllowance } = useUSDCAllowance(userAddress, ADDRESSES.convictionVault)
 
   const { data: userDeposit }      = useConvictionDeposit(userAddress, team.id)
   const { data: pendingYield }     = usePendingYield(userAddress)
@@ -273,6 +275,11 @@ function DepositForm({ team, usdcBalance, allowance, userAddress, convictionOpen
 
   const { writeContract: writeApprove,  data: approveTxHash  } = useWriteContract()
   const { isLoading: approvePending, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash })
+
+  // Immediately re-read allowance after approval so the button switches without delay
+  useEffect(() => {
+    if (approveSuccess) refetchAllowance()
+  }, [approveSuccess])
 
   const { writeContract: writeDeposit,  data: depositTxHash  } = useWriteContract()
   const { isLoading: depositPending, isSuccess: depositSuccess } = useWaitForTransactionReceipt({ hash: depositTxHash })
