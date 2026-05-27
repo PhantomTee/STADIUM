@@ -20,9 +20,9 @@ interface ITeamFactory {
 /// Optional:
 ///   STADIUM_HOOK_ADDRESS     - if set, updates the factory hook before pool creation
 ///
-/// Team source of truth: config/teams.json (keep in sync with _teams() below).
-/// Placeholder entries (isPlaceholder=true in JSON) are registered on-chain but pools
-/// for them will be skipped until the real team name/code is back-filled.
+/// Team source of truth: config/teams.json and frontend/src/utils/contracts.js.
+/// teamId values 1-48 here MUST match the id field in contracts.js WORLD_CUP_TEAMS.
+/// isPlaceholder entries (ids 35 and 42) must be updated once confirmed.
 ///
 /// Usage:
 ///   forge script script/CreatePools.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
@@ -65,17 +65,16 @@ contract CreatePools is Script {
 
         console.log("\n=== TEAM REGISTRATION SUMMARY ===");
         console.log("TeamFactory:", factoryAddr);
-        console.log("Teams registered: 48 (World Cup 2026)");
+        console.log("Teams registered: 48 (World Cup 2026, ids 1-48)");
 
         if (hookAddr != address(0)) {
             _writePoolManifest(factory, hookAddr, ids, names, syms);
         }
     }
 
-    // ── Team list ─────────────────────────────────────────────────────────────
-    // Source of truth: config/teams.json — update both files together.
-    // isPlaceholder entries (UEFA Playoff 1-4, IC Playoff Winner 1-2) must be
-    // replaced with confirmed team names once the draw is finalised.
+    // ── Team list (ids 1-48, Groups A-L) ─────────────────────────────────────
+    // Keep in sync with config/teams.json and frontend/src/utils/contracts.js.
+    // Non-ASCII names are ASCII-approximated here; JSON/JS files use proper Unicode.
 
     function _teams() internal pure returns (
         uint16[] memory ids,
@@ -86,69 +85,77 @@ contract CreatePools is Script {
         names = new string[](48);
         syms  = new string[](48);
 
-        // CONMEBOL (6)
-        ids[0]=9;   names[0]="Brazil";          syms[0]="BRA";
-        ids[1]=37;  names[1]="Argentina";        syms[1]="ARG";
-        ids[2]=5;   names[2]="Uruguay";          syms[2]="URU";
-        ids[3]=6;   names[3]="Colombia";         syms[3]="COL";
-        ids[4]=7;   names[4]="Ecuador";          syms[4]="ECU";
-        ids[5]=8;   names[5]="Paraguay";         syms[5]="PAR";
+        // Group A
+        ids[0]=1;  names[0]="Mexico";        syms[0]="MEX";
+        ids[1]=2;  names[1]="South Africa";  syms[1]="RSA";
+        ids[2]=3;  names[2]="South Korea";   syms[2]="KOR";
+        ids[3]=4;  names[3]="Czechia";       syms[3]="CZE";
 
-        // CONCACAF (6 - USA/Mexico/Canada are hosts)
-        ids[6]=1;   names[6]="Mexico";           syms[6]="MEX";
-        ids[7]=2;   names[7]="USA";              syms[7]="USA";
-        ids[8]=4;   names[8]="Canada";           syms[8]="CAN";
-        ids[9]=47;  names[9]="Panama";           syms[9]="PAN";
-        ids[10]=46; names[10]="Curacao";         syms[10]="CUW";
-        ids[11]=48; names[11]="Haiti";           syms[11]="HAI";
+        // Group B
+        ids[4]=5;  names[4]="Canada";        syms[4]="CAN";
+        ids[5]=6;  names[5]="Bosnia";        syms[5]="BIH";
+        ids[6]=7;  names[6]="Qatar";         syms[6]="QAT";
+        ids[7]=8;  names[7]="Switzerland";   syms[7]="SUI";
 
-        // UEFA direct qualifiers (12)
-        ids[12]=10; names[12]="Spain";           syms[12]="ESP";
-        ids[13]=26; names[13]="Germany";         syms[13]="GER";
-        ids[14]=33; names[14]="France";          syms[14]="FRA";
-        ids[15]=45; names[15]="England";         syms[15]="ENG";
-        ids[16]=11; names[16]="Portugal";        syms[16]="POR";
-        ids[17]=12; names[17]="Netherlands";     syms[17]="NED";
-        ids[18]=13; names[18]="Belgium";         syms[18]="BEL";
-        ids[19]=14; names[19]="Croatia";         syms[19]="CRO";
-        ids[20]=15; names[20]="Norway";          syms[20]="NOR";
-        ids[21]=17; names[21]="Austria";         syms[21]="AUT";
-        ids[22]=18; names[22]="Switzerland";     syms[22]="SUI";
-        ids[23]=19; names[23]="Scotland";        syms[23]="SCO";
+        // Group C
+        ids[8]=9;  names[8]="Brazil";        syms[8]="BRA";
+        ids[9]=10; names[9]="Morocco";       syms[9]="MAR";
+        ids[10]=11; names[10]="Haiti";       syms[10]="HAI";
+        ids[11]=12; names[11]="Scotland";    syms[11]="SCO";
 
-        // UEFA playoff winners (4) - isPlaceholder; replace when confirmed
-        ids[24]=60; names[24]="UEFA Playoff 1";  syms[24]="UP1";
-        ids[25]=61; names[25]="UEFA Playoff 2";  syms[25]="UP2";
-        ids[26]=62; names[26]="UEFA Playoff 3";  syms[26]="UP3";
-        ids[27]=63; names[27]="UEFA Playoff 4";  syms[27]="UP4";
+        // Group D
+        ids[12]=13; names[12]="USA";         syms[12]="USA";
+        ids[13]=14; names[13]="Paraguay";    syms[13]="PAR";
+        ids[14]=15; names[14]="Australia";   syms[14]="AUS";
+        ids[15]=16; names[15]="Turkiye";     syms[15]="TUR";
 
-        // AFC (8)
-        ids[28]=3;  names[28]="South Korea";     syms[28]="KOR";
-        ids[29]=27; names[29]="Japan";           syms[29]="JPN";
-        ids[30]=28; names[30]="Iran";            syms[30]="IRN";
-        ids[31]=29; names[31]="Saudi Arabia";    syms[31]="KSA";
-        ids[32]=30; names[32]="Australia";       syms[32]="AUS";
-        ids[33]=31; names[33]="Uzbekistan";      syms[33]="UZB";
-        ids[34]=32; names[34]="Jordan";          syms[34]="JOR";
-        ids[35]=34; names[35]="Qatar";           syms[35]="QAT";
+        // Group E
+        ids[16]=17; names[16]="Germany";     syms[16]="GER";
+        ids[17]=18; names[17]="Curacao";     syms[17]="CUW";
+        ids[18]=19; names[18]="Ivory Coast"; syms[18]="CIV";
+        ids[19]=20; names[19]="Ecuador";     syms[19]="ECU";
 
-        // CAF (9)
-        ids[36]=35; names[36]="Morocco";         syms[36]="MAR";
-        ids[37]=36; names[37]="Senegal";         syms[37]="SEN";
-        ids[38]=38; names[38]="Egypt";           syms[38]="EGY";
-        ids[39]=39; names[39]="Ghana";           syms[39]="GHA";
-        ids[40]=40; names[40]="South Africa";    syms[40]="RSA";
-        ids[41]=41; names[41]="Ivory Coast";     syms[41]="CIV";
-        ids[42]=42; names[42]="Algeria";         syms[42]="ALG";
-        ids[43]=43; names[43]="Tunisia";         syms[43]="TUN";
-        ids[44]=44; names[44]="Cape Verde";      syms[44]="CPV";
+        // Group F
+        ids[20]=21; names[20]="Netherlands"; syms[20]="NED";
+        ids[21]=22; names[21]="Japan";       syms[21]="JPN";
+        ids[22]=23; names[22]="Sweden";      syms[22]="SWE";
+        ids[23]=24; names[23]="Tunisia";     syms[23]="TUN";
 
-        // OFC (1)
-        ids[45]=49; names[45]="New Zealand";     syms[45]="NZL";
+        // Group G
+        ids[24]=25; names[24]="Belgium";     syms[24]="BEL";
+        ids[25]=26; names[25]="Egypt";       syms[25]="EGY";
+        ids[26]=27; names[26]="Iran";        syms[26]="IRN";
+        ids[27]=28; names[27]="New Zealand"; syms[27]="NZL";
 
-        // Inter-confederation playoff winners (2) - isPlaceholder; replace when confirmed
-        ids[46]=64; names[46]="IC Playoff Winner 1"; syms[46]="IP1";
-        ids[47]=65; names[47]="IC Playoff Winner 2"; syms[47]="IP2";
+        // Group H
+        ids[28]=29; names[28]="Spain";       syms[28]="ESP";
+        ids[29]=30; names[29]="Cape Verde";  syms[29]="CPV";
+        ids[30]=31; names[30]="Saudi Arabia";syms[30]="KSA";
+        ids[31]=32; names[31]="Uruguay";     syms[31]="URU";
+
+        // Group I
+        ids[32]=33; names[32]="France";      syms[32]="FRA";
+        ids[33]=34; names[33]="Senegal";     syms[33]="SEN";
+        ids[34]=35; names[34]="IC Playoff 1";syms[34]="IP1"; // isPlaceholder
+        ids[35]=36; names[35]="Norway";      syms[35]="NOR";
+
+        // Group J
+        ids[36]=37; names[36]="Argentina";   syms[36]="ARG";
+        ids[37]=38; names[37]="Algeria";     syms[37]="ALG";
+        ids[38]=39; names[38]="Austria";     syms[38]="AUT";
+        ids[39]=40; names[39]="Jordan";      syms[39]="JOR";
+
+        // Group K
+        ids[40]=41; names[40]="Portugal";    syms[40]="POR";
+        ids[41]=42; names[41]="IC Playoff 2";syms[41]="IP2"; // isPlaceholder
+        ids[42]=43; names[42]="Uzbekistan";  syms[42]="UZB";
+        ids[43]=44; names[43]="Colombia";    syms[43]="COL";
+
+        // Group L
+        ids[44]=45; names[44]="England";     syms[44]="ENG";
+        ids[45]=46; names[45]="Croatia";     syms[45]="CRO";
+        ids[46]=47; names[46]="Ghana";       syms[46]="GHA";
+        ids[47]=48; names[47]="Panama";      syms[47]="PAN";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -320,17 +320,18 @@ Required GitHub secrets:
 
 ## Contract Addresses
 
-| Contract | Testnet | Mainnet |
+| Contract | X Layer Testnet (1952) | X Layer Mainnet (196) |
 |---|---|---|
-| MockUSDC | TBD | TBD |
-| ConvictionVault | TBD | TBD |
-| VARMarket | TBD | TBD |
-| MatchOracle | TBD | TBD |
-| ChampionPool | TBD | TBD |
-| StadiumHook | TBD | TBD |
-| TeamFactory | TBD | TBD |
-
-*Update after deployment.*
+| MockUSDC | `0xab87caF62157AD17b07473a02FD4bB50DFefF72F` | N/A |
+| Treasury | `0x55EC7211E5EB2A2761be3C455813fBBe0C331227` | TBD |
+| ConvictionVault | `0xb1059Fda29493B00F83a77aD0A633f8b97b306EA` | TBD |
+| VARMarket | `0x46E7E0615fbe0c0Db876F4c5E7B2eC6fCdbaF358` | TBD |
+| MatchOracle | `0x7b1E506b37f6FCa058176dc208184fBEB9F5F338` | TBD |
+| ChampionPool | `0xfE7a4fDA91dc6FC0a607ebAFb9a49Ca317D05A5b` | TBD |
+| StadiumNFT | `0xf081BB46cb46Cedc1B1D8b29b70C1E8038294c3A` | TBD |
+| StadiumHook | `0xC529f376Af39fa58Da592447Cc659cdD58bb4cc0` | TBD |
+| TeamFactory | `0x60dDFE8207474c55c34bfe0474987c1076D5E855` | TBD |
+| PoolManager | `0xb5E3F0eeE2094c764808de784398eAf1Cd25A4ec` [demo] | TBD |
 
 ---
 
