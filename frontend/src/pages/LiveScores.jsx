@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { getFixtures, getStandings } from '../services/footballData'
+import { getFixtures, getGroupStandings, getProviderStatus } from '../services/footballData'
 import ScoreboardCard from '../components/ScoreboardCard'
 
-const REFRESH_MS = 30_000 // poll live scores every 30 s
+const REFRESH_MS  = 30_000
+const API_BASE    = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
 
 /* Mock hook state per matchId — in production, read from on-chain events */
 function mockHookState(match) {
@@ -39,12 +40,41 @@ function StatusFilter({ value, onChange }) {
   )
 }
 
-function StandingsTable({ rows }) {
+function StandingsTable({ groups }) {
+  const [activeGroup, setActiveGroup] = useState(0)
+  if (!groups || groups.length === 0) return null
+
+  const current = groups[activeGroup] ?? groups[0]
+  const rows    = current?.table ?? []
+
   return (
     <div className="border border-stadium-border overflow-hidden">
-      <div className="bg-stadium-dark px-4 py-2 border-b border-stadium-border">
-        <span className="font-mono text-stadium-muted text-xs uppercase tracking-widest">Group Standings</span>
-      </div>
+      {/* Group tabs */}
+      {groups.length > 1 && (
+        <div className="flex overflow-x-auto bg-stadium-dark border-b border-stadium-border">
+          {groups.map((g, i) => {
+            const label = g.group.replace('GROUP_', '')
+            return (
+              <button
+                key={g.group}
+                onClick={() => setActiveGroup(i)}
+                className={`px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-widest flex-shrink-0 transition-colors ${
+                  i === activeGroup
+                    ? 'text-stadium-green border-b-2 border-stadium-green'
+                    : 'text-stadium-muted hover:text-stadium-text'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {groups.length === 1 && (
+        <div className="bg-stadium-dark px-4 py-2 border-b border-stadium-border">
+          <span className="font-mono text-stadium-muted text-xs uppercase tracking-widest">Group Standings</span>
+        </div>
+      )}
       <table className="w-full text-xs font-mono">
         <thead>
           <tr className="text-stadium-muted border-b border-stadium-border/50">
@@ -55,7 +85,7 @@ function StandingsTable({ rows }) {
             <th className="text-center px-2 py-2 font-normal">D</th>
             <th className="text-center px-2 py-2 font-normal">L</th>
             <th className="text-center px-2 py-2 font-normal">GD</th>
-            <th className="text-center px-2 py-2 font-normal font-bold text-stadium-text">Pts</th>
+            <th className="text-center px-2 py-2 font-bold text-stadium-text">Pts</th>
           </tr>
         </thead>
         <tbody>
@@ -85,19 +115,60 @@ function StandingsTable({ rows }) {
   )
 }
 
+function ProviderPanel({ status, onSync, syncing }) {
+  const isLive = status?.provider === 'football-data.org'
+  return (
+    <div className="border border-stadium-border bg-stadium-dark p-4 font-mono text-xs">
+      <div className="text-stadium-muted uppercase tracking-widest mb-3">Data Source</div>
+      <div className="flex items-center gap-2 mb-1">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isLive ? 'bg-stadium-green' : 'bg-stadium-gold'}`} />
+        <span className={isLive ? 'text-stadium-green' : 'text-stadium-gold'}>
+          {isLive ? 'football-data.org' : 'Mock data'}
+        </span>
+      </div>
+      <div className="text-stadium-muted leading-relaxed">
+        {isLive
+          ? 'Trusted sports-data relayer · Results posted to MatchOracle by keeper'
+          : 'Set FOOTBALL_API_KEY on the backend to enable live scores'}
+      </div>
+      {status?.lastFetch > 0 && (
+        <div className="text-stadium-muted mt-2">
+          {status.matchCount} fixtures · last fetch {new Date(status.lastFetch).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      )}
+      <div className="text-stadium-muted mt-3">Auto-refreshes every 30 s</div>
+      <button
+        onClick={onSync}
+        disabled={syncing}
+        className="mt-3 w-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest border border-stadium-border text-stadium-muted hover:text-stadium-text hover:border-stadium-green transition-colors disabled:opacity-40"
+        style={{ borderRadius: 2 }}
+      >
+        {syncing ? 'Syncing…' : 'Trigger Oracle Sync'}
+      </button>
+    </div>
+  )
+}
+
 export default function LiveScores() {
-  const [fixtures,   setFixtures]   = useState([])
-  const [standings,  setStandings]  = useState([])
-  const [filter,     setFilter]     = useState('all')
-  const [loading,    setLoading]    = useState(true)
-  const [lastUpdate, setLastUpdate] = useState(null)
-  const [error,      setError]      = useState(null)
+  const [fixtures,    setFixtures]    = useState([])
+  const [groups,      setGroups]      = useState([])
+  const [filter,      setFilter]      = useState('all')
+  const [loading,     setLoading]     = useState(true)
+  const [lastUpdate,  setLastUpdate]  = useState(null)
+  const [error,       setError]       = useState(null)
+  const [status,      setStatus]      = useState(null)
+  const [syncing,     setSyncing]     = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [fix, stand] = await Promise.all([getFixtures(), getStandings()])
+      const [fix, grps, prov] = await Promise.all([
+        getFixtures(),
+        getGroupStandings(),
+        getProviderStatus(),
+      ])
       setFixtures(fix)
-      setStandings(stand)
+      setGroups(grps)
+      setStatus(prov)
       setLastUpdate(new Date())
       setError(null)
     } catch (e) {
@@ -113,8 +184,21 @@ export default function LiveScores() {
     return () => clearInterval(interval)
   }, [load])
 
-  const filtered = fixtures.filter(m => filter === 'all' || m.status === filter || (filter === 'live' && m.status === 'halftime'))
+  async function triggerSync() {
+    setSyncing(true)
+    try {
+      await fetch(`${API_BASE}/api/admin/sync`, { method: 'POST' })
+      await load()
+    } catch {
+      /* ignore */
+    } finally {
+      setSyncing(false)
+    }
+  }
 
+  const filtered  = fixtures.filter(m =>
+    filter === 'all' || m.status === filter || (filter === 'live' && m.status === 'halftime')
+  )
   const liveCount = fixtures.filter(m => m.status === 'live' || m.status === 'halftime').length
 
   return (
@@ -176,27 +260,10 @@ export default function LiveScores() {
             )}
           </div>
 
-          {/* Right: Standings */}
+          {/* Right: Standings + Provider */}
           <div className="space-y-6">
-            <StandingsTable rows={standings} />
-
-            {/* Provider info */}
-            <div className="border border-stadium-border bg-stadium-dark p-4 font-mono text-xs">
-              <div className="text-stadium-muted uppercase tracking-widest mb-3">Data Provider</div>
-              {import.meta.env.VITE_API_FOOTBALL_KEY ? (
-                <div className="text-stadium-green">API-Football · Live</div>
-              ) : import.meta.env.VITE_SPORTMONKS_KEY ? (
-                <div className="text-stadium-green">Sportmonks · Live</div>
-              ) : (
-                <>
-                  <div className="text-stadium-gold">Mock data · No API key set</div>
-                  <div className="text-stadium-muted mt-2 leading-relaxed">
-                    Set VITE_API_FOOTBALL_KEY or VITE_SPORTMONKS_KEY in .env to enable live scores.
-                  </div>
-                </>
-              )}
-              <div className="text-stadium-muted mt-3">Auto-refreshes every 30s</div>
-            </div>
+            <StandingsTable groups={groups} />
+            <ProviderPanel status={status} onSync={triggerSync} syncing={syncing} />
           </div>
         </div>
       )}

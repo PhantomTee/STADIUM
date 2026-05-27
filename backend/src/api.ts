@@ -3,9 +3,12 @@ import { publicClient } from './chain'
 import { MATCH_ORACLE_ABI, CONVICTION_VAULT_ABI, CONVICTION_DEPOSITED_EVENT } from './abis'
 import { config } from './config'
 import { getCachedMatches } from './football'
+import { footballRouter } from './footballRoutes'
 import { state } from './state'
 
 export const router = Router()
+
+router.use('/football', footballRouter)
 
 // GET /api/matches
 // Returns football API cache merged with keeper sync state
@@ -118,5 +121,21 @@ router.get('/stats', async (_req: Request, res: Response) => {
     })
   } catch (e) {
     res.status(500).json({ error: 'Stats unavailable' })
+  }
+})
+
+// POST /api/admin/sync
+// Manually trigger a keeper cycle (oracle sync + settlement). Guarded by ADMIN_KEY.
+router.post('/admin/sync', async (req: Request, res: Response) => {
+  const adminKey = process.env.ADMIN_KEY
+  if (adminKey && req.headers['x-admin-key'] !== adminKey) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  try {
+    const { runKeeper } = await import('./keeper')
+    await runKeeper()
+    res.json({ ok: true, message: 'Keeper sync triggered', ts: Date.now() })
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message ?? 'Sync failed' })
   }
 })
