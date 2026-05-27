@@ -6,35 +6,58 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IConvictionHook {
-    function getTeamBackers(string memory team) external view returns (address[] memory);
-    function convictionDeposit(address user, string memory team) external view returns (uint256);
-    function totalConvictionLocked(string memory team) external view returns (uint256);
+interface IConvictionVault {
+    function teamTotalDeposit(uint16 teamId) external view returns (uint256);
+    function getUserDeposit(address user, uint16 teamId) external view returns (uint256);
 }
 
-/// @notice Accumulates USDC losses and distributes to World Cup champion backers
+/// @notice Pull-based champion pool. Accumulates USDC from eliminations and VAR market losses,
+///         then allows champion backers to pull their proportional share once the champion is set.
+///
+/// Share math:
+///   share = userDeposit * championPoolSnapshot / totalChampionStake
+///
+/// CRITICAL ORDER (enforced by MatchOracle):
+///   1. ChampionPool.setChampion() must be called FIRST — reads vault.teamTotalDeposit() before
+///      any champion principal claims could drain deposits.
+///   2. ConvictionVault.setChampion() is called SECOND — allows principal claims.
 contract ChampionPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    // ─────────────────────────────── State ───────────────────────────────
+
     IERC20 public immutable usdc;
 
-    address public convictionHook;
+    IConvictionVault public vault;
     address public varMarket;
     address public oracle;
 
+    /// @notice Which addresses can call recordDeposit (convictionVault + varMarket)
+    mapping(address => bool) public authorized;
+
+    /// @notice Cumulative USDC recorded via recordDeposit
     uint256 public totalAccumulated;
-    bool public distributionComplete;
-    string public champion;
+
+    uint16  public championTeamId;
+    /// @notice USDC balance of this contract at the moment setChampion was called
+    uint256 public championPoolSnapshot;
+    /// @notice vault.teamTotalDeposit(championTeamId) at the moment setChampion was called
+    uint256 public totalChampionStake;
+    bool    public championSet;
+
+    /// @notice Per-user-team claim guard
+    mapping(address => mapping(uint16 => bool)) public champClaimed;
+
+    // ─────────────────────────────── Events ───────────────────────────────
 
     event Deposited(address indexed from, uint256 amount);
-    event Distributed(string winningTeam, uint256 totalDistributed);
-    event BackerPaid(address indexed backer, uint256 amount);
+    event ChampionDeclared(uint16 indexed teamId, uint256 poolSnapshot, uint256 totalStake);
+    event ChampionShareClaimed(address indexed user, uint16 indexed teamId, uint256 share);
+
+    // ─────────────────────────────── Modifiers ───────────────────────────────
 
     modifier onlyAuthorized() {
-        require(
-            msg.sender == convictionHook || msg.sender == varMarket,
-            "ChampionPool: unauthorized"
-        );
+        require(authorized[msg.sender], "ChampionPool: not authorized");
         _;
     }
 
@@ -43,69 +66,88 @@ contract ChampionPool is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(address _usdc, address initialOwner) Ownable(initialOwner) {
+    // ─────────────────────────────── Constructor ───────────────────────────────
+
+    constructor(address _usdc, address _owner) Ownable(_owner) {
         require(_usdc != address(0), "ChampionPool: zero usdc");
         usdc = IERC20(_usdc);
     }
 
-    /// @notice One-time address wiring, owner only
-    function setAddresses(address _convictionHook, address _varMarket, address _oracle) external onlyOwner {
-        require(oracle == address(0), "ChampionPool: already set");
-        require(_convictionHook != address(0), "ChampionPool: zero hook");
-        require(_varMarket != address(0), "ChampionPool: zero market");
-        require(_oracle != address(0), "ChampionPool: zero oracle");
-        convictionHook = _convictionHook;
+    // ─────────────────────────────── Admin ───────────────────────────────
+
+    /// @notice Wire up vault, varMarket, and oracle. Can be called by owner; updates addresses.
+    function setAddresses(
+        address _vault,
+        address _varMarket,
+        address _oracle
+    ) external onlyOwner {
+        require(_vault    != address(0), "ChampionPool: zero vault");
+        require(_varMarket != address(0), "ChampionPool: zero varMarket");
+        require(_oracle   != address(0), "ChampionPool: zero oracle");
+
+        // Revoke old authorizations
+        if (address(vault) != address(0)) authorized[address(vault)]    = false;
+        if (varMarket      != address(0)) authorized[varMarket]         = false;
+
+        vault    = IConvictionVault(_vault);
         varMarket = _varMarket;
-        oracle = _oracle;
+        oracle   = _oracle;
+
+        // Grant new authorizations
+        authorized[_vault]    = true;
+        authorized[_varMarket] = true;
     }
 
-    /// @notice Tokens are transferred directly; this call just updates the accounting counter
+    // ─────────────────────────────── Authorized inflow ───────────────────────────────
+
+    /// @notice Record an inbound USDC deposit (tokens must already be transferred to this contract).
+    ///         Called by ConvictionVault and VARMarket after safeTransfer.
     function recordDeposit(uint256 amount) external onlyAuthorized {
         totalAccumulated += amount;
         emit Deposited(msg.sender, amount);
     }
 
-    /// @notice Oracle triggers proportional distribution to champion backers.
-    ///         Must be called BEFORE ConvictionHook.settleChampion() so deposits are still non-zero.
-    function distribute(string memory winningTeam) external onlyOracle nonReentrant {
-        require(!distributionComplete, "ChampionPool: already distributed");
+    // ─────────────────────────────── Oracle ───────────────────────────────
 
-        uint256 balance = usdc.balanceOf(address(this));
-        if (balance == 0) {
-            distributionComplete = true;
-            champion = winningTeam;
-            emit Distributed(winningTeam, 0);
-            return;
-        }
+    /// @notice Snapshot the pool balance and champion stake. Must be called BEFORE
+    ///         ConvictionVault.setChampion() so teamTotalDeposit is still intact.
+    function setChampion(uint16 teamId) external onlyOracle {
+        require(!championSet, "ChampionPool: champion already set");
 
-        address[] memory backers = IConvictionHook(convictionHook).getTeamBackers(winningTeam);
-        uint256 teamTotal = IConvictionHook(convictionHook).totalConvictionLocked(winningTeam);
+        // Snapshot total champion stake from vault (read before any claims can drain it)
+        totalChampionStake   = vault.teamTotalDeposit(teamId);
+        // Snapshot current USDC balance of this contract
+        championPoolSnapshot = usdc.balanceOf(address(this));
+        championTeamId       = teamId;
+        championSet          = true;
 
-        if (backers.length == 0 || teamTotal == 0) {
-            distributionComplete = true;
-            champion = winningTeam;
-            emit Distributed(winningTeam, 0);
-            return;
-        }
-
-        uint256 distributed = 0;
-        for (uint256 i = 0; i < backers.length; i++) {
-            address backer = backers[i];
-            uint256 backerDeposit = IConvictionHook(convictionHook).convictionDeposit(backer, winningTeam);
-            if (backerDeposit == 0) continue;
-            uint256 share = (backerDeposit * balance) / teamTotal;
-            if (share > 0) {
-                usdc.safeTransfer(backer, share);
-                distributed += share;
-                emit BackerPaid(backer, share);
-            }
-        }
-
-        // Mark complete only after all transfers succeed
-        distributionComplete = true;
-        champion = winningTeam;
-        emit Distributed(winningTeam, distributed);
+        emit ChampionDeclared(teamId, championPoolSnapshot, totalChampionStake);
     }
+
+    // ─────────────────────────────── User: claim ───────────────────────────────
+
+    /// @notice Pull proportional share of the champion pool.
+    ///         share = userDeposit * championPoolSnapshot / totalChampionStake
+    function claimChampionPool(uint16 teamId) external nonReentrant {
+        require(championSet,                "ChampionPool: champion not set");
+        require(teamId == championTeamId,   "ChampionPool: wrong team");
+        require(!champClaimed[msg.sender][teamId], "ChampionPool: already claimed");
+
+        uint256 dep = vault.getUserDeposit(msg.sender, teamId);
+        require(dep > 0,                    "ChampionPool: no deposit");
+        require(totalChampionStake > 0,     "ChampionPool: zero stake");
+
+        champClaimed[msg.sender][teamId] = true;
+
+        uint256 share = dep * championPoolSnapshot / totalChampionStake;
+        if (share > 0) {
+            usdc.safeTransfer(msg.sender, share);
+        }
+
+        emit ChampionShareClaimed(msg.sender, teamId, share);
+    }
+
+    // ─────────────────────────────── View ───────────────────────────────
 
     function getBalance() external view returns (uint256) {
         return usdc.balanceOf(address(this));

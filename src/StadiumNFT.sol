@@ -6,12 +6,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-/// @notice Mints EliminationBadge (type 0) and ChampionNFT (type 1) with on-chain SVG metadata
+/// @notice Mints EliminationBadge (type 0) and ChampionNFT (type 1) with on-chain SVG metadata.
+///         Caller must be the ConvictionVault (replaces old ConvictionHook).
 contract StadiumNFT is ERC721, Ownable {
     using Strings for uint256;
 
     uint256 private _tokenIdCounter;
-    address public convictionHook;
+    address public convictionVault;
 
     struct TokenData {
         uint8 tokenType;       // 0 = EliminationBadge, 1 = ChampionNFT
@@ -27,16 +28,16 @@ contract StadiumNFT is ERC721, Ownable {
     event EliminationBadgeMinted(address indexed to, string team, uint256 tokenId);
     event ChampionNFTMinted(address indexed to, string team, uint256 tokenId);
 
-    modifier onlyHook() {
-        require(msg.sender == convictionHook, "StadiumNFT: not hook");
+    modifier onlyVault() {
+        require(msg.sender == convictionVault, "StadiumNFT: not vault");
         _;
     }
 
     constructor(address initialOwner) ERC721("STADIUM NFT", "STDM") Ownable(initialOwner) {}
 
-    function setConvictionHook(address _hook) external onlyOwner {
-        require(_hook != address(0), "StadiumNFT: zero hook");
-        convictionHook = _hook;
+    function setConvictionVault(address _vault) external onlyOwner {
+        require(_vault != address(0), "StadiumNFT: zero vault");
+        convictionVault = _vault;
     }
 
     function mintChampionNFT(
@@ -44,7 +45,7 @@ contract StadiumNFT is ERC721, Ownable {
         string memory team,
         uint256 depositAmount,
         uint256 totalEarned
-    ) external onlyHook returns (uint256) {
+    ) external onlyVault returns (uint256) {
         uint256 tokenId = ++_tokenIdCounter;
         _safeMint(to, tokenId);
         tokenData[tokenId] = TokenData({
@@ -64,7 +65,7 @@ contract StadiumNFT is ERC721, Ownable {
         string memory team,
         uint256 depositAmount,
         string memory round
-    ) external onlyHook returns (uint256) {
+    ) external onlyVault returns (uint256) {
         uint256 tokenId = ++_tokenIdCounter;
         _safeMint(to, tokenId);
         tokenData[tokenId] = TokenData({

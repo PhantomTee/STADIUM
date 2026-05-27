@@ -2,227 +2,176 @@
 pragma solidity ^0.8.26;
 
 import {Test, console} from "forge-std/Test.sol";
-import {MockUSDC} from "../src/MockUSDC.sol";
-import {ChampionPool} from "../src/ChampionPool.sol";
-import {StadiumNFT} from "../src/StadiumNFT.sol";
-import {MatchOracle} from "../src/MatchOracle.sol";
-import {ConvictionHook} from "../src/ConvictionHook.sol";
-import {VARMarket} from "../src/VARMarket.sol";
-import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
-import {PoolManager} from "@uniswap/v4-core/PoolManager.sol";
-import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
-import {Currency} from "@uniswap/v4-core/types/Currency.sol";
-import {IHooks} from "@uniswap/v4-core/interfaces/IHooks.sol";
+import {ConvictionVault} from "../src/ConvictionVault.sol";
+import {VARMarket}       from "../src/VARMarket.sol";
+import {ChampionPool}    from "../src/ChampionPool.sol";
+import {MatchOracle}     from "../src/MatchOracle.sol";
+import {MockUSDC}        from "../src/MockUSDC.sol";
 
-/// @notice Full tournament simulation: group stage → knockout → final → champion distribution
+/// @notice Full protocol integration tests (4 tests) — connect all contracts
 contract IntegrationTest is Test {
-    MockUSDC usdc;
-    ChampionPool champPool;
-    StadiumNFT nft;
-    MatchOracle oracle;
-    ConvictionHook hook;
-    VARMarket varMarket;
-    PoolManager poolManager;
+    MockUSDC        usdc;
+    ConvictionVault vault;
+    VARMarket       varMarket;
+    ChampionPool    champPool;
+    MatchOracle     oracle;
 
-    address deployer = address(0x1);
-    address treasury = address(0x2);
+    address deployer  = address(this);
+    address treasury  = makeAddr("treasury");
 
-    // 5 users backing 4 teams
-    address alice = address(0x10);   // backs Argentina
-    address bob = address(0x11);     // backs France
-    address charlie = address(0x12); // backs Brazil
-    address dave = address(0x13);    // backs France
-    address eve = address(0x14);     // backs Argentina (champion)
+    address alice = makeAddr("alice"); // backs Argentina (id 37)
+    address bob   = makeAddr("bob");   // backs France (id 33)
+
+    uint16 constant ARG  = 37;
+    uint16 constant FRA  = 33;
+    uint16 constant BRA  = 9;
+
+    uint256 constant MATCH_1 = 1001;
 
     function setUp() public {
-        vm.startPrank(deployer);
-
-        poolManager = new PoolManager(deployer);
-        usdc = new MockUSDC();
+        usdc      = new MockUSDC();
         champPool = new ChampionPool(address(usdc), deployer);
-        nft = new StadiumNFT(deployer);
-        oracle = new MatchOracle(deployer, treasury);
-        hook = new ConvictionHook(IPoolManager(address(poolManager)), address(usdc), treasury, deployer);
-        varMarket = new VARMarket(address(usdc), address(oracle), address(hook), treasury, address(champPool));
+        oracle    = new MatchOracle(deployer, treasury);
+        vault     = new ConvictionVault(address(usdc), treasury, deployer);
+        varMarket = new VARMarket(
+            address(usdc),
+            address(oracle),
+            address(vault),
+            treasury,
+            address(champPool)
+        );
 
-        hook.setOracle(address(oracle));
-        hook.setChampionPool(address(champPool));
-        hook.setVarMarket(address(varMarket));
-        hook.setStadiumNFT(address(nft));
+        // Wire addresses
+        vault.setOracle(address(oracle));
+        vault.setChampionPool(address(champPool));
 
-        oracle.setAddresses(address(hook), address(varMarket), address(champPool));
-        champPool.setAddresses(address(hook), address(varMarket), address(oracle));
-        nft.setConvictionHook(address(hook));
+        oracle.setAddresses(address(vault), address(varMarket), address(champPool));
 
-        PoolKey memory key = PoolKey({
-            currency0: Currency.wrap(address(usdc)),
-            currency1: Currency.wrap(address(usdc)),
-            fee: 3000,
-            tickSpacing: 60,
-            hooks: IHooks(address(hook))
-        });
-        hook.registerTeam("Argentina", key);
-        hook.registerTeam("France", key);
-        hook.registerTeam("Brazil", key);
-        hook.registerTeam("Germany", key);
+        champPool.setAddresses(address(vault), address(varMarket), address(oracle));
 
-        // Fund users
-        usdc.mint(alice, 100_000 * 1e6);
-        usdc.mint(bob, 100_000 * 1e6);
-        usdc.mint(charlie, 100_000 * 1e6);
-        usdc.mint(dave, 100_000 * 1e6);
-        usdc.mint(eve, 100_000 * 1e6);
+        // Mint and approve
+        usdc.mint(alice, 5_000e6);
+        usdc.mint(bob,   5_000e6);
 
-        vm.stopPrank();
+        vm.prank(alice); usdc.approve(address(vault),     type(uint256).max);
+        vm.prank(alice); usdc.approve(address(varMarket), type(uint256).max);
+        vm.prank(bob);   usdc.approve(address(vault),     type(uint256).max);
+        vm.prank(bob);   usdc.approve(address(varMarket), type(uint256).max);
+
+        // Register teams
+        oracle.registerTeam(ARG, "Argentina");
+        oracle.registerTeam(FRA, "France");
+        oracle.registerTeam(BRA, "Brazil");
     }
 
-    function test_full_tournament_simulation() public {
-        // ─── Phase 1: Initial CONVICTION deposits ───
+    // ── Test 1: Full elimination flow ─────────────────────────────────────────
+
+    function test_EliminationFlow_EndToEnd() public {
+        // Alice backs Argentina 1000, Bob backs France 1000
+        vm.prank(alice); vault.depositConviction(ARG, 1_000e6);
+        vm.prank(bob);   vault.depositConviction(FRA, 1_000e6);
+
+        uint256 champBefore = usdc.balanceOf(address(champPool));
+
+        // Argentina is eliminated
+        oracle.postElimination(ARG);
+
+        // forfeited = 500e6, champShare = 250e6 (50% of forfeited)
+        assertEq(usdc.balanceOf(address(champPool)) - champBefore, 250e6, "Champ pool must receive 250e6");
+
+        // Bob (France, alive) earned survivor yield: 500 * 20% = 100e6
+        uint256 bobPending = vault.pendingYield(bob);
+        assertApproxEqAbs(bobPending, 100e6, 1, "Bob survivor yield mismatch");
+
+        // Alice can claim 50% refund
+        uint256 aliceBefore = usdc.balanceOf(alice);
         vm.prank(alice);
-        usdc.approve(address(hook), 1000 * 1e6);
-        vm.prank(alice);
-        hook.depositConviction("Argentina", 1000 * 1e6);
-
-        vm.prank(bob);
-        usdc.approve(address(hook), 2000 * 1e6);
-        vm.prank(bob);
-        hook.depositConviction("France", 2000 * 1e6);
-
-        vm.prank(charlie);
-        usdc.approve(address(hook), 1500 * 1e6);
-        vm.prank(charlie);
-        hook.depositConviction("Brazil", 1500 * 1e6);
-
-        vm.prank(dave);
-        usdc.approve(address(hook), 500 * 1e6);
-        vm.prank(dave);
-        hook.depositConviction("France", 500 * 1e6);
-
-        vm.prank(eve);
-        usdc.approve(address(hook), 3000 * 1e6);
-        vm.prank(eve);
-        hook.depositConviction("Argentina", 3000 * 1e6);
-
-        uint256 totalLocked = hook.totalAliveConvictionLocked();
-        assertEq(totalLocked, 8000 * 1e6, "Total should be 8000 USDC");
-
-        // ─── Phase 2: Group stage match + VAR ───
-        vm.prank(deployer);
-        oracle.createMatch(1, "Brazil", "Germany", block.timestamp + 2 hours);
-        vm.prank(deployer);
-        oracle.openVARWindow(1);
-
-        // Place VAR bets
-        vm.prank(alice);
-        usdc.approve(address(varMarket), 200 * 1e6);
-        vm.prank(alice);
-        varMarket.placeBet(1, 0, "teamA", 200 * 1e6); // Alice bets Brazil wins
-
-        vm.prank(charlie);
-        usdc.approve(address(varMarket), 100 * 1e6);
-        vm.prank(charlie);
-        varMarket.placeBet(1, 0, "teamB", 100 * 1e6); // Charlie bets Germany wins
-
-        vm.prank(deployer);
-        oracle.startMatch(1);
-
-        // Brazil wins
-        vm.prank(deployer);
-        oracle.postResult(1, "teamA", "teamA", false, false);
-
-        // Alice should have received payout (bet on teamA = Brazil)
-        console.log("Alice VAR payout from match 1");
-
-        // ─── Phase 3: Germany eliminated ───
-        uint256 aliceYieldBefore = hook.accruedYield(alice);
-
-        vm.prank(deployer);
-        oracle.postElimination("Germany");
-
-        // ─── Phase 4: France eliminated ───
-        uint256 aliceYieldAfterGermany = hook.accruedYield(alice);
-        assertGe(aliceYieldAfterGermany, aliceYieldBefore, "Alice yield should increase on Germany elimination");
-
-        uint256 bobBalanceBefore = usdc.balanceOf(bob);
-        uint256 daveBalanceBefore = usdc.balanceOf(dave);
-
-        vm.prank(deployer);
-        oracle.postElimination("France");
-
-        // Bob and Dave should have received 50% back + their yield
-        uint256 bobBalance = usdc.balanceOf(bob);
-        uint256 daveBalance = usdc.balanceOf(dave);
-
-        assertGe(bobBalance, bobBalanceBefore + 1000 * 1e6, "Bob gets at least 50% back");
-        assertGe(daveBalance, daveBalanceBefore + 250 * 1e6, "Dave gets at least 50% back");
-
-        // NFT badges minted
-        assertEq(nft.totalSupply(), 2, "2 elimination badges minted");
-
-        // ─── Phase 5: Brazil eliminated ───
-        vm.prank(deployer);
-        oracle.postElimination("Brazil");
-
-        // ─── Phase 6: Argentina is champion ───
-        uint256 aliceBalanceBefore = usdc.balanceOf(alice);
-        uint256 eveBalanceBefore = usdc.balanceOf(eve);
-        uint256 champPoolBalance = champPool.getBalance();
-
-        console.log("Champion Pool balance before distribution:", champPoolBalance);
-
-        vm.prank(deployer);
-        oracle.postChampion("Argentina");
-
-        uint256 aliceBalance = usdc.balanceOf(alice);
-        uint256 eveBalance = usdc.balanceOf(eve);
-
-        // Alice had 1000 USDC conviction + yield, should get all back
-        assertGe(aliceBalance, aliceBalanceBefore + 1000 * 1e6, "Alice gets principal back");
-        // Eve had 3000 USDC, should get principal + yield back
-        assertGe(eveBalance, eveBalanceBefore + 3000 * 1e6, "Eve gets principal back");
-
-        // Champion NFTs minted (2 champion NFTs for Alice and Eve)
-        assertEq(nft.totalSupply(), 5, "5 NFTs total: 3 badges + 2 champion");
-
-        console.log("=== Integration test passed ===");
-        console.log("Final champion pool distributed:", champPoolBalance);
+        vault.claimEliminatedPosition(ARG);
+        assertApproxEqAbs(usdc.balanceOf(alice) - aliceBefore, 500e6, 1, "Alice 50% refund mismatch");
     }
 
-    function test_treasury_receives_funds() public {
-        // Multiple eliminations should fill treasury
-        vm.prank(charlie);
-        usdc.approve(address(hook), 1000 * 1e6);
-        vm.prank(charlie);
-        hook.depositConviction("Brazil", 1000 * 1e6);
+    // ── Test 2: VAR bet → settle → claim flows through all contracts ─────────
 
+    function test_VAR_PlaceBetSettleClaim() public {
+        vm.prank(alice); vault.depositConviction(ARG, 500e6);
+
+        // Create and open match
+        oracle.createMatch(MATCH_1, ARG, FRA, block.timestamp + 3600);
+        oracle.openVARWindow(MATCH_1);
+
+        // Alice bets on Argentina (outcome 1)
+        vm.prank(alice);
+        varMarket.placeBet(MATCH_1, 0, 1, 100e6); // OUTCOME_TEAM_A = 1
+
+        // Bob bets on France (outcome 2)
         vm.prank(bob);
-        usdc.approve(address(hook), 1000 * 1e6);
+        varMarket.placeBet(MATCH_1, 0, 2, 200e6); // OUTCOME_TEAM_B = 2
+
+        oracle.startMatch(MATCH_1);
+
+        // Post result: Argentina wins (winner=1, firstGoal=1, redCard=false, extraTime=false)
+        oracle.postResult(MATCH_1, 1, 1, false, false);
+
+        // Alice claims VAR — should get bet back + winners pool share
+        uint256 aliceBefore = usdc.balanceOf(alice);
+        vm.prank(alice);
+        varMarket.claimVAR(MATCH_1, 0);
+        uint256 aliceGain = usdc.balanceOf(alice) - aliceBefore;
+
+        // losingPool = 200e6, loserRefund = 20e6, remaining = 180e6
+        // toWinners = 90e6, alice is only winner → total = 100 + 90 = 190e6
+        assertApproxEqAbs(aliceGain, 190e6, 1, "Alice VAR payout mismatch");
+
+        // Bob claims 10% refund
+        uint256 bobBefore = usdc.balanceOf(bob);
         vm.prank(bob);
-        hook.depositConviction("France", 1000 * 1e6);
+        varMarket.claimVAR(MATCH_1, 0);
+        assertApproxEqAbs(usdc.balanceOf(bob) - bobBefore, 20e6, 1, "Bob VAR refund mismatch");
+    }
+
+    // ── Test 3: Champion pool flow ────────────────────────────────────────────
+
+    function test_ChampionPool_FlowEndToEnd() public {
+        // Alice and Bob both back Argentina
+        vm.prank(alice); vault.depositConviction(ARG, 1_000e6);
+        vm.prank(bob);   vault.depositConviction(ARG, 1_000e6);
+
+        // Fund champPool directly to simulate accumulated USDC
+        usdc.mint(address(champPool), 500e6);
+        champPool.recordDeposit(500e6);
+
+        // Declare champion — ChampionPool.setChampion first, then vault
+        oracle.postChampion(ARG);
+
+        // Snapshot = 500e6, totalStake = 2000e6 (alice + bob both 1000)
+        assertEq(champPool.championPoolSnapshot(), 500e6);
+        assertEq(champPool.totalChampionStake(),   2_000e6);
+
+        // Alice claims half the pool (500e6 * 1000/2000 = 250e6)
+        uint256 aliceBefore = usdc.balanceOf(alice);
+        vm.prank(alice);
+        champPool.claimChampionPool(ARG);
+        assertApproxEqAbs(usdc.balanceOf(alice) - aliceBefore, 250e6, 1, "Alice champion pool share mismatch");
+
+        // Alice also claims principal
+        vm.prank(alice);
+        vault.claimChampionPrincipal(ARG);
+        assertApproxEqAbs(usdc.balanceOf(alice) - aliceBefore, 1_250e6, 1, "Alice champion total mismatch");
+    }
+
+    // ── Test 4: Treasury receives correct share on elimination ───────────────
+
+    function test_Treasury_ReceivesShare() public {
+        vm.prank(alice); vault.depositConviction(ARG, 1_000e6);
+        vm.prank(bob);   vault.depositConviction(FRA, 1_000e6);
 
         uint256 treasuryBefore = usdc.balanceOf(treasury);
+        oracle.postElimination(ARG);
 
-        vm.prank(deployer);
-        oracle.postElimination("France");
-
-        uint256 treasuryAfter = usdc.balanceOf(treasury);
-        // France total = 1000, halfLost = 500, treasury = ~15% of 500 = 75 USDC
-        assertGt(treasuryAfter, treasuryBefore, "Treasury should receive funds on elimination");
-    }
-
-    function test_nft_metadata() public {
-        vm.prank(alice);
-        usdc.approve(address(hook), 1000 * 1e6);
-        vm.prank(alice);
-        hook.depositConviction("France", 1000 * 1e6);
-
-        vm.prank(deployer);
-        oracle.postElimination("France");
-
-        // Token 1 should be an EliminationBadge
-        string memory uri = nft.tokenURI(1);
-        assertTrue(bytes(uri).length > 0, "tokenURI should not be empty");
-        // Should contain base64 prefix
-        assertEq(bytes(uri)[0], bytes("d")[0]); // "data:application/json;base64,"
+        // forfeited = 500e6
+        // survivorYield = 100e6 (20%) — stays in vault for bob to pull
+        // champShare = 250e6 (50%) — to champPool
+        // treasuryShare = 150e6 (30%)
+        assertApproxEqAbs(usdc.balanceOf(treasury) - treasuryBefore, 150e6, 1, "Treasury share mismatch");
     }
 }

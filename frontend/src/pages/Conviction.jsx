@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS, formatUSDC, parseUSDC } from '../utils/contracts'
-import { MockUSDC_ABI, ConvictionHook_ABI } from '../abis'
+import { MockUSDC_ABI, ConvictionVault_ABI } from '../abis'
 import {
-  useUSDCBalance, useUSDCAllowance, useConvictionDeposit,
-  useAccruedYield, useTotalConvictionLocked, useTeamEliminated,
-  useBackerCount, useTotalAliveConvictionLocked,
+  useUSDCBalance, useUSDCAllowance,
+  useConvictionDeposit, usePendingYield,
+  useTeamTotalDeposit, useTeamEliminated, useTeamChampion,
+  useBackerCount, useTotalAliveDeposits, usePrincipalClaimed,
 } from '../hooks/useContracts'
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
@@ -16,11 +17,10 @@ export default function Conviction() {
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [amount, setAmount]             = useState('')
   const [filterGroup, setFilterGroup]   = useState('ALL')
-  const [txStep, setTxStep]             = useState('idle')
 
-  const { data: usdcBalance }  = useUSDCBalance(address)
-  const { data: allowance }    = useUSDCAllowance(address, ADDRESSES.convictionHook)
-  const { data: totalAlive }   = useTotalAliveConvictionLocked()
+  const { data: usdcBalance } = useUSDCBalance(address)
+  const { data: allowance }   = useUSDCAllowance(address, ADDRESSES.convictionVault)
+  const { data: totalAlive }  = useTotalAliveDeposits()
 
   const { writeContract, data: txHash } = useWriteContract()
   const { isLoading: txPending, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
@@ -33,23 +33,21 @@ export default function Conviction() {
   const needsApproval = allowance !== undefined && parsedAmount > 0n && allowance < parsedAmount
 
   function handleApprove() {
-    setTxStep('approving')
     writeContract({
       address: ADDRESSES.mockUSDC,
       abi: MockUSDC_ABI,
       functionName: 'approve',
-      args: [ADDRESSES.convictionHook, parsedAmount],
+      args: [ADDRESSES.convictionVault, parsedAmount],
     })
   }
 
   function handleDeposit() {
     if (!selectedTeam || !parsedAmount) return
-    setTxStep('depositing')
     writeContract({
-      address: ADDRESSES.convictionHook,
-      abi: ConvictionHook_ABI,
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
       functionName: 'depositConviction',
-      args: [selectedTeam.name, parsedAmount],
+      args: [selectedTeam.id, parsedAmount],
     })
   }
 
@@ -85,7 +83,7 @@ export default function Conviction() {
         {[
           { label: 'Total Locked',       value: `$${formatUSDC(totalAlive)}`, accent: 'text-stadium-green' },
           { label: 'Teams Competing',    value: '48',                          accent: 'text-stadium-text'  },
-          { label: 'Survivor Yield Rate', value: '10%',                        accent: 'text-stadium-gold'  },
+          { label: 'Survivor Yield Rate', value: '10% of forfeited',           accent: 'text-stadium-gold'  },
         ].map(s => (
           <div key={s.label} className="bg-stadium-card p-5 text-center">
             <div className={`text-2xl font-black tracking-tight ${s.accent}`}>{s.value}</div>
@@ -110,7 +108,7 @@ export default function Conviction() {
                       : 'bg-stadium-card text-stadium-muted hover:text-stadium-text'
                   }`}
                 >
-                  {g === 'ALL' ? 'ALL' : g}
+                  {g}
                 </button>
               ))}
             </div>
@@ -119,9 +117,9 @@ export default function Conviction() {
           <div className="grid sm:grid-cols-2 gap-px bg-stadium-border max-h-[520px] overflow-y-auto">
             {filteredTeams.map(team => (
               <TeamCard
-                key={team.name}
+                key={team.id}
                 team={team}
-                isSelected={selectedTeam?.name === team.name}
+                isSelected={selectedTeam?.id === team.id}
                 onSelect={() => setSelectedTeam(team)}
                 userAddress={address}
               />
@@ -150,7 +148,6 @@ export default function Conviction() {
                 setAmount={setAmount}
                 usdcBalance={usdcBalance}
                 needsApproval={needsApproval}
-                txStep={txStep}
                 txPending={txPending}
                 txSuccess={txSuccess}
                 onApprove={handleApprove}
@@ -187,10 +184,11 @@ export default function Conviction() {
 }
 
 function TeamCard({ team, isSelected, onSelect, userAddress }) {
-  const { data: totalLocked } = useTotalConvictionLocked(team.name)
-  const { data: backerCount } = useBackerCount(team.name)
-  const { data: eliminated }  = useTeamEliminated(team.name)
-  const { data: userDeposit } = useConvictionDeposit(userAddress, team.name)
+  const { data: totalLocked }  = useTeamTotalDeposit(team.id)
+  const { data: backerCount }  = useBackerCount(team.id)
+  const { data: eliminated }   = useTeamEliminated(team.id)
+  const { data: champion }     = useTeamChampion(team.id)
+  const { data: userDeposit }  = useConvictionDeposit(userAddress, team.id)
 
   const hasPosition = userDeposit && userDeposit > 0n
 
@@ -203,8 +201,10 @@ function TeamCard({ team, isSelected, onSelect, userAddress }) {
           ? 'border-l-stadium-green bg-stadium-green/10'
           : eliminated
           ? 'border-l-transparent bg-stadium-card opacity-40 cursor-not-allowed'
+          : champion
+          ? 'border-l-stadium-gold bg-stadium-card'
           : 'border-l-transparent bg-stadium-card hover:border-l-stadium-green/40 hover:bg-stadium-dark'
-      } ${hasPosition && !eliminated ? 'active-position' : ''}`}
+      }`}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -213,7 +213,8 @@ function TeamCard({ team, isSelected, onSelect, userAddress }) {
         </div>
         <div className="flex gap-1">
           {eliminated && <span className="badge-red">OUT</span>}
-          {hasPosition && !eliminated && <span className="badge-green">Backed</span>}
+          {champion && <span className="badge-gold">CHAMPION</span>}
+          {hasPosition && !eliminated && !champion && <span className="badge-green">Backed</span>}
         </div>
       </div>
       <div className="flex items-center justify-between text-xs font-mono text-stadium-muted">
@@ -232,17 +233,90 @@ function TeamCard({ team, isSelected, onSelect, userAddress }) {
   )
 }
 
-function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txStep, txPending, txSuccess, onApprove, onDeposit, userAddress }) {
-  const { data: userDeposit } = useConvictionDeposit(userAddress, team.name)
-  const { data: accruedYield } = useAccruedYield(userAddress)
-  const { data: eliminated }   = useTeamEliminated(team.name)
+function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPending, txSuccess, onApprove, onDeposit, userAddress }) {
+  const { data: userDeposit }    = useConvictionDeposit(userAddress, team.id)
+  const { data: pendingYield }   = usePendingYield(userAddress)
+  const { data: eliminated }     = useTeamEliminated(team.id)
+  const { data: champion }       = useTeamChampion(team.id)
+  const { data: principalClaimed } = usePrincipalClaimed(userAddress, team.id)
+
+  const { writeContract, data: claimTxHash } = useWriteContract()
+  const { isLoading: claimPending } = useWaitForTransactionReceipt({ hash: claimTxHash })
 
   const maxAmount = usdcBalance ? formatUSDC(usdcBalance).replace(/,/g, '') : '0'
+
+  function handleClaimEliminated() {
+    writeContract({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'claimEliminatedPosition',
+      args: [team.id],
+    })
+  }
+
+  function handleClaimChampion() {
+    writeContract({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'claimChampionPrincipal',
+      args: [team.id],
+    })
+  }
+
+  if (eliminated && userDeposit > 0n && !principalClaimed) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 p-3 bg-stadium-dark border border-stadium-border">
+          <span className="text-3xl">{team.flag}</span>
+          <div>
+            <div className="font-bold text-stadium-text uppercase tracking-tight">{team.name}</div>
+            <div className="text-xs text-red-400 font-mono">Eliminated</div>
+          </div>
+        </div>
+        <div className="bg-red-500/10 border border-red-500/20 p-3 text-xs font-mono">
+          <div className="flex justify-between text-red-400">
+            <span>Original stake</span>
+            <span className="font-bold">${formatUSDC(userDeposit)}</span>
+          </div>
+          <div className="flex justify-between text-stadium-muted mt-1">
+            <span>Refund (50%)</span>
+            <span className="font-bold text-stadium-text">${formatUSDC(userDeposit ? userDeposit / 2n : 0n)}</span>
+          </div>
+        </div>
+        <button onClick={handleClaimEliminated} disabled={claimPending} className="btn-primary w-full">
+          {claimPending ? 'Claiming...' : 'Claim 50% Refund'}
+        </button>
+      </div>
+    )
+  }
 
   if (eliminated) {
     return (
       <div className="text-center py-6 text-red-400 text-sm font-mono">
         {team.name} has been eliminated.
+      </div>
+    )
+  }
+
+  if (champion && userDeposit > 0n && !principalClaimed) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 p-3 bg-stadium-dark border border-stadium-border">
+          <span className="text-3xl">{team.flag}</span>
+          <div>
+            <div className="font-bold text-stadium-text uppercase tracking-tight">{team.name}</div>
+            <div className="text-xs text-stadium-gold font-mono">World Cup Champion</div>
+          </div>
+        </div>
+        <div className="bg-stadium-gold/10 border border-stadium-gold/30 p-3 text-xs font-mono">
+          <div className="flex justify-between text-stadium-gold">
+            <span>Full principal return</span>
+            <span className="font-bold">${formatUSDC(userDeposit)}</span>
+          </div>
+        </div>
+        <button onClick={handleClaimChampion} disabled={claimPending} className="btn-primary w-full">
+          {claimPending ? 'Claiming...' : 'Claim Champion Principal'}
+        </button>
       </div>
     )
   }
@@ -266,8 +340,8 @@ function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txSt
             <span className="font-bold">${formatUSDC(userDeposit)}</span>
           </div>
           <div className="flex justify-between text-stadium-muted mt-1">
-            <span>Accrued yield</span>
-            <span>${formatUSDC(accruedYield)}</span>
+            <span>Pending yield</span>
+            <span>${formatUSDC(pendingYield)}</span>
           </div>
         </div>
       )}
@@ -316,19 +390,19 @@ function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txSt
 }
 
 function UserPositions({ address }) {
-  const { data: accruedYield } = useAccruedYield(address)
+  const { data: pending } = usePendingYield(address)
   const { writeContract, data: txHash } = useWriteContract()
   const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
 
   function handleClaimYield() {
     writeContract({
-      address: ADDRESSES.convictionHook,
-      abi: ConvictionHook_ABI,
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
       functionName: 'claimYield',
     })
   }
 
-  const hasYield = accruedYield && accruedYield > 0n
+  const hasYield = pending && pending > 0n
   if (!hasYield) return null
 
   return (
@@ -336,7 +410,7 @@ function UserPositions({ address }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-1">Accrued Survivor Yield</div>
-          <div className="text-2xl font-black text-stadium-green">${formatUSDC(accruedYield)}</div>
+          <div className="text-2xl font-black text-stadium-green">${formatUSDC(pending)}</div>
           <div className="text-xs text-stadium-muted font-mono mt-1">From team eliminations</div>
         </div>
         <button onClick={handleClaimYield} disabled={isLoading} className="btn-primary py-3 px-6">

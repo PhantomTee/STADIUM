@@ -2,13 +2,13 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAcc
 import { ADDRESSES, parseUSDC, formatUSDC } from '../utils/contracts'
 import {
   MockUSDC_ABI,
-  ConvictionHook_ABI,
+  ConvictionVault_ABI,
   VARMarket_ABI,
   MatchOracle_ABI,
   ChampionPool_ABI,
 } from '../abis'
 
-// ─── USDC Balance ────────────────────────────────────────────────────────────
+// ─── USDC ────────────────────────────────────────────────────────────────────
 
 export function useUSDCBalance(address) {
   return useReadContract({
@@ -30,117 +30,149 @@ export function useUSDCAllowance(owner, spender) {
   })
 }
 
-// ─── CONVICTION ──────────────────────────────────────────────────────────────
+// ─── CONVICTION VAULT ────────────────────────────────────────────────────────
 
-export function useConvictionDeposit(user, team) {
+export function useConvictionDeposit(user, teamId) {
   return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'convictionDeposit',
-    args: [user, team],
-    query: { enabled: !!user && !!team },
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'deposits',
+    args: [user, teamId],
+    query: { enabled: !!user && teamId !== undefined },
   })
 }
 
-export function useAccruedYield(user) {
+export function usePendingYield(user) {
   return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'accruedYield',
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'pendingYield',
     args: [user],
     query: { enabled: !!user },
   })
 }
 
-export function useHasConviction(user, team) {
+export function useTeamTotalDeposit(teamId) {
   return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'hasConviction',
-    args: [user, team],
-    query: { enabled: !!user && !!team },
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'teamTotalDeposit',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
   })
 }
 
-export function useTotalConvictionLocked(team) {
+export function useBackerCount(teamId) {
   return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'totalConvictionLocked',
-    args: [team],
-    query: { enabled: !!team },
-  })
-}
-
-export function useAliveTeams() {
-  return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'getAliveTeams',
-  })
-}
-
-export function useTeamEliminated(team) {
-  return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'teamEliminated',
-    args: [team],
-    query: { enabled: !!team },
-  })
-}
-
-export function useConvictionMultiplier(user, team) {
-  return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'getConvictionMultiplier',
-    args: [user, team],
-    query: { enabled: !!user && !!team },
-  })
-}
-
-export function useTotalAliveConvictionLocked() {
-  return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
-    functionName: 'totalAliveConvictionLocked',
-  })
-}
-
-export function useBackerCount(team) {
-  return useReadContract({
-    address: ADDRESSES.convictionHook,
-    abi: ConvictionHook_ABI,
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
     functionName: 'backerCount',
-    args: [team],
-    query: { enabled: !!team },
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
   })
 }
 
-// ─── VAR ─────────────────────────────────────────────────────────────────────
+export function useTotalAliveDeposits() {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'totalAliveDeposits',
+  })
+}
+
+export function useTeamActive(teamId) {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'teamActive',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function useTeamEliminated(teamId) {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'teamEliminated',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function useTeamChampion(teamId) {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'teamChampion',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function usePrincipalClaimed(user, teamId) {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'principalClaimed',
+    args: [user, teamId],
+    query: { enabled: !!user && teamId !== undefined },
+  })
+}
+
+export function useConvictionMultiplier(user, teamId) {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'getConvictionMultiplier',
+    args: [user, teamId],
+    query: { enabled: !!user && teamId !== undefined },
+  })
+}
+
+// ─── VAR MARKET ──────────────────────────────────────────────────────────────
 
 export function useVARMarket(matchId, marketType) {
   return useReadContract({
     address: ADDRESSES.varMarket,
     abi: VARMarket_ABI,
-    functionName: 'getMarket',
+    functionName: 'markets',
     args: [matchId, marketType],
     query: { enabled: matchId !== undefined && marketType !== undefined },
   })
 }
 
-export function useUserBet(matchId, marketType, user) {
+export function useOutcomePool(matchId, marketType, outcome) {
   return useReadContract({
     address: ADDRESSES.varMarket,
     abi: VARMarket_ABI,
-    functionName: 'getUserBet',
+    functionName: 'outcomePool',
+    args: [matchId, marketType, outcome],
+    query: { enabled: matchId !== undefined && marketType !== undefined && outcome !== undefined },
+  })
+}
+
+export function useUserBet(matchId, marketType, user, outcome) {
+  return useReadContract({
+    address: ADDRESSES.varMarket,
+    abi: VARMarket_ABI,
+    functionName: 'betAmount',
+    args: [matchId, marketType, user, outcome],
+    query: { enabled: matchId !== undefined && marketType !== undefined && !!user && outcome !== undefined },
+  })
+}
+
+export function useVARClaimed(matchId, marketType, user) {
+  return useReadContract({
+    address: ADDRESSES.varMarket,
+    abi: VARMarket_ABI,
+    functionName: 'claimed',
     args: [matchId, marketType, user],
     query: { enabled: matchId !== undefined && marketType !== undefined && !!user },
   })
 }
 
-// ─── Oracle / Matches ────────────────────────────────────────────────────────
+// ─── ORACLE / MATCHES ────────────────────────────────────────────────────────
 
 export function useMatchCount() {
   return useReadContract({
@@ -168,27 +200,61 @@ export function useAllMatchIds() {
   })
 }
 
-// ─── Champion Pool ────────────────────────────────────────────────────────────
-
-export function useChampionPoolBalance() {
+export function useOracleTeam(teamId) {
   return useReadContract({
-    address: ADDRESSES.championPool,
-    abi: ChampionPool_ABI,
-    functionName: 'getBalance',
+    address: ADDRESSES.matchOracle,
+    abi: MatchOracle_ABI,
+    functionName: 'getTeam',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
   })
 }
 
+export function useTeamCount() {
+  return useReadContract({
+    address: ADDRESSES.matchOracle,
+    abi: MatchOracle_ABI,
+    functionName: 'teamCount',
+  })
+}
+
+// ─── CHAMPION POOL ────────────────────────────────────────────────────────────
+
 export function useChampionPoolData() {
-  const balance = useChampionPoolBalance()
   const { data: totalAccumulated } = useReadContract({
     address: ADDRESSES.championPool,
     abi: ChampionPool_ABI,
     functionName: 'totalAccumulated',
   })
-  const { data: champion } = useReadContract({
+  const { data: snapshot } = useReadContract({
     address: ADDRESSES.championPool,
     abi: ChampionPool_ABI,
-    functionName: 'champion',
+    functionName: 'championPoolSnapshot',
   })
-  return { balance: balance.data, totalAccumulated, champion }
+  const { data: championSet } = useReadContract({
+    address: ADDRESSES.championPool,
+    abi: ChampionPool_ABI,
+    functionName: 'championSet',
+  })
+  const { data: championTeamId } = useReadContract({
+    address: ADDRESSES.championPool,
+    abi: ChampionPool_ABI,
+    functionName: 'championTeamId',
+  })
+  const { data: totalStake } = useReadContract({
+    address: ADDRESSES.championPool,
+    abi: ChampionPool_ABI,
+    functionName: 'totalChampionStake',
+  })
+  return { totalAccumulated, snapshot, championSet, championTeamId, totalStake }
+}
+
+export function useChampClaimed(user, teamId) {
+  return useReadContract({
+    address: ADDRESSES.championPool,
+    abi: ChampionPool_ABI,
+    functionName: 'champClaimed',
+    args: [user, teamId],
+    query: { enabled: !!user && teamId !== undefined },
+  })
 }

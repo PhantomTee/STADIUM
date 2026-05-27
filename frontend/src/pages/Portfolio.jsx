@@ -1,15 +1,15 @@
 import React from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { WORLD_CUP_TEAMS, formatUSDC } from '../utils/contracts'
+import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
 import {
-  useConvictionDeposit, useAccruedYield, useTeamEliminated,
-  useAllMatchIds, useMatch, useUserBet, useUSDCBalance,
-  useTotalAliveConvictionLocked, useConvictionMultiplier,
+  useConvictionDeposit, usePendingYield,
+  useTeamEliminated, useTeamChampion, usePrincipalClaimed,
+  useAllMatchIds, useMatch, useUSDCBalance,
+  useTotalAliveDeposits, useConvictionMultiplier,
+  useChampionPoolData, useChampClaimed,
 } from '../hooks/useContracts'
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { ADDRESSES } from '../utils/contracts'
-import { ConvictionHook_ABI } from '../abis'
+import { ConvictionVault_ABI, ChampionPool_ABI } from '../abis'
 
 export default function Portfolio() {
   const { address, isConnected } = useAccount()
@@ -33,6 +33,7 @@ export default function Portfolio() {
 
       <PortfolioSummary address={address} />
       <ConvictionPositions address={address} />
+      <ChampionPoolSection address={address} />
       <VARHistory address={address} />
     </div>
   )
@@ -40,17 +41,18 @@ export default function Portfolio() {
 
 function PortfolioSummary({ address }) {
   const { data: usdcBalance }  = useUSDCBalance(address)
-  const { data: accruedYield } = useAccruedYield(address)
+  const { data: pendingYield } = usePendingYield(address)
+  const { data: totalAlive }   = useTotalAliveDeposits()
 
   const { writeContract, data: txHash } = useWriteContract()
   const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
 
-  const hasYield = accruedYield && accruedYield > 0n
+  const hasYield = pendingYield && pendingYield > 0n
 
   function handleClaimYield() {
     writeContract({
-      address: ADDRESSES.convictionHook,
-      abi: ConvictionHook_ABI,
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
       functionName: 'claimYield',
     })
   }
@@ -62,8 +64,8 @@ function PortfolioSummary({ address }) {
         <div className="stat-label">Wallet Balance</div>
       </div>
       <div className="card">
-        <div className="stat-value text-stadium-green">${formatUSDC(accruedYield)}</div>
-        <div className="stat-label">Accrued Yield</div>
+        <div className="stat-value text-stadium-green">${formatUSDC(pendingYield)}</div>
+        <div className="stat-label">Pending Yield</div>
         {hasYield && (
           <button
             onClick={handleClaimYield}
@@ -75,12 +77,12 @@ function PortfolioSummary({ address }) {
         )}
       </div>
       <div className="card">
-        <div className="stat-value text-stadium-text">—</div>
-        <div className="stat-label">Active Positions</div>
+        <div className="stat-value text-stadium-text">${formatUSDC(totalAlive)}</div>
+        <div className="stat-label">Total Alive Locked</div>
       </div>
       <div className="card">
         <div className="stat-value text-stadium-gold">—</div>
-        <div className="stat-label">Total Earned</div>
+        <div className="stat-label">Champion Pool Share</div>
       </div>
     </div>
   )
@@ -92,7 +94,7 @@ function ConvictionPositions({ address }) {
       <h2 className="font-semibold text-stadium-text mb-4">CONVICTION Positions</h2>
       <div className="grid md:grid-cols-2 gap-4">
         {WORLD_CUP_TEAMS.map(team => (
-          <ConvictionPositionCard key={team.name} team={team} address={address} />
+          <ConvictionPositionCard key={team.id} team={team} address={address} />
         ))}
       </div>
     </div>
@@ -100,17 +102,40 @@ function ConvictionPositions({ address }) {
 }
 
 function ConvictionPositionCard({ team, address }) {
-  const { data: deposit }    = useConvictionDeposit(address, team.name)
-  const { data: eliminated } = useTeamEliminated(team.name)
-  const { data: multiplier } = useConvictionMultiplier(address, team.name)
+  const { data: deposit }          = useConvictionDeposit(address, team.id)
+  const { data: eliminated }       = useTeamEliminated(team.id)
+  const { data: champion }         = useTeamChampion(team.id)
+  const { data: principalClaimed } = usePrincipalClaimed(address, team.id)
+  const { data: multiplier }       = useConvictionMultiplier(address, team.id)
+
+  const { writeContract, data: txHash } = useWriteContract()
+  const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
 
   if (!deposit || deposit === 0n) return null
 
-  const isAlive  = !eliminated
+  const isAlive  = !eliminated && !champion
   const hasBonus = multiplier === 150n
 
+  function handleClaim() {
+    if (champion) {
+      writeContract({
+        address: ADDRESSES.convictionVault,
+        abi: ConvictionVault_ABI,
+        functionName: 'claimChampionPrincipal',
+        args: [team.id],
+      })
+    } else {
+      writeContract({
+        address: ADDRESSES.convictionVault,
+        abi: ConvictionVault_ABI,
+        functionName: 'claimEliminatedPosition',
+        args: [team.id],
+      })
+    }
+  }
+
   return (
-    <div className={`card ${isAlive ? 'border-stadium-green/30' : 'border-stadium-border/50 opacity-60'}`}>
+    <div className={`card ${isAlive ? 'border-stadium-green/30' : champion ? 'border-stadium-gold/30' : 'border-stadium-border/50 opacity-70'}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <span className="text-2xl">{team.flag}</span>
@@ -120,12 +145,10 @@ function ConvictionPositionCard({ team, address }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          {isAlive
-            ? <span className="badge-green">Active</span>
-            : <span className="badge-red">Eliminated</span>}
-          {hasBonus && isAlive && (
-            <span className="badge-gold">1.5× VAR</span>
-          )}
+          {isAlive   && <span className="badge-green">Active</span>}
+          {eliminated && <span className="badge-red">Eliminated</span>}
+          {champion   && <span className="badge-gold">Champion</span>}
+          {hasBonus && isAlive && <span className="badge-gold">1.5× VAR</span>}
         </div>
       </div>
 
@@ -136,19 +159,81 @@ function ConvictionPositionCard({ team, address }) {
         </div>
         <div>
           <div className="text-stadium-muted text-xs mb-0.5">
-            {isAlive ? 'Current Value' : 'Returned (50%)'}
+            {champion ? 'Full Return' : eliminated ? 'Refund (50%)' : 'Locked'}
           </div>
-          <div className="font-semibold text-stadium-green">
-            {isAlive ? `$${formatUSDC(deposit)}` : `$${formatUSDC(deposit / 2n)}`}
+          <div className={`font-semibold ${champion ? 'text-stadium-gold' : 'text-stadium-green'}`}>
+            {champion ? `$${formatUSDC(deposit)}` : eliminated ? `$${formatUSDC(deposit / 2n)}` : `$${formatUSDC(deposit)}`}
           </div>
         </div>
       </div>
 
-      {isAlive && (
-        <div className="mt-3 pt-3 border-t border-stadium-border text-xs text-stadium-muted">
-          Principal locked until team elimination or championship
-        </div>
+      {(eliminated || champion) && !principalClaimed && (
+        <button
+          onClick={handleClaim}
+          disabled={isLoading}
+          className="btn-primary w-full py-2 text-xs mt-3"
+        >
+          {isLoading ? 'Claiming...' : champion ? 'Claim Principal' : 'Claim 50% Refund'}
+        </button>
       )}
+      {principalClaimed && (
+        <div className="text-xs text-stadium-muted font-mono mt-2">Principal claimed</div>
+      )}
+    </div>
+  )
+}
+
+function ChampionPoolSection({ address }) {
+  const { totalAccumulated, snapshot, championSet, championTeamId } = useChampionPoolData()
+  const { data: claimed } = useChampClaimed(address, championTeamId)
+
+  const { writeContract, data: txHash } = useWriteContract()
+  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+
+  function handleClaim() {
+    writeContract({
+      address: ADDRESSES.championPool,
+      abi: ChampionPool_ABI,
+      functionName: 'claimChampionPool',
+      args: [championTeamId],
+    })
+  }
+
+  return (
+    <div>
+      <h2 className="font-semibold text-stadium-text mb-4">Champion Pool</h2>
+      <div className="card">
+        <div className="grid grid-cols-3 gap-px bg-stadium-border -mx-5 -mt-5 mb-5">
+          <div className="bg-stadium-dark p-4 text-center">
+            <div className="text-xl font-black text-stadium-gold">${formatUSDC(totalAccumulated)}</div>
+            <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest mt-1">Total Accumulated</div>
+          </div>
+          <div className="bg-stadium-dark p-4 text-center">
+            <div className="text-xl font-black text-stadium-text">${formatUSDC(snapshot)}</div>
+            <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest mt-1">Pool Snapshot</div>
+          </div>
+          <div className="bg-stadium-dark p-4 text-center">
+            <div className={`text-xl font-black ${championSet ? 'text-stadium-green' : 'text-stadium-muted'}`}>
+              {championSet ? 'SET' : 'PENDING'}
+            </div>
+            <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest mt-1">Status</div>
+          </div>
+        </div>
+
+        {championSet && !claimed && !isSuccess && (
+          <button onClick={handleClaim} disabled={isLoading} className="btn-primary w-full">
+            {isLoading ? 'Claiming...' : 'Claim Champion Pool Share'}
+          </button>
+        )}
+        {(claimed || isSuccess) && (
+          <div className="text-center text-stadium-muted text-xs font-mono">Champion pool share claimed</div>
+        )}
+        {!championSet && (
+          <div className="text-center text-stadium-muted text-xs font-mono">
+            Champion pool distributes when the World Cup winner is declared
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -185,13 +270,11 @@ function VARMatchRow({ matchId, address }) {
 
   if (!match) return null
 
-  const markets = [0, 1, 2, 3].map(i => ({ type: i, name: MARKET_NAMES[i] }))
-
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
         <div className="font-medium text-stadium-text">
-          {match.teamA} vs {match.teamB}
+          {match.teamAName} vs {match.teamBName}
         </div>
         {match.settled ? (
           <span className="badge-green text-xs">Settled</span>
@@ -201,51 +284,13 @@ function VARMatchRow({ matchId, address }) {
           <span className="text-xs text-stadium-muted">Upcoming</span>
         )}
       </div>
-      <div className="grid grid-cols-4 gap-2">
-        {markets.map(m => (
-          <SingleBetCell
-            key={m.type}
-            matchId={matchId}
-            marketType={m.type}
-            marketName={m.name}
-            address={address}
-            match={match}
-          />
+      <div className="grid grid-cols-4 gap-2 text-xs font-mono text-stadium-muted">
+        {MARKET_NAMES.map((name, i) => (
+          <div key={i} className="text-center p-2 bg-stadium-dark border border-stadium-border">
+            {name}
+          </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-function SingleBetCell({ matchId, marketType, marketName, address, match }) {
-  const { data: bet } = useUserBet(matchId, marketType, address)
-
-  const yes   = bet?.[0] || 0n
-  const no    = bet?.[1] || 0n
-  const draw  = bet?.[2] || 0n
-  const total = yes + no + draw
-
-  if (total === 0n) {
-    return (
-      <div className="text-center p-2 bg-stadium-dark border border-stadium-border text-xs text-stadium-muted">
-        <div className="mb-1">{marketName}</div>
-        <div>—</div>
-      </div>
-    )
-  }
-
-  const side = yes >= no && yes >= draw ? 'YES/A' : no >= draw ? 'NO/B' : 'DRAW'
-
-  return (
-    <div className="text-center p-2 bg-stadium-green/10 border border-stadium-green/20 text-xs">
-      <div className="text-stadium-muted mb-1">{marketName}</div>
-      <div className="font-semibold text-stadium-green">${formatUSDC(total)}</div>
-      <div className="text-stadium-muted">{side}</div>
-      {match.settled && (
-        <div className="mt-1 text-xs text-stadium-muted">
-          Result: {match.winner || '—'}
-        </div>
-      )}
     </div>
   )
 }

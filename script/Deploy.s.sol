@@ -2,105 +2,148 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
-import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
 import {PoolManager} from "@uniswap/v4-core/PoolManager.sol";
+import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
 
-import {MockUSDC} from "../src/MockUSDC.sol";
-import {ChampionPool} from "../src/ChampionPool.sol";
-import {StadiumNFT} from "../src/StadiumNFT.sol";
-import {MatchOracle} from "../src/MatchOracle.sol";
-import {ConvictionHook} from "../src/ConvictionHook.sol";
-import {VARMarket} from "../src/VARMarket.sol";
+import {MockUSDC}        from "../src/MockUSDC.sol";
+import {ChampionPool}    from "../src/ChampionPool.sol";
+import {StadiumNFT}      from "../src/StadiumNFT.sol";
+import {MatchOracle}     from "../src/MatchOracle.sol";
+import {ConvictionVault} from "../src/ConvictionVault.sol";
+import {VARMarket}       from "../src/VARMarket.sol";
 
+/// @notice Deploys the full STADIUM protocol.
+///
+/// Chain / RPC are read from .env:
+///   XLAYER_CHAIN_ID  — set to 1952 (testnet docs) or 196 (mainnet)
+///   XLAYER_RPC_URL   — RPC endpoint
+///   PRIVATE_KEY      — deployer key
+///   TREASURY_ADDRESS — protocol treasury wallet
+///
+/// Optional overrides (leave blank to deploy fresh):
+///   POOL_MANAGER_ADDRESS — official Uniswap v4 PoolManager (mainnet)
+///                          If empty, deploys a DEMO MockPoolManager (testnet only)
+///   MOCK_USDC_ADDRESS    — existing USDC token
+///                          If empty, deploys MockUSDC
+///
+/// StadiumHook is NOT deployed here — it requires address mining for V4 hook bits.
+/// See README for hook deployment instructions.
 contract Deploy is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer   = vm.addr(deployerPrivateKey);
-        address treasuryAddr = vm.envAddress("TREASURY_ADDRESS");
+        uint256 deployerKey  = vm.envUint("PRIVATE_KEY");
+        address deployer     = vm.addr(deployerKey);
+        address treasury     = vm.envAddress("TREASURY_ADDRESS");
+        require(treasury != address(0), "Deploy: TREASURY_ADDRESS not set");
 
-        require(treasuryAddr != address(0), "Deploy: treasury not set");
+        // ── Optional overrides ────────────────────────────────────────────────
+        address poolManagerOverride = _envAddressOr("POOL_MANAGER_ADDRESS", address(0));
+        address usdcOverride        = _envAddressOr("MOCK_USDC_ADDRESS",    address(0));
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast(deployerKey);
 
-        // 1. Deploy Uniswap V4 PoolManager (self-hosted for X Layer Testnet)
-        PoolManager poolManager = new PoolManager(deployer);
-        console.log("PoolManager:", address(poolManager));
+        // 1. PoolManager — use override or deploy demo
+        address poolManagerAddr;
+        bool demoPoolManager = (poolManagerOverride == address(0));
+        if (demoPoolManager) {
+            PoolManager pm = new PoolManager(deployer);
+            poolManagerAddr = address(pm);
+            console.log("[DEMO] MockPoolManager:", poolManagerAddr);
+            console.log("       ^ Testnet demo only. For mainnet, set POOL_MANAGER_ADDRESS.");
+        } else {
+            poolManagerAddr = poolManagerOverride;
+            console.log("PoolManager (existing):", poolManagerAddr);
+        }
 
-        // 2. Deploy MockUSDC
-        MockUSDC usdc = new MockUSDC();
-        console.log("MockUSDC:", address(usdc));
+        // 2. MockUSDC — use override or deploy fresh
+        address usdcAddr;
+        if (usdcOverride != address(0)) {
+            usdcAddr = usdcOverride;
+            console.log("MockUSDC (existing):", usdcAddr);
+        } else {
+            MockUSDC usdc = new MockUSDC();
+            usdcAddr = address(usdc);
+            console.log("MockUSDC:", usdcAddr);
+            // Mint faucet supply for testing
+            usdc.mint(deployer, 10_000_000 * 1e6); // 10M USDC
+        }
 
-        // 3. Deploy ChampionPool (needs deployer as Ownable owner)
-        ChampionPool champPool = new ChampionPool(address(usdc), deployer);
+        // 3. ChampionPool
+        ChampionPool champPool = new ChampionPool(usdcAddr, deployer);
         console.log("ChampionPool:", address(champPool));
 
-        // 4. Deploy StadiumNFT
+        // 4. StadiumNFT
         StadiumNFT nft = new StadiumNFT(deployer);
         console.log("StadiumNFT:", address(nft));
 
-        // 5. Deploy MatchOracle
-        MatchOracle oracle = new MatchOracle(deployer, treasuryAddr);
+        // 5. MatchOracle
+        MatchOracle oracle = new MatchOracle(deployer, treasury);
         console.log("MatchOracle:", address(oracle));
 
-        // 6. Deploy ConvictionHook
-        ConvictionHook hook = new ConvictionHook(
-            IPoolManager(address(poolManager)),
-            address(usdc),
-            treasuryAddr,
-            deployer
-        );
-        console.log("ConvictionHook:", address(hook));
+        // 6. ConvictionVault (replaces old ConvictionHook accounting)
+        ConvictionVault vault = new ConvictionVault(usdcAddr, treasury, deployer);
+        console.log("ConvictionVault:", address(vault));
 
-        // 7. Deploy VARMarket
+        // 7. VARMarket
         VARMarket varMarket = new VARMarket(
-            address(usdc),
+            usdcAddr,
             address(oracle),
-            address(hook),
-            treasuryAddr,
+            address(vault),
+            treasury,
             address(champPool)
         );
         console.log("VARMarket:", address(varMarket));
 
-        // 8. Wire up addresses
-        hook.setOracle(address(oracle));
-        hook.setChampionPool(address(champPool));
-        hook.setVarMarket(address(varMarket));
-        hook.setStadiumNFT(address(nft));
+        // 8. Wire addresses
+        vault.setOracle(address(oracle));
+        vault.setChampionPool(address(champPool));
+        vault.setStadiumNFT(address(nft));
 
-        oracle.setAddresses(address(hook), address(varMarket), address(champPool));
-        champPool.setAddresses(address(hook), address(varMarket), address(oracle));
-        nft.setConvictionHook(address(hook));
+        oracle.setAddresses(address(vault), address(varMarket), address(champPool));
 
-        // 9. Mint initial faucet supply for testing
-        usdc.mint(deployer, 10_000_000 * 1e6);
+        champPool.setAddresses(address(vault), address(varMarket), address(oracle));
+
+        nft.setConvictionVault(address(vault));
 
         vm.stopBroadcast();
 
+        // ── Summary ───────────────────────────────────────────────────────────
         console.log("\n=== STADIUM DEPLOYMENT SUMMARY ===");
-        console.log("Chain: X Layer Testnet (ID 195)");
-        console.log("Deployer:      ", deployer);
-        console.log("Treasury:      ", treasuryAddr);
-        console.log("PoolManager:   ", address(poolManager));
-        console.log("MockUSDC:      ", address(usdc));
-        console.log("ChampionPool:  ", address(champPool));
-        console.log("StadiumNFT:    ", address(nft));
-        console.log("MatchOracle:   ", address(oracle));
-        console.log("ConvictionHook:", address(hook));
-        console.log("VARMarket:     ", address(varMarket));
+        console.log("Deployer:       ", deployer);
+        console.log("Treasury:       ", treasury);
+        console.log("PoolManager:    ", poolManagerAddr, demoPoolManager ? "[DEMO]" : "[OFFICIAL]");
+        console.log("MockUSDC:       ", usdcAddr);
+        console.log("ChampionPool:   ", address(champPool));
+        console.log("StadiumNFT:     ", address(nft));
+        console.log("MatchOracle:    ", address(oracle));
+        console.log("ConvictionVault:", address(vault));
+        console.log("VARMarket:      ", address(varMarket));
 
+        // Write deployments.json
+        string memory chainIdStr = vm.toString(block.chainid);
         string memory json = string.concat(
             '{\n',
-            '  "chainId": 195,\n',
-            '  "poolManager": "',    vm.toString(address(poolManager)), '",\n',
-            '  "mockUSDC": "',       vm.toString(address(usdc)),        '",\n',
-            '  "championPool": "',   vm.toString(address(champPool)),   '",\n',
-            '  "stadiumNFT": "',     vm.toString(address(nft)),         '",\n',
-            '  "matchOracle": "',    vm.toString(address(oracle)),      '",\n',
-            '  "convictionHook": "', vm.toString(address(hook)),        '",\n',
-            '  "varMarket": "',      vm.toString(address(varMarket)),   '"\n',
+            '  "chainId": ',        chainIdStr,                          ',\n',
+            '  "demoPoolManager": ', demoPoolManager ? "true" : "false", ',\n',
+            '  "poolManager": "',   vm.toString(poolManagerAddr),        '",\n',
+            '  "mockUSDC": "',      vm.toString(usdcAddr),               '",\n',
+            '  "championPool": "',  vm.toString(address(champPool)),     '",\n',
+            '  "stadiumNFT": "',    vm.toString(address(nft)),           '",\n',
+            '  "matchOracle": "',   vm.toString(address(oracle)),        '",\n',
+            '  "convictionVault": "',vm.toString(address(vault)),        '",\n',
+            '  "varMarket": "',     vm.toString(address(varMarket)),     '"\n',
             '}'
         );
         vm.writeFile("./deployments.json", json);
         console.log("\nAddresses written to deployments.json");
+        console.log("Copy frontend/.env values from deployments.json after deployment.");
+    }
+
+    /// @dev Reads an address env var, returns fallback if not set or zero-string
+    function _envAddressOr(string memory key, address fallback_) internal view returns (address) {
+        try vm.envAddress(key) returns (address val) {
+            return val == address(0) ? fallback_ : val;
+        } catch {
+            return fallback_;
+        }
     }
 }

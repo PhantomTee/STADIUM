@@ -21,7 +21,10 @@ runs = 256
 fuzz = { runs = 1000 }
 
 [rpc_endpoints]
-xlayer_testnet = "https://testrpc.xlayer.tech"
+# Official testnet docs list 1952; some chain lists show 195. Set via .env.
+xlayer_testnet = "${XLAYER_RPC_URL}"
+xlayer_mainnet = "https://rpc.xlayer.tech"
 
 [etherscan]
 xlayer_testnet = { key = "${ETHERSCAN_API_KEY}", url = "https://web3.okx.com/explorer/xlayer-test/api" }
+xlayer_mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://web3.okx.com/explorer/xlayer/api" }

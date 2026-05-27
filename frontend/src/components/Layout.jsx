@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { path: '/portfolio',   label: 'Portfolio'   },
   { path: '/leaderboard', label: 'Leaderboard' },
   { path: '/nfts',        label: 'NFTs'        },
+  { path: '/admin',       label: 'Admin'       },
 ]
 
 function useTheme() {
@@ -199,10 +200,14 @@ export default function Layout({ children }) {
 
 function NetworkBanner() {
   const { chain } = useAccount()
-  if (!chain || chain.id === 195) return null
+  const expectedId = parseInt(import.meta.env.VITE_CHAIN_ID ?? '1952', 10)
+  const label = expectedId === 196
+    ? 'X Layer Mainnet (Chain ID 196)'
+    : `X Layer Testnet (Chain ID ${expectedId})`
+  if (!chain || chain.id === expectedId) return null
   return (
     <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-center text-xs text-red-400 font-mono uppercase tracking-widest">
-      Wrong network — switch to X Layer Testnet (Chain ID 195)
+      Wrong network — switch to {label}
     </div>
   )
 }

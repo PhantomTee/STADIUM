@@ -1,30 +1,63 @@
 import React, { useState } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { ADDRESSES, WORLD_CUP_TEAMS, formatUSDC, parseUSDC } from '../utils/contracts'
+import { ADDRESSES, WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC, parseUSDC } from '../utils/contracts'
 import { MockUSDC_ABI, VARMarket_ABI } from '../abis'
-import { useUSDCBalance, useUSDCAllowance, useVARMarket, useAllMatchIds, useMatch, useConvictionMultiplier } from '../hooks/useContracts'
+import {
+  useUSDCBalance, useUSDCAllowance,
+  useVARMarket, useOutcomePool,
+  useAllMatchIds, useMatch,
+  useConvictionMultiplier, useVARClaimed,
+} from '../hooks/useContracts'
+
+// Outcome constants matching VARMarket.sol
+const OUTCOME_TEAM_A  = 1
+const OUTCOME_TEAM_B  = 2
+const OUTCOME_DRAW    = 3
+const OUTCOME_YES     = 4
+const OUTCOME_NO      = 5
+const OUTCOME_NO_GOAL = 6
 
 const MARKET_NAMES = ['Match Winner', 'First Goal', 'Red Card', 'Extra Time']
 const MARKET_DESCRIPTIONS = [
   'Which team wins, or draw in group stage',
   'Which team scores first, or no goals',
-  'Will a red card be shown (YES/NO)',
-  'Will the match go to extra time (YES/NO)',
+  'Will a red card be shown',
+  'Will the match go to extra time',
 ]
 
-function getOutcomes(marketType, teamA, teamB) {
-  if (marketType === 2 || marketType === 3) return ['YES', 'NO']
-  if (marketType === 0) return [teamA, teamB, 'Draw']
-  return [teamA, teamB, 'No Goal']
+function getOutcomes(marketType, teamAName, teamBName) {
+  if (marketType === 2 || marketType === 3) {
+    return [
+      { label: 'YES', value: OUTCOME_YES },
+      { label: 'NO',  value: OUTCOME_NO  },
+    ]
+  }
+  if (marketType === 0) {
+    return [
+      { label: teamAName, value: OUTCOME_TEAM_A },
+      { label: teamBName, value: OUTCOME_TEAM_B },
+      { label: 'Draw',    value: OUTCOME_DRAW   },
+    ]
+  }
+  // marketType === 1 (First Goal)
+  return [
+    { label: teamAName,   value: OUTCOME_TEAM_A  },
+    { label: teamBName,   value: OUTCOME_TEAM_B  },
+    { label: 'No Goal',   value: OUTCOME_NO_GOAL },
+  ]
 }
 
-function outcomeToContract(outcome, teamA, teamB) {
-  if (outcome === teamA)     return 'teamA'
-  if (outcome === teamB)     return 'teamB'
-  if (outcome === 'Draw')    return 'draw'
-  if (outcome === 'No Goal') return 'none'
-  return outcome
+function outcomeLabel(outcomeId, teamAName, teamBName) {
+  switch (outcomeId) {
+    case OUTCOME_TEAM_A:  return teamAName || 'Team A'
+    case OUTCOME_TEAM_B:  return teamBName || 'Team B'
+    case OUTCOME_DRAW:    return 'Draw'
+    case OUTCOME_YES:     return 'YES'
+    case OUTCOME_NO:      return 'NO'
+    case OUTCOME_NO_GOAL: return 'No Goal'
+    default:              return '—'
+  }
 }
 
 export default function VAR() {
@@ -45,17 +78,26 @@ export default function VAR() {
   const { writeContract, data: txHash } = useWriteContract()
   const { isLoading: txPending, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
 
-  const teamA = selectedMatch?.teamA || ''
-  const teamB = selectedMatch?.teamB || ''
+  const teamAName = selectedMatch?.teamAName || ''
+  const teamBName = selectedMatch?.teamBName || ''
 
   function handleApprove() {
-    writeContract({ address: ADDRESSES.mockUSDC, abi: MockUSDC_ABI, functionName: 'approve', args: [ADDRESSES.varMarket, parsedAmount] })
+    writeContract({
+      address: ADDRESSES.mockUSDC,
+      abi: MockUSDC_ABI,
+      functionName: 'approve',
+      args: [ADDRESSES.varMarket, parsedAmount],
+    })
   }
 
   function handlePlaceBet() {
-    if (!selectedMatchId || !selectedOutcome || !parsedAmount) return
-    const contractOutcome = outcomeToContract(selectedOutcome, teamA, teamB)
-    writeContract({ address: ADDRESSES.varMarket, abi: VARMarket_ABI, functionName: 'placeBet', args: [BigInt(selectedMatchId), selectedMarket, contractOutcome, parsedAmount] })
+    if (!selectedMatchId || selectedOutcome === null || !parsedAmount) return
+    writeContract({
+      address: ADDRESSES.varMarket,
+      abi: VARMarket_ABI,
+      functionName: 'placeBet',
+      args: [BigInt(selectedMatchId), selectedMarket, selectedOutcome, parsedAmount],
+    })
   }
 
   return (
@@ -71,7 +113,7 @@ export default function VAR() {
         {[
           { title: 'How VAR Pays Out', items: ['Correct: bet + share of losing pool', 'CONVICTION holder: 1.5× net winnings', 'Wrong: 10% of your bet returned'] },
           { title: 'VAR Window',       items: ['Opens 60 min before kickoff', 'Closes at kickoff', 'Settles after match via oracle'] },
-          { title: 'Loss Split',       items: ['45% → winning pool', '25% → Champion Pool', '20% → Treasury · 10% → refunds'] },
+          { title: 'Loss Split',       items: ['45% → winning pool', '22.5% → Champion Pool', '22.5% → Treasury · 10% → refunds'] },
         ].map(block => (
           <div key={block.title} className="bg-stadium-card p-5">
             <div className="font-bold text-stadium-text text-xs uppercase tracking-widest mb-3">{block.title}</div>
@@ -159,7 +201,7 @@ function MatchListItem({ matchId, isSelected, onSelect }) {
     >
       <div className="flex items-center justify-between mb-1">
         <div className="text-sm font-bold text-stadium-text">
-          {match.teamA} vs {match.teamB}
+          {match.teamAName} vs {match.teamBName}
         </div>
         <span className={`text-xs font-mono font-bold flex items-center gap-1 ${match.varOpen ? 'text-stadium-green' : 'text-stadium-muted'}`}>
           {match.varOpen && <span className="w-1.5 h-1.5 bg-stadium-green inline-block animate-pulse" />}
@@ -169,7 +211,6 @@ function MatchListItem({ matchId, isSelected, onSelect }) {
       <div className="text-xs text-stadium-muted font-mono">
         {kickoff.toLocaleDateString()} · {kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </div>
-      {match.settled && <div className="text-xs text-stadium-muted mt-1 font-mono">Result: {match.winner}</div>}
     </button>
   )
 }
@@ -180,41 +221,43 @@ function VARBettingPanel({
   usdcBalance, needsApproval, txPending, txSuccess,
   isConnected, address, onApprove, onBet,
 }) {
-  const teamA   = match?.teamA || ''
-  const teamB   = match?.teamB || ''
-  const outcomes = getOutcomes(selectedMarket, teamA, teamB)
+  const teamAId   = match?.teamAId
+  const teamBId   = match?.teamBId
+  const teamAName = match?.teamAName || ''
+  const teamBName = match?.teamBName || ''
+  const teamAInfo = TEAM_BY_ID[teamAId]
+  const teamBInfo = TEAM_BY_ID[teamBId]
 
-  const { data: market }      = useVARMarket(matchId, selectedMarket)
-  const { data: multiplierA } = useConvictionMultiplier(address, teamA)
-  const { data: multiplierB } = useConvictionMultiplier(address, teamB)
-  const hasBonus = multiplierA === 150n || multiplierB === 150n
+  const { data: multA } = useConvictionMultiplier(address, teamAId)
+  const { data: multB } = useConvictionMultiplier(address, teamBId)
+  const hasBonus = multA === 150n || multB === 150n
 
-  const totalPool = market ? (market.totalYesPool + market.totalNoPool + (market.totalDrawPool || 0n)) : 0n
+  const { data: market } = useVARMarket(matchId, selectedMarket)
+
+  const outcomes   = getOutcomes(selectedMarket, teamAName, teamBName)
+  const correctId  = market?.correctOutcome || 0
 
   return (
     <div className="card space-y-5">
       {/* Match Header */}
       <div className="text-center pb-4 border-b border-stadium-border">
         <div className="flex items-center justify-center gap-8 mb-3">
-          {[teamA, teamB].map(t => {
-            const info = WORLD_CUP_TEAMS.find(w => w.name === t)
-            return (
-              <div key={t} className="text-center">
-                <div className="text-2xl mb-1">{info?.flag || '—'}</div>
-                <div className="font-black text-stadium-text text-sm uppercase tracking-tight">{t}</div>
-              </div>
-            )
-          })}
+          {[{ info: teamAInfo, name: teamAName }, { info: teamBInfo, name: teamBName }].map(({ info, name }) => (
+            <div key={name} className="text-center">
+              <div className="text-2xl mb-1">{info?.flag || '—'}</div>
+              <div className="font-black text-stadium-text text-sm uppercase tracking-tight">{name}</div>
+            </div>
+          ))}
           <div className="text-stadium-muted font-mono text-xs font-bold">VS</div>
         </div>
         <div className="flex items-center justify-center gap-2 flex-wrap">
-          {hasBonus && (
-            <span className="badge-gold">1.5× CONVICTION BONUS ACTIVE</span>
-          )}
+          {hasBonus && <span className="badge-gold">1.5× CONVICTION BONUS ACTIVE</span>}
           {match?.varOpen ? (
             <span className="badge-green">VAR Window Open</span>
           ) : match?.settled ? (
-            <span className="badge-red">Settled · Winner: {match.winner}</span>
+            <span className="badge-red">
+              Settled · {outcomeLabel(market?.correctOutcome, teamAName, teamBName)}
+            </span>
           ) : (
             <span className="text-xs text-stadium-muted font-mono">VAR window not open yet</span>
           )}
@@ -243,44 +286,38 @@ function VARBettingPanel({
       </div>
 
       {/* Pool Info */}
-      <div className="grid grid-cols-3 gap-px bg-stadium-border text-xs font-mono">
-        <div className="bg-stadium-dark p-3 text-center">
-          <div className="text-stadium-text font-bold">${formatUSDC(totalPool)}</div>
-          <div className="text-stadium-muted">Total pool</div>
-        </div>
-        <div className="bg-stadium-dark p-3 text-center">
-          <div className="text-stadium-text font-bold">${formatUSDC(market?.totalYesPool)}</div>
-          <div className="text-stadium-muted">Yes / A</div>
-        </div>
-        <div className="bg-stadium-dark p-3 text-center">
-          <div className="text-stadium-text font-bold">${formatUSDC(market?.totalNoPool)}</div>
-          <div className="text-stadium-muted">No / B</div>
-        </div>
-      </div>
+      <OutcomePools matchId={matchId} marketType={selectedMarket} outcomes={outcomes} />
 
       {/* Outcome Selection */}
       <div>
         <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-2">Choose Outcome</div>
-        <div className="grid grid-cols-3 gap-px bg-stadium-border">
-          {outcomes.map(outcome => (
+        <div className={`grid gap-px bg-stadium-border ${outcomes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {outcomes.map(({ label, value }) => (
             <button
-              key={outcome}
-              onClick={() => setSelectedOutcome(outcome)}
+              key={value}
+              onClick={() => setSelectedOutcome(value)}
               disabled={!match?.varOpen}
               className={`p-4 text-sm font-bold uppercase tracking-wide transition-all ${
-                selectedOutcome === outcome
+                selectedOutcome === value
                   ? 'bg-stadium-green/10 text-stadium-green'
+                  : correctId > 0 && value === correctId
+                  ? 'bg-stadium-gold/10 text-stadium-gold'
                   : 'bg-stadium-card text-stadium-muted hover:text-stadium-text hover:bg-stadium-dark disabled:opacity-40 disabled:cursor-not-allowed'
               }`}
             >
-              {outcome}
+              {label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Claim section if settled */}
+      {match?.settled && address && (
+        <ClaimSection matchId={matchId} marketType={selectedMarket} address={address} />
+      )}
+
       {/* Bet Amount */}
-      {isConnected && (
+      {isConnected && match?.varOpen && (
         <div>
           <label className="text-xs font-bold text-stadium-muted uppercase tracking-widest mb-2 block">Bet Amount (USDC)</label>
           <div className="relative">
@@ -290,8 +327,7 @@ function VARBettingPanel({
               onChange={e => setBetAmount(e.target.value)}
               placeholder="50"
               min="1"
-              disabled={!match?.varOpen}
-              className="input-field pr-16 disabled:opacity-40"
+              className="input-field pr-16"
             />
             <button
               onClick={() => setBetAmount(formatUSDC(usdcBalance).replace(/,/g, ''))}
@@ -303,16 +339,26 @@ function VARBettingPanel({
         </div>
       )}
 
-      {!isConnected ? (
-        <ConnectButton />
-      ) : needsApproval ? (
-        <button onClick={onApprove} disabled={txPending || !betAmount} className="btn-primary w-full">
-          {txPending ? 'Approving...' : 'Approve USDC'}
-        </button>
-      ) : (
-        <button onClick={onBet} disabled={txPending || !betAmount || !selectedOutcome || !match?.varOpen} className="btn-primary w-full">
-          {txPending ? 'Placing bet...' : match?.varOpen ? `Bet $${betAmount || '0'} on ${selectedOutcome || '...'}` : 'VAR Window Closed'}
-        </button>
+      {match?.varOpen && (
+        !isConnected ? (
+          <ConnectButton />
+        ) : needsApproval ? (
+          <button onClick={onApprove} disabled={txPending || !betAmount} className="btn-primary w-full">
+            {txPending ? 'Approving...' : 'Approve USDC'}
+          </button>
+        ) : (
+          <button
+            onClick={onBet}
+            disabled={txPending || !betAmount || selectedOutcome === null}
+            className="btn-primary w-full"
+          >
+            {txPending ? 'Placing bet...' : `Bet $${betAmount || '0'} on ${
+              selectedOutcome !== null
+                ? outcomeLabel(selectedOutcome, teamAName, teamBName)
+                : '...'
+            }`}
+          </button>
+        )
       )}
 
       {txSuccess && (
@@ -321,5 +367,62 @@ function VARBettingPanel({
         </div>
       )}
     </div>
+  )
+}
+
+function OutcomePools({ matchId, marketType, outcomes }) {
+  return (
+    <div className={`grid gap-px bg-stadium-border text-xs font-mono ${outcomes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      {outcomes.map(({ label, value }) => (
+        <OutcomePoolCell key={value} matchId={matchId} marketType={marketType} outcome={value} label={label} />
+      ))}
+    </div>
+  )
+}
+
+function OutcomePoolCell({ matchId, marketType, outcome, label }) {
+  const { data: pool } = useOutcomePool(matchId, marketType, outcome)
+  return (
+    <div className="bg-stadium-dark p-3 text-center">
+      <div className="text-stadium-text font-bold">${formatUSDC(pool || 0n)}</div>
+      <div className="text-stadium-muted">{label}</div>
+    </div>
+  )
+}
+
+function ClaimSection({ matchId, marketType, address }) {
+  const { data: alreadyClaimed } = useVARClaimed(matchId, marketType, address)
+  const { writeContract, data: txHash } = useWriteContract()
+  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+
+  function handleClaim() {
+    writeContract({
+      address: ADDRESSES.varMarket,
+      abi: VARMarket_ABI,
+      functionName: 'claimVAR',
+      args: [BigInt(matchId), marketType],
+    })
+  }
+
+  if (alreadyClaimed) {
+    return (
+      <div className="text-center text-xs text-stadium-muted font-mono py-2">
+        VAR payout claimed
+      </div>
+    )
+  }
+
+  if (isSuccess) {
+    return (
+      <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
+        VAR payout claimed successfully
+      </div>
+    )
+  }
+
+  return (
+    <button onClick={handleClaim} disabled={isLoading} className="btn-primary w-full">
+      {isLoading ? 'Claiming...' : 'Claim VAR Payout'}
+    </button>
   )
 }

@@ -5,152 +5,148 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IConvictionHookMultiplier {
-    function getConvictionMultiplier(address user, string memory team) external view returns (uint256);
+interface IConvictionVault {
+    function getConvictionMultiplier(address user, uint16 teamId) external view returns (uint256);
 }
 
-interface IChampionPoolRecord {
+interface IChampionPoolVAR {
     function recordDeposit(uint256 amount) external;
 }
 
-/// @notice Handles all VAR prediction market logic for all 4 markets per match.
+/// @notice VAR prediction market — completely rewritten with uint8 outcome enums,
+///         uint16 teamIds, and pull-based claims (no payment loops in settleMarket).
 ///
-/// Outcome routing:
-///   MATCH_WINNER  (type 0): "teamA" → yesPool | "teamB" → noPool | "draw" → drawPool
-///   FIRST_GOAL    (type 1): "teamA" → yesPool | "teamB" → noPool | "none" → drawPool
-///   RED_CARD      (type 2): "YES"   → yesPool | "NO"   → noPool
-///   EXTRA_TIME    (type 3): "YES"   → yesPool | "NO"   → noPool
+/// Market types (MarketType enum, stored as uint8 index 0-3):
+///   0 = MatchWinner  — valid outcomes: TEAM_A(1), TEAM_B(2), DRAW(3)
+///   1 = FirstGoal    — valid outcomes: TEAM_A(1), TEAM_B(2), NO_GOAL(6)
+///   2 = RedCard      — valid outcomes: YES(4), NO(5)
+///   3 = ExtraTime    — valid outcomes: YES(4), NO(5)
 ///
-/// Distribution on settlement (percentages of the total losingPool):
-///   10% → per-loser refunds  |  45% → winners pool  |  25% → champion pool  |  20% → treasury
-///
-/// Conviction multiplier: applied as a weighted share — conviction holders receive a larger
-/// proportion of the 45% winners pool without creating extra tokens.
+/// Settlement distribution (percentages of losingPool):
+///   10% → per-loser refund pool (10% of each loser's bet returned on claim)
+///   45% → winners pool (distributed pro-rata weighted by conviction multiplier)
+///   22.5% → champion pool
+///   22.5% → treasury  (= remaining - toWinnersPool - toChampPool, absorbs rounding)
+///   Total of remaining (90% of losingPool): 50 + 25 + 25 = 100% ✓
 contract VARMarket is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // ────────────────────────────── Constants ──────────────────────────────
+    // ─────────────────────────────── Outcome constants ───────────────────────────────
+
+    uint8 public constant OUTCOME_NONE    = 0;  // unset / invalid
+    uint8 public constant OUTCOME_TEAM_A  = 1;
+    uint8 public constant OUTCOME_TEAM_B  = 2;
+    uint8 public constant OUTCOME_DRAW    = 3;
+    uint8 public constant OUTCOME_YES     = 4;
+    uint8 public constant OUTCOME_NO      = 5;
+    uint8 public constant OUTCOME_NO_GOAL = 6;
+
+    // ─────────────────────────────── Market type constants ───────────────────────────────
 
     uint8 public constant MARKET_MATCH_WINNER = 0;
     uint8 public constant MARKET_FIRST_GOAL   = 1;
     uint8 public constant MARKET_RED_CARD     = 2;
     uint8 public constant MARKET_EXTRA_TIME   = 3;
 
-    bytes32 private constant H_TEAM_A = keccak256(bytes("teamA"));
-    bytes32 private constant H_TEAM_B = keccak256(bytes("teamB"));
-    bytes32 private constant H_DRAW   = keccak256(bytes("draw"));
-    bytes32 private constant H_NONE   = keccak256(bytes("none"));
-    bytes32 private constant H_YES    = keccak256(bytes("YES"));
-    bytes32 private constant H_NO     = keccak256(bytes("NO"));
+    // ─────────────────────────────── Structs ───────────────────────────────
 
-    // ────────────────────────────── Types ──────────────────────────────
-
-    struct MarketInfo {
-        uint256 matchId;
-        uint8   marketType;
+    struct MarketState {
+        uint16  teamAId;
+        uint16  teamBId;
         bool    open;
         bool    settled;
-        string  correctOutcome;
-        uint256 totalYesPool;   // teamA / YES bets
-        uint256 totalNoPool;    // teamB / NO  bets
-        uint256 totalDrawPool;  // draw / none bets (3-way markets only)
+        uint8   correctOutcome;
+        uint256 toWinnersPool;        // set at settlement
+        uint256 totalWeightedWinning; // set at settlement (for share computation)
     }
 
-    // ────────────────────────────── State ──────────────────────────────
+    // ─────────────────────────────── State ───────────────────────────────
 
     IERC20 public immutable usdc;
 
     address public immutable oracle;
-    address public immutable convictionHook;
+    address public immutable vault;      // IConvictionVault — for multiplier queries
     address public immutable treasury;
     address public immutable championPool;
 
-    // matchId → marketType → MarketInfo
-    mapping(uint256 => mapping(uint8 => MarketInfo)) public markets;
+    /// @notice matchId → marketType → market state
+    mapping(uint256 => mapping(uint8 => MarketState)) public markets;
 
-    // Per-user bet amounts per outcome bucket
-    mapping(uint256 => mapping(uint8 => mapping(address => uint256))) public yesAmounts;
-    mapping(uint256 => mapping(uint8 => mapping(address => uint256))) public noAmounts;
-    mapping(uint256 => mapping(uint8 => mapping(address => uint256))) public drawAmounts;
+    /// @notice matchId → marketType → outcome → total USDC bet on that outcome
+    mapping(uint256 => mapping(uint8 => mapping(uint8 => uint256))) public outcomePool;
 
-    // Ordered participant list for iteration during settlement
-    mapping(uint256 => mapping(uint8 => address[])) public marketParticipants;
+    /// @notice Per-user bet amounts
+    mapping(uint256 => mapping(uint8 => mapping(address => mapping(uint8 => uint256)))) public betAmount;
+
+    /// @notice Conviction multiplier captured at bet time (100 or 150); last-write-wins per user per market
+    mapping(uint256 => mapping(uint8 => mapping(address => uint256))) public betMultiplier;
+
+    /// @notice Whether the user has already participated in this market (for dedup in participants list)
     mapping(uint256 => mapping(uint8 => mapping(address => bool))) public hasParticipated;
 
-    // Team names stored at market-open time for conviction multiplier lookups
-    mapping(uint256 => string) public matchTeamA;
-    mapping(uint256 => string) public matchTeamB;
+    /// @notice Ordered participant list — iterated in settleMarket to compute totalWeightedWinning
+    mapping(uint256 => mapping(uint8 => address[])) public participants;
 
-    // ────────────────────────────── Events ──────────────────────────────
+    /// @notice Whether the user has already pulled their payout/refund for this market
+    mapping(uint256 => mapping(uint8 => mapping(address => bool))) public claimed;
 
-    event BetPlaced(uint256 indexed matchId, uint8 marketType, address indexed user, string outcome, uint256 amount);
-    event MarketSettled(uint256 indexed matchId, uint8 marketType, string correctOutcome);
-    event RefundSent(address indexed user, uint256 amount);
-    event PayoutSent(address indexed user, uint256 amount);
-    event MarketsOpened(uint256 indexed matchId);
+    // ─────────────────────────────── Events ───────────────────────────────
+
+    event MarketsOpened(uint256 indexed matchId, uint16 teamAId, uint16 teamBId);
     event MarketsClosed(uint256 indexed matchId);
+    event BetPlaced(uint256 indexed matchId, uint8 marketType, address indexed user, uint8 outcome, uint256 amount);
+    event MarketSettled(uint256 indexed matchId, uint8 marketType, uint8 correctOutcome, uint256 toWinnersPool);
+    event VARClaimed(address indexed user, uint256 indexed matchId, uint8 marketType, uint256 payout);
 
-    // ────────────────────────────── Constructor ──────────────────────────────
-
-    constructor(
-        address _usdc,
-        address _oracle,
-        address _convictionHook,
-        address _treasury,
-        address _championPool
-    ) {
-        require(_usdc           != address(0), "VARMarket: zero usdc");
-        require(_oracle         != address(0), "VARMarket: zero oracle");
-        require(_treasury       != address(0), "VARMarket: zero treasury");
-        require(_championPool   != address(0), "VARMarket: zero champPool");
-        // convictionHook may legitimately be address(0) if multiplier not used
-        usdc         = IERC20(_usdc);
-        oracle       = _oracle;
-        convictionHook = _convictionHook;
-        treasury     = _treasury;
-        championPool = _championPool;
-    }
+    // ─────────────────────────────── Modifiers ───────────────────────────────
 
     modifier onlyOracle() {
         require(msg.sender == oracle, "VARMarket: not oracle");
         _;
     }
 
-    // ────────────────────────────── Oracle: open / close ──────────────────────────────
+    // ─────────────────────────────── Constructor ───────────────────────────────
 
-    /// @notice Open all 4 markets for a match and record team names for multiplier lookups
+    constructor(
+        address _usdc,
+        address _oracle,
+        address _vault,
+        address _treasury,
+        address _championPool
+    ) {
+        require(_usdc         != address(0), "VARMarket: zero usdc");
+        require(_oracle       != address(0), "VARMarket: zero oracle");
+        require(_treasury     != address(0), "VARMarket: zero treasury");
+        require(_championPool != address(0), "VARMarket: zero champPool");
+        // _vault may be address(0) if vault not deployed yet; multiplier defaults to 100
+        usdc         = IERC20(_usdc);
+        oracle       = _oracle;
+        vault        = _vault;
+        treasury     = _treasury;
+        championPool = _championPool;
+    }
+
+    // ─────────────────────────────── Oracle: open / close ───────────────────────────────
+
+    /// @notice Open all 4 markets for a match and record the team IDs for multiplier lookups.
     function openMarketsWithTeams(
         uint256 matchId,
-        string memory teamA,
-        string memory teamB
+        uint16  teamAId,
+        uint16  teamBId
     ) external onlyOracle {
-        // Guard against double-open or re-opening a settled market
-        require(!markets[matchId][0].open, "VARMarket: already open");
-        require(!markets[matchId][0].settled, "VARMarket: already settled");
-
-        matchTeamA[matchId] = teamA;
-        matchTeamB[matchId] = teamB;
+        require(!markets[matchId][0].open,     "VARMarket: already open");
+        require(!markets[matchId][0].settled,  "VARMarket: already settled");
 
         for (uint8 i = 0; i < 4; i++) {
-            markets[matchId][i].matchId    = matchId;
-            markets[matchId][i].marketType = i;
-            markets[matchId][i].open       = true;
+            markets[matchId][i].teamAId = teamAId;
+            markets[matchId][i].teamBId = teamBId;
+            markets[matchId][i].open    = true;
         }
-        emit MarketsOpened(matchId);
+
+        emit MarketsOpened(matchId, teamAId, teamBId);
     }
 
-    /// @notice Legacy open (no team names) — kept for backward compat
-    function openMarkets(uint256 matchId) external onlyOracle {
-        require(!markets[matchId][0].open, "VARMarket: already open");
-        require(!markets[matchId][0].settled, "VARMarket: already settled");
-        for (uint8 i = 0; i < 4; i++) {
-            markets[matchId][i].matchId    = matchId;
-            markets[matchId][i].marketType = i;
-            markets[matchId][i].open       = true;
-        }
-        emit MarketsOpened(matchId);
-    }
-
+    /// @notice Close all 4 markets for a match (betting window ends).
     function closeMarkets(uint256 matchId) external onlyOracle {
         for (uint8 i = 0; i < 4; i++) {
             markets[matchId][i].open = false;
@@ -158,251 +154,241 @@ contract VARMarket is ReentrancyGuard {
         emit MarketsClosed(matchId);
     }
 
-    // ────────────────────────────── Oracle: settle ──────────────────────────────
+    // ─────────────────────────────── Oracle: settle ───────────────────────────────
 
-    /// @notice Settle a specific market. Idempotent.
-    ///         Markets MUST be closed before settlement can happen.
+    /// @notice Settle a specific market. Computes totalWeightedWinning and
+    ///         routes funds. Users pull payouts via claimVAR().
+    ///
+    /// Distribution of losingPool:
+    ///   loserRefundPool = losingPool * 10 / 100           (10% — reserved for 10% refunds to losers)
+    ///   remaining       = losingPool - loserRefundPool     (90% of losingPool)
+    ///   toWinnersPool   = remaining * 50 / 100             (45% of losingPool → proportional to winners)
+    ///   toChampPool     = remaining * 25 / 100             (22.5% of losingPool → champion pool)
+    ///   toTreasury      = remaining - toWinnersPool - toChampPool  (22.5% of losingPool, absorbs dust)
     function settleMarket(
         uint256 matchId,
         uint8   marketType,
-        string memory correctOutcome
-    ) external onlyOracle nonReentrant {
-        require(marketType < 4, "VARMarket: bad market type");
-        MarketInfo storage market = markets[matchId][marketType];
+        uint8   correctOutcome
+    ) external onlyOracle {
+        require(marketType < 4,               "VARMarket: bad market type");
+        require(_isValidOutcome(marketType, correctOutcome), "VARMarket: invalid outcome");
 
-        // Idempotent guard
-        if (market.settled) return;
+        MarketState storage m = markets[matchId][marketType];
+        require(!m.settled, "VARMarket: already settled");
+        require(!m.open,    "VARMarket: market still open");
 
-        // Market must be closed before settlement
-        require(!market.open, "VARMarket: market still open");
+        m.settled       = true;
+        m.correctOutcome = correctOutcome;
 
-        market.settled       = true;
-        market.correctOutcome = correctOutcome;
-
-        bytes32 outcomeHash = keccak256(bytes(correctOutcome));
-        bool is3Way = (marketType == MARKET_MATCH_WINNER || marketType == MARKET_FIRST_GOAL);
-
-        // ── Determine winner and loser pool totals ──
-        (uint256 winningPool, uint256 losingPool) = _computePools(market, outcomeHash, is3Way);
+        // ── Compute losingPool = sum of all non-winning outcome pools ──
+        uint256 losingPool = 0;
+        for (uint8 o = 1; o <= 6; o++) {
+            if (o != correctOutcome) {
+                losingPool += outcomePool[matchId][marketType][o];
+            }
+        }
 
         if (losingPool == 0) {
-            // No losers — nothing to distribute; winners keep their bets (already in contract)
-            // They can be recovered via a separate sweep, but for this protocol they stay as-is.
-            emit MarketSettled(matchId, marketType, correctOutcome);
+            // No losers — nothing to distribute; toWinnersPool stays 0
+            emit MarketSettled(matchId, marketType, correctOutcome, 0);
             return;
         }
 
-        // ── Distribution (percentages of losingPool) ──
-        // 45% to winners | 25% to champion pool | 20% to treasury | 10% refunded per loser
-        uint256 toWinnersPool = losingPool * 45 / 100;
-        uint256 toChampPool   = losingPool * 25 / 100;
-        // Treasury absorbs remainder (handles integer rounding) ≈ 20%
-        uint256 toTreasury    = losingPool - toWinnersPool - toChampPool - (losingPool * 10 / 100);
+        // ── Split losingPool ──
+        uint256 loserRefundPool = losingPool * 10 / 100;                             // 10% reserved for loser 10% refunds
+        uint256 remaining       = losingPool - loserRefundPool;                      // 90% of losingPool
+        uint256 toWinnersPool   = remaining * 50 / 100;                              // 45% of losingPool
+        uint256 toChampPool     = remaining * 25 / 100;                              // 22.5% of losingPool
+        uint256 toTreasury      = remaining - toWinnersPool - toChampPool;           // 22.5% of losingPool (absorbs dust)
 
-        // Send champion pool share (record for accounting)
+        // ── Transfer champion pool share ──
         if (toChampPool > 0) {
             usdc.safeTransfer(championPool, toChampPool);
-            IChampionPoolRecord(championPool).recordDeposit(toChampPool);
+            IChampionPoolVAR(championPool).recordDeposit(toChampPool);
         }
 
+        // ── Transfer treasury share ──
         if (toTreasury > 0) {
             usdc.safeTransfer(treasury, toTreasury);
         }
 
-        // ── First pass: compute total weighted winning shares (for conviction multiplier) ──
-        address[] memory participants = marketParticipants[matchId][marketType];
-        uint256 totalWeightedWinning = 0;
-
-        for (uint256 i = 0; i < participants.length; i++) {
-            address p = participants[i];
-            uint256 winBet = _getWinningBet(matchId, marketType, p, outcomeHash);
-            if (winBet == 0) continue;
-            uint256 multiplier = _getMultiplier(p, matchId, marketType, correctOutcome);
-            totalWeightedWinning += (winBet * multiplier) / 100;
-        }
-
-        // ── Second pass: pay winners and refund losers ──
-        for (uint256 i = 0; i < participants.length; i++) {
-            address p = participants[i];
-            uint256 winBet  = _getWinningBet(matchId, marketType, p, outcomeHash);
-            uint256 loseBet = _getLosingBet(matchId, marketType, p, outcomeHash);
-
-            if (winBet > 0 && totalWeightedWinning > 0) {
-                uint256 multiplier   = _getMultiplier(p, matchId, marketType, correctOutcome);
-                uint256 weightedBet  = (winBet * multiplier) / 100;
-                uint256 earnedShare  = (weightedBet * toWinnersPool) / totalWeightedWinning;
-                uint256 totalPayout  = winBet + earnedShare;
-                usdc.safeTransfer(p, totalPayout);
-                emit PayoutSent(p, totalPayout);
-            }
-
-            if (loseBet > 0) {
-                uint256 refund = loseBet * 10 / 100;
-                if (refund > 0) {
-                    usdc.safeTransfer(p, refund);
-                    emit RefundSent(p, refund);
-                }
+        // ── Iterate participants to compute totalWeightedWinning ──
+        //    This single pass determines each winner's proportional share of toWinnersPool.
+        address[] storage parts = participants[matchId][marketType];
+        uint256 totalWeighted = 0;
+        for (uint256 i = 0; i < parts.length; i++) {
+            address p = parts[i];
+            uint256 winBet = betAmount[matchId][marketType][p][correctOutcome];
+            if (winBet > 0) {
+                uint256 mult = betMultiplier[matchId][marketType][p];
+                if (mult == 0) mult = 100; // safety fallback
+                totalWeighted += winBet * mult / 100;
             }
         }
 
-        emit MarketSettled(matchId, marketType, correctOutcome);
+        // Store settled state for pull-based claims
+        m.toWinnersPool        = toWinnersPool;
+        m.totalWeightedWinning = totalWeighted;
+
+        emit MarketSettled(matchId, marketType, correctOutcome, toWinnersPool);
     }
 
-    // ────────────────────────────── User: place bet ──────────────────────────────
+    // ─────────────────────────────── User: place bet ───────────────────────────────
 
+    /// @notice Place a bet on a specific outcome for an open market.
+    ///         The conviction multiplier is captured once per (user, market) — the highest
+    ///         multiplier from any team relevant to the market is stored.
     function placeBet(
         uint256 matchId,
         uint8   marketType,
-        string memory outcome,
+        uint8   outcome,
         uint256 amount
     ) external nonReentrant {
         require(marketType < 4, "VARMarket: invalid market type");
-        MarketInfo storage market = markets[matchId][marketType];
-        require(market.open,   "VARMarket: market not open");
-        require(amount > 0,    "VARMarket: zero amount");
-        require(_isValidOutcome(marketType, outcome), "VARMarket: invalid outcome");
+        MarketState storage m = markets[matchId][marketType];
+        require(m.open,   "VARMarket: market not open");
+        require(amount > 0, "VARMarket: zero amount");
+        require(_isValidOutcome(marketType, outcome), "VARMarket: invalid outcome for market type");
 
         usdc.safeTransferFrom(msg.sender, address(this), amount);
 
+        // Track participant list (deduplicated)
         if (!hasParticipated[matchId][marketType][msg.sender]) {
             hasParticipated[matchId][marketType][msg.sender] = true;
-            marketParticipants[matchId][marketType].push(msg.sender);
+            participants[matchId][marketType].push(msg.sender);
         }
 
-        bytes32 h = keccak256(bytes(outcome));
-        if (h == H_TEAM_A || h == H_YES) {
-            yesAmounts[matchId][marketType][msg.sender] += amount;
-            market.totalYesPool += amount;
-        } else if (h == H_DRAW || h == H_NONE) {
-            drawAmounts[matchId][marketType][msg.sender] += amount;
-            market.totalDrawPool += amount;
-        } else {
-            // teamB or NO
-            noAmounts[matchId][marketType][msg.sender] += amount;
-            market.totalNoPool += amount;
+        // Capture conviction multiplier — relevant team depends on market type and outcome
+        uint256 newMult = _getMultiplier(msg.sender, matchId, marketType, outcome, m.teamAId, m.teamBId);
+        uint256 curMult = betMultiplier[matchId][marketType][msg.sender];
+        // Keep the higher multiplier (150 beats 100)
+        if (newMult > curMult) {
+            betMultiplier[matchId][marketType][msg.sender] = newMult;
         }
+
+        // Update per-user and per-market-outcome tallies
+        betAmount[matchId][marketType][msg.sender][outcome] += amount;
+        outcomePool[matchId][marketType][outcome]           += amount;
 
         emit BetPlaced(matchId, marketType, msg.sender, outcome, amount);
     }
 
-    // ────────────────────────────── View Functions ──────────────────────────────
+    // ─────────────────────────────── User: claim ───────────────────────────────
 
-    function getMarket(uint256 matchId, uint8 marketType) external view returns (MarketInfo memory) {
+    /// @notice Pull-based payout for a settled market.
+    ///         Winners receive their bet back plus a pro-rata share of toWinnersPool
+    ///         (weighted by conviction multiplier). Losers receive a 10% refund.
+    function claimVAR(uint256 matchId, uint8 marketType) external nonReentrant {
+        require(marketType < 4, "VARMarket: invalid market type");
+        MarketState storage m = markets[matchId][marketType];
+        require(m.settled, "VARMarket: market not settled");
+        require(!claimed[matchId][marketType][msg.sender], "VARMarket: already claimed");
+
+        claimed[matchId][marketType][msg.sender] = true;
+
+        uint8   correct  = m.correctOutcome;
+        uint256 winBet   = betAmount[matchId][marketType][msg.sender][correct];
+
+        // Sum all losing bets for this user
+        uint256 loseBet = 0;
+        for (uint8 o = 1; o <= 6; o++) {
+            if (o != correct) {
+                loseBet += betAmount[matchId][marketType][msg.sender][o];
+            }
+        }
+
+        uint256 payout = 0;
+
+        // ── Winner share ──
+        if (winBet > 0 && m.totalWeightedWinning > 0) {
+            uint256 mult = betMultiplier[matchId][marketType][msg.sender];
+            if (mult == 0) mult = 100;
+            uint256 weighted   = winBet * mult / 100;
+            uint256 earnedShare = weighted * m.toWinnersPool / m.totalWeightedWinning;
+            payout += winBet + earnedShare; // principal back + pro-rata winnings
+        } else if (winBet > 0) {
+            // Winner but no losers (totalWeightedWinning == 0) — just return the bet
+            payout += winBet;
+        }
+
+        // ── Loser 10% refund ──
+        if (loseBet > 0) {
+            payout += loseBet * 10 / 100; // 10% refund on losing bets
+        }
+
+        if (payout > 0) {
+            usdc.safeTransfer(msg.sender, payout);
+        }
+
+        emit VARClaimed(msg.sender, matchId, marketType, payout);
+    }
+
+    // ─────────────────────────────── View functions ───────────────────────────────
+
+    function getMarket(uint256 matchId, uint8 marketType) external view returns (MarketState memory) {
         return markets[matchId][marketType];
     }
 
-    function getUserBet(
-        uint256 matchId,
-        uint8   marketType,
-        address user
-    ) external view returns (uint256 yes, uint256 no, uint256 draw) {
-        return (
-            yesAmounts[matchId][marketType][user],
-            noAmounts[matchId][marketType][user],
-            drawAmounts[matchId][marketType][user]
-        );
+    function getUserBet(uint256 matchId, uint8 marketType, address user, uint8 outcome)
+        external view returns (uint256)
+    {
+        return betAmount[matchId][marketType][user][outcome];
+    }
+
+    function getOutcomePool(uint256 matchId, uint8 marketType, uint8 outcome)
+        external view returns (uint256)
+    {
+        return outcomePool[matchId][marketType][outcome];
     }
 
     function getParticipantCount(uint256 matchId, uint8 marketType) external view returns (uint256) {
-        return marketParticipants[matchId][marketType].length;
+        return participants[matchId][marketType].length;
     }
 
-    // ────────────────────────────── Internal Helpers ──────────────────────────────
+    // ─────────────────────────────── Internal helpers ───────────────────────────────
 
-    function _computePools(
-        MarketInfo storage market,
-        bytes32 outcomeHash,
-        bool is3Way
-    ) internal view returns (uint256 winningPool, uint256 losingPool) {
-        if (!is3Way) {
-            // Binary: YES or NO
-            if (outcomeHash == H_YES) {
-                winningPool = market.totalYesPool;
-                losingPool  = market.totalNoPool;
-            } else {
-                winningPool = market.totalNoPool;
-                losingPool  = market.totalYesPool;
-            }
-        } else {
-            // 3-way: teamA / teamB / draw|none
-            if (outcomeHash == H_TEAM_A) {
-                winningPool = market.totalYesPool;
-                losingPool  = market.totalNoPool + market.totalDrawPool;
-            } else if (outcomeHash == H_TEAM_B) {
-                winningPool = market.totalNoPool;
-                losingPool  = market.totalYesPool + market.totalDrawPool;
-            } else {
-                // draw or none
-                winningPool = market.totalDrawPool;
-                losingPool  = market.totalYesPool + market.totalNoPool;
-            }
-        }
-    }
-
-    function _getWinningBet(
-        uint256 matchId,
-        uint8   marketType,
-        address user,
-        bytes32 outcomeHash
-    ) internal view returns (uint256) {
-        if (outcomeHash == H_TEAM_A || outcomeHash == H_YES) {
-            return yesAmounts[matchId][marketType][user];
-        }
-        if (outcomeHash == H_TEAM_B || outcomeHash == H_NO) {
-            return noAmounts[matchId][marketType][user];
-        }
-        // draw or none
-        return drawAmounts[matchId][marketType][user];
-    }
-
-    function _getLosingBet(
-        uint256 matchId,
-        uint8   marketType,
-        address user,
-        bytes32 outcomeHash
-    ) internal view returns (uint256) {
-        uint256 total = yesAmounts[matchId][marketType][user]
-                      + noAmounts[matchId][marketType][user]
-                      + drawAmounts[matchId][marketType][user];
-        return total - _getWinningBet(matchId, marketType, user, outcomeHash);
-    }
-
-    /// @dev Returns the conviction multiplier (100 or 150) for a user given the winning outcome.
-    ///      Only teamA/teamB wins in MATCH_WINNER / FIRST_GOAL markets yield a relevant team.
-    function _getMultiplier(
-        address user,
-        uint256 matchId,
-        uint8   marketType,
-        string memory correctOutcome
-    ) internal view returns (uint256) {
-        if (convictionHook == address(0)) return 100;
-        if (marketType != MARKET_MATCH_WINNER && marketType != MARKET_FIRST_GOAL) return 100;
-
-        bytes32 h = keccak256(bytes(correctOutcome));
-        string memory relevantTeam;
-        if (h == H_TEAM_A) {
-            relevantTeam = matchTeamA[matchId];
-        } else if (h == H_TEAM_B) {
-            relevantTeam = matchTeamB[matchId];
-        } else {
-            return 100; // draw/none win — no conviction team
-        }
-
-        if (bytes(relevantTeam).length == 0) return 100;
-        return IConvictionHookMultiplier(convictionHook).getConvictionMultiplier(user, relevantTeam);
-    }
-
-    function _isValidOutcome(uint8 marketType, string memory outcome) internal pure returns (bool) {
-        bytes32 h = keccak256(bytes(outcome));
-        if (marketType == MARKET_RED_CARD || marketType == MARKET_EXTRA_TIME) {
-            return h == H_YES || h == H_NO;
-        }
+    /// @dev Validate that an outcome is legal for the given market type.
+    ///      MatchWinner (0): TEAM_A(1), TEAM_B(2), DRAW(3)
+    ///      FirstGoal   (1): TEAM_A(1), TEAM_B(2), NO_GOAL(6)
+    ///      RedCard     (2): YES(4), NO(5)
+    ///      ExtraTime   (3): YES(4), NO(5)
+    function _isValidOutcome(uint8 marketType, uint8 outcome) internal pure returns (bool) {
         if (marketType == MARKET_MATCH_WINNER) {
-            return h == H_TEAM_A || h == H_TEAM_B || h == H_DRAW;
+            return outcome == OUTCOME_TEAM_A || outcome == OUTCOME_TEAM_B || outcome == OUTCOME_DRAW;
         }
         if (marketType == MARKET_FIRST_GOAL) {
-            return h == H_TEAM_A || h == H_TEAM_B || h == H_NONE;
+            return outcome == OUTCOME_TEAM_A || outcome == OUTCOME_TEAM_B || outcome == OUTCOME_NO_GOAL;
+        }
+        if (marketType == MARKET_RED_CARD || marketType == MARKET_EXTRA_TIME) {
+            return outcome == OUTCOME_YES || outcome == OUTCOME_NO;
         }
         return false;
+    }
+
+    /// @dev Determine the relevant teamId for conviction multiplier lookup.
+    ///      Only MatchWinner and FirstGoal have team-linked conviction;
+    ///      other market types and draws always return 100.
+    function _getMultiplier(
+        address user,
+        uint256 /*matchId*/,
+        uint8   marketType,
+        uint8   outcome,
+        uint16  teamAId,
+        uint16  teamBId
+    ) internal view returns (uint256) {
+        if (vault == address(0)) return 100;
+        if (marketType != MARKET_MATCH_WINNER && marketType != MARKET_FIRST_GOAL) return 100;
+
+        uint16 relevantTeam;
+        if (outcome == OUTCOME_TEAM_A) {
+            relevantTeam = teamAId;
+        } else if (outcome == OUTCOME_TEAM_B) {
+            relevantTeam = teamBId;
+        } else {
+            return 100; // DRAW or NO_GOAL — no conviction team
+        }
+
+        if (relevantTeam == 0) return 100;
+        return IConvictionVault(vault).getConvictionMultiplier(user, relevantTeam);
     }
 }

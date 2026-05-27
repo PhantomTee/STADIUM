@@ -8,9 +8,11 @@ export const MockUSDC_ABI = [
   { inputs: [{ name: "addr", type: "address" }], name: "lastFaucetTime", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
 ]
 
-export const ConvictionHook_ABI = [
+// ConvictionVault — MasterChef-style accumulator vault (replaces old ConvictionHook)
+export const ConvictionVault_ABI = [
+  // ── User write functions ──
   {
-    inputs: [{ name: "team", type: "string" }, { name: "amount", type: "uint256" }],
+    inputs: [{ name: "teamId", type: "uint16" }, { name: "amount", type: "uint256" }],
     name: "depositConviction",
     outputs: [],
     stateMutability: "nonpayable",
@@ -24,42 +26,57 @@ export const ConvictionHook_ABI = [
     type: "function",
   },
   {
-    inputs: [{ name: "user", type: "address" }, { name: "team", type: "string" }],
-    name: "convictionDeposit",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "claimEliminatedPosition",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "claimChampionPrincipal",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // ── View functions ──
   {
     inputs: [{ name: "user", type: "address" }],
-    name: "accruedYield",
+    name: "pendingYield",
+    outputs: [{ name: "total", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "user", type: "address" }, { name: "teamId", type: "uint16" }],
+    name: "getUserDeposit",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "user", type: "address" }, { name: "team", type: "string" }],
-    name: "hasConviction",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "user", type: "address" }, { name: "team", type: "string" }],
+    inputs: [{ name: "user", type: "address" }, { name: "teamId", type: "uint16" }],
     name: "getConvictionMultiplier",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "team", type: "string" }],
-    name: "totalConvictionLocked",
+    inputs: [{ name: "", type: "address" }, { name: "", type: "uint16" }],
+    name: "deposits",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "team", type: "string" }],
+    inputs: [{ name: "", type: "uint16" }],
+    name: "teamTotalDeposit",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "uint16" }],
     name: "backerCount",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
@@ -67,42 +84,54 @@ export const ConvictionHook_ABI = [
   },
   {
     inputs: [],
-    name: "totalAliveConvictionLocked",
+    name: "totalAliveDeposits",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "team", type: "string" }],
+    inputs: [{ name: "", type: "uint16" }],
+    name: "teamActive",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "uint16" }],
     name: "teamEliminated",
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "team", type: "string" }],
+    inputs: [{ name: "", type: "uint16" }],
     name: "teamChampion",
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [],
-    name: "getAliveTeams",
-    outputs: [{ name: "", type: "string[]" }],
+    inputs: [{ name: "", type: "address" }, { name: "", type: "uint16" }],
+    name: "principalClaimed",
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ name: "team", type: "string" }],
-    name: "getTeamBackers",
-    outputs: [{ name: "", type: "address[]" }],
+    inputs: [{ name: "", type: "address" }],
+    name: "claimableYield",
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
+  // ── Events ──
   {
     anonymous: false,
-    inputs: [{ indexed: true, name: "user", type: "address" }, { name: "team", type: "string" }, { name: "amount", type: "uint256" }],
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: true, name: "teamId", type: "uint16" },
+      { name: "amount", type: "uint256" },
+    ],
     name: "ConvictionDeposited",
     type: "event",
   },
@@ -112,11 +141,38 @@ export const ConvictionHook_ABI = [
     name: "YieldClaimed",
     type: "event",
   },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: true, name: "teamId", type: "uint16" },
+      { name: "refund", type: "uint256" },
+    ],
+    name: "EliminationClaimed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: true, name: "teamId", type: "uint16" },
+      { name: "principal", type: "uint256" },
+    ],
+    name: "ChampionClaimed",
+    type: "event",
+  },
 ]
 
+// VARMarket — uint8 outcome constants, pull-based claimVAR
 export const VARMarket_ABI = [
+  // ── User write functions ──
   {
-    inputs: [{ name: "matchId", type: "uint256" }, { name: "marketType", type: "uint8" }, { name: "outcome", type: "string" }, { name: "amount", type: "uint256" }],
+    inputs: [
+      { name: "matchId", type: "uint256" },
+      { name: "marketType", type: "uint8" },
+      { name: "outcome", type: "uint8" },
+      { name: "amount", type: "uint256" },
+    ],
     name: "placeBet",
     outputs: [],
     stateMutability: "nonpayable",
@@ -124,17 +180,24 @@ export const VARMarket_ABI = [
   },
   {
     inputs: [{ name: "matchId", type: "uint256" }, { name: "marketType", type: "uint8" }],
-    name: "getMarket",
+    name: "claimVAR",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // ── View functions ──
+  {
+    inputs: [{ name: "matchId", type: "uint256" }, { name: "marketType", type: "uint8" }],
+    name: "markets",
     outputs: [{
       components: [
-        { name: "matchId", type: "uint256" },
-        { name: "marketType", type: "uint8" },
+        { name: "teamAId", type: "uint16" },
+        { name: "teamBId", type: "uint16" },
         { name: "open", type: "bool" },
         { name: "settled", type: "bool" },
-        { name: "correctOutcome", type: "string" },
-        { name: "totalYesPool", type: "uint256" },
-        { name: "totalNoPool", type: "uint256" },
-        { name: "totalDrawPool", type: "uint256" },
+        { name: "correctOutcome", type: "uint8" },
+        { name: "toWinnersPool", type: "uint256" },
+        { name: "totalWeightedWinning", type: "uint256" },
       ],
       name: "",
       type: "tuple",
@@ -143,39 +206,171 @@ export const VARMarket_ABI = [
     type: "function",
   },
   {
-    inputs: [{ name: "matchId", type: "uint256" }, { name: "marketType", type: "uint8" }, { name: "user", type: "address" }],
-    name: "getUserBet",
-    outputs: [{ name: "yes", type: "uint256" }, { name: "no", type: "uint256" }, { name: "draw", type: "uint256" }],
+    inputs: [
+      { name: "matchId", type: "uint256" },
+      { name: "marketType", type: "uint8" },
+      { name: "outcome", type: "uint8" },
+    ],
+    name: "outcomePool",
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
+    inputs: [
+      { name: "matchId", type: "uint256" },
+      { name: "marketType", type: "uint8" },
+      { name: "user", type: "address" },
+      { name: "outcome", type: "uint8" },
+    ],
+    name: "betAmount",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "matchId", type: "uint256" },
+      { name: "marketType", type: "uint8" },
+      { name: "user", type: "address" },
+    ],
+    name: "claimed",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // ── Events ──
+  {
     anonymous: false,
-    inputs: [{ indexed: true, name: "matchId", type: "uint256" }, { name: "marketType", type: "uint8" }, { indexed: true, name: "user", type: "address" }, { name: "outcome", type: "string" }, { name: "amount", type: "uint256" }],
+    inputs: [
+      { indexed: true, name: "matchId", type: "uint256" },
+      { name: "marketType", type: "uint8" },
+      { indexed: true, name: "user", type: "address" },
+      { name: "outcome", type: "uint8" },
+      { name: "amount", type: "uint256" },
+    ],
     name: "BetPlaced",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: true, name: "matchId", type: "uint256" },
+      { name: "marketType", type: "uint8" },
+      { name: "payout", type: "uint256" },
+    ],
+    name: "VARClaimed",
     type: "event",
   },
 ]
 
+// MatchOracle — uint16 teamIds, Match struct with teamAId/teamBId
 export const MatchOracle_ABI = [
+  // ── Admin write functions ──
+  {
+    inputs: [{ name: "teamId", type: "uint16" }, { name: "name", type: "string" }],
+    name: "registerTeam",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "matchId", type: "uint256" },
+      { name: "teamAId", type: "uint16" },
+      { name: "teamBId", type: "uint16" },
+      { name: "kickoffTime", type: "uint256" },
+    ],
+    name: "createMatch",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "matchId", type: "uint256" }],
+    name: "openVARWindow",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "matchId", type: "uint256" }],
+    name: "startMatch",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "matchId", type: "uint256" },
+      { name: "winner", type: "uint8" },
+      { name: "firstGoal", type: "uint8" },
+      { name: "redCard", type: "bool" },
+      { name: "extraTime", type: "bool" },
+    ],
+    name: "postResult",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "postElimination",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "postChampion",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_vault", type: "address" }, { name: "_varMarket", type: "address" }, { name: "_champPool", type: "address" }],
+    name: "setAddresses",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // ── View functions ──
   {
     inputs: [{ name: "matchId", type: "uint256" }],
     name: "getMatch",
     outputs: [{
       components: [
         { name: "matchId", type: "uint256" },
-        { name: "teamA", type: "string" },
-        { name: "teamB", type: "string" },
+        { name: "teamAId", type: "uint16" },
+        { name: "teamBId", type: "uint16" },
+        { name: "teamAName", type: "string" },
+        { name: "teamBName", type: "string" },
         { name: "kickoffTime", type: "uint256" },
         { name: "varOpen", type: "bool" },
         { name: "varClosed", type: "bool" },
         { name: "settled", type: "bool" },
-        { name: "winner", type: "string" },
-        { name: "firstGoal", type: "string" },
+        { name: "winner", type: "uint8" },
+        { name: "firstGoal", type: "uint8" },
         { name: "redCard", type: "bool" },
         { name: "extraTime", type: "bool" },
-        { name: "teamAEliminated", type: "bool" },
-        { name: "teamBEliminated", type: "bool" },
+      ],
+      name: "",
+      type: "tuple",
+    }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "getTeam",
+    outputs: [{
+      components: [
+        { name: "teamId", type: "uint16" },
+        { name: "name", type: "string" },
+        { name: "registered", type: "bool" },
+        { name: "eliminated", type: "bool" },
+        { name: "champion", type: "bool" },
       ],
       name: "",
       type: "tuple",
@@ -197,16 +392,62 @@ export const MatchOracle_ABI = [
     stateMutability: "view",
     type: "function",
   },
-]
-
-export const ChampionPool_ABI = [
   {
-    inputs: [],
-    name: "getBalance",
-    outputs: [{ name: "", type: "uint256" }],
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "teamNameOf",
+    outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "teamCount",
+    outputs: [{ name: "", type: "uint16" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // ── Events ──
+  {
+    anonymous: false,
+    inputs: [{ indexed: true, name: "teamId", type: "uint16" }, { name: "name", type: "string" }],
+    name: "TeamRegistered",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "matchId", type: "uint256" },
+      { name: "teamAId", type: "uint16" },
+      { name: "teamBId", type: "uint16" },
+      { name: "kickoffTime", type: "uint256" },
+    ],
+    name: "MatchCreated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: true, name: "teamId", type: "uint16" }, { name: "name", type: "string" }],
+    name: "TeamEliminated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: true, name: "teamId", type: "uint16" }, { name: "name", type: "string" }],
+    name: "ChampionAnnounced",
+    type: "event",
+  },
+]
+
+export const ChampionPool_ABI = [
+  // ── User write functions ──
+  {
+    inputs: [{ name: "teamId", type: "uint16" }],
+    name: "claimChampionPool",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // ── View functions ──
   {
     inputs: [],
     name: "totalAccumulated",
@@ -216,17 +457,59 @@ export const ChampionPool_ABI = [
   },
   {
     inputs: [],
-    name: "distributionComplete",
+    name: "championPoolSnapshot",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalChampionStake",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "championSet",
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
-    name: "champion",
-    outputs: [{ name: "", type: "string" }],
+    name: "championTeamId",
+    outputs: [{ name: "", type: "uint16" }],
     stateMutability: "view",
     type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "address" }, { name: "", type: "uint16" }],
+    name: "champClaimed",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // ── Events ──
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "teamId", type: "uint16" },
+      { name: "poolSnapshot", type: "uint256" },
+      { name: "totalStake", type: "uint256" },
+    ],
+    name: "ChampionDeclared",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: true, name: "teamId", type: "uint16" },
+      { name: "share", type: "uint256" },
+    ],
+    name: "ChampionShareClaimed",
+    type: "event",
   },
 ]
 
@@ -246,8 +529,8 @@ export const StadiumNFT_ABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "totalSupply",
+    inputs: [{ name: "owner", type: "address" }, { name: "index", type: "uint256" }],
+    name: "tokenOfOwnerByIndex",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
