@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { WORLD_CUP_TEAMS, formatUSDC } from '../utils/contracts'
+import { WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC } from '../utils/contracts'
 import {
-  useTotalConvictionLocked, useBackerCount, useTeamEliminated,
-  useTotalAliveConvictionLocked, useChampionPoolData,
+  useTeamTotalDeposit, useBackerCount, useTeamEliminated,
+  useTotalAliveDeposits, useChampionPoolData,
 } from '../hooks/useContracts'
 
 const TABS = ['Teams', 'Champion Pool']
@@ -17,7 +17,6 @@ export default function Leaderboard() {
         <p className="section-subtitle">Live standings by conviction locked. The most-backed team earns its supporters the most yield.</p>
       </div>
 
-      {/* Tab Nav */}
       <div className="grid grid-cols-2 gap-px bg-stadium-border">
         {TABS.map(tab => (
           <button
@@ -41,7 +40,7 @@ export default function Leaderboard() {
 }
 
 function TeamsLeaderboard() {
-  const { data: totalAlive } = useTotalAliveConvictionLocked()
+  const { data: totalAlive } = useTotalAliveDeposits()
   const [sortBy, setSortBy]  = useState('locked')
 
   return (
@@ -67,7 +66,6 @@ function TeamsLeaderboard() {
         </div>
       </div>
 
-      {/* Table header */}
       <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-mono text-stadium-muted uppercase tracking-widest border-b border-stadium-border mb-px">
         <div className="col-span-1">#</div>
         <div className="col-span-5">Team</div>
@@ -77,7 +75,7 @@ function TeamsLeaderboard() {
 
       <div className="space-y-px bg-stadium-border">
         {WORLD_CUP_TEAMS.map((team, i) => (
-          <TeamLeaderboardRow key={team.name} team={team} rank={i + 1} totalAlive={totalAlive} />
+          <TeamLeaderboardRow key={team.id} team={team} rank={i + 1} totalAlive={totalAlive} />
         ))}
       </div>
     </div>
@@ -85,9 +83,9 @@ function TeamsLeaderboard() {
 }
 
 function TeamLeaderboardRow({ team, rank, totalAlive }) {
-  const { data: locked }    = useTotalConvictionLocked(team.name)
-  const { data: backers }   = useBackerCount(team.name)
-  const { data: eliminated } = useTeamEliminated(team.name)
+  const { data: locked }    = useTeamTotalDeposit(team.id)
+  const { data: backers }   = useBackerCount(team.id)
+  const { data: eliminated } = useTeamEliminated(team.id)
 
   const pct = totalAlive && locked && totalAlive > 0n
     ? Number(locked * 10000n / totalAlive) / 100
@@ -112,7 +110,6 @@ function TeamLeaderboardRow({ team, rank, totalAlive }) {
         </div>
       </div>
       <div className="col-span-3">
-        {/* Progress bar */}
         <div className="w-full bg-stadium-border h-1 mb-1">
           <div
             className={`h-1 transition-all ${eliminated ? 'bg-stadium-muted' : 'bg-stadium-green'}`}
@@ -130,34 +127,38 @@ function TeamLeaderboardRow({ team, rank, totalAlive }) {
 }
 
 function ChampionPoolView() {
-  const { balance, totalAccumulated, champion } = useChampionPoolData()
+  const { totalAccumulated, snapshot, championSet, championTeamId } = useChampionPoolData()
+  const championTeam = TEAM_BY_ID[championTeamId]
 
   const CONTRIBUTIONS = [
     { source: 'CONVICTION Eliminations', pct: '25%', desc: "25% of each eliminated team's 50% forfeit" },
-    { source: 'VAR Losing Bets',         pct: '25%', desc: "25% of each losing VAR bet's redistribution" },
+    { source: 'VAR Losing Bets',         pct: '22.5%', desc: "22.5% of each losing VAR bet's redistribution" },
   ]
 
   return (
     <div className="space-y-6">
-      {/* Pool Size */}
       <div className="bg-stadium-card border border-stadium-gold/30 p-10 text-center">
-        <div className="text-xs font-mono text-stadium-gold uppercase tracking-widest mb-3">Current Balance</div>
+        <div className="text-xs font-mono text-stadium-gold uppercase tracking-widest mb-3">Total Accumulated</div>
         <div className="text-display text-stadium-gold" style={{ fontSize: 'clamp(3rem, 8vw, 6rem)' }}>
-          ${formatUSDC(balance)}
+          ${formatUSDC(totalAccumulated)}
         </div>
         <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest mt-3">Champion Pool</div>
-        {champion && (
-          <div className="mt-6 inline-block badge-gold text-sm">Champion: {champion}</div>
+        {championSet && championTeam && (
+          <div className="mt-6 inline-block badge-gold text-sm">
+            Champion: {championTeam.flag} {championTeam.name}
+          </div>
+        )}
+        {championSet && !championTeam && (
+          <div className="mt-6 inline-block badge-gold text-sm">Champion declared</div>
         )}
       </div>
 
-      {/* How it accumulates */}
       <div>
         <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">How the Pool Grows</div>
         <div className="grid gap-px bg-stadium-border">
           {CONTRIBUTIONS.map(c => (
             <div key={c.source} className="flex items-center gap-5 p-4 bg-stadium-card">
-              <div className="text-2xl font-black text-stadium-gold font-mono w-12 flex-shrink-0">{c.pct}</div>
+              <div className="text-2xl font-black text-stadium-gold font-mono w-16 flex-shrink-0">{c.pct}</div>
               <div>
                 <div className="font-bold text-stadium-text text-sm uppercase tracking-tight">{c.source}</div>
                 <div className="text-xs text-stadium-muted font-mono mt-0.5">{c.desc}</div>
@@ -167,7 +168,6 @@ function ChampionPoolView() {
         </div>
       </div>
 
-      {/* Distribution formula */}
       <div>
         <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">Distribution at Tournament End</div>
         <div className="bg-stadium-dark border border-stadium-border p-5 font-mono text-sm">
@@ -175,20 +175,16 @@ function ChampionPoolView() {
           <div className="space-y-1">
             <div className="text-stadium-green">share =</div>
             <div className="ml-6 text-stadium-text">(yourDeposit / totalChampDeposits)</div>
-            <div className="ml-6 text-stadium-muted">× championPoolBalance</div>
+            <div className="ml-6 text-stadium-muted">× championPoolSnapshot</div>
           </div>
-        </div>
-        <div className="text-stadium-muted text-xs font-mono mt-3 leading-relaxed">
-          The larger your CONVICTION stake on the champion, the larger your share. Distributed automatically when the oracle posts the final result.
         </div>
       </div>
 
-      {/* Favorites */}
       <div>
         <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">Tournament Favorites</div>
         <div className="space-y-px bg-stadium-border">
           {WORLD_CUP_TEAMS.slice(0, 8).map(team => (
-            <FavoriteRow key={team.name} team={team} />
+            <FavoriteRow key={team.id} team={team} />
           ))}
         </div>
       </div>
@@ -197,9 +193,9 @@ function ChampionPoolView() {
 }
 
 function FavoriteRow({ team }) {
-  const { data: locked }    = useTotalConvictionLocked(team.name)
-  const { data: backers }   = useBackerCount(team.name)
-  const { data: eliminated } = useTeamEliminated(team.name)
+  const { data: locked }    = useTeamTotalDeposit(team.id)
+  const { data: backers }   = useBackerCount(team.id)
+  const { data: eliminated } = useTeamEliminated(team.id)
 
   return (
     <div className={`flex items-center gap-3 p-4 bg-stadium-card border-l-2 border-l-transparent hover:border-l-stadium-gold/50 transition-colors ${eliminated ? 'opacity-30' : ''}`}>
