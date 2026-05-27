@@ -18,7 +18,7 @@ library HookMiner {
         uint160 flags,
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal view returns (address hookAddress, bytes32 salt) {
+    ) internal pure returns (address hookAddress, bytes32 salt) {
         bytes32 initCodeHash = keccak256(abi.encodePacked(creationCode, constructorArgs));
         uint160 targetFlags  = flags & FLAG_MASK;
 

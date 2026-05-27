@@ -306,7 +306,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     /// @dev Update stats after liquidity is added.
     function afterAddLiquidity(
         address,
-        PoolKey calldata key,
+        PoolKey calldata,
         IPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta,
         BalanceDelta,

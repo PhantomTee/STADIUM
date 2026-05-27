@@ -20,6 +20,10 @@ import {StadiumHook} from "../src/StadiumHook.sol";
 /// Usage:
 ///   forge script script/DeployHook.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
 contract DeployHook is Script {
+    // Foundry routes `new Contract{salt: s}()` broadcasts through this
+    // deterministic CREATE2 factory (auto-deployed by forge if absent).
+    address constant CREATE2_FACTORY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+
     function run() external {
         uint256 deployerKey  = vm.envUint("PRIVATE_KEY");
         address owner        = vm.addr(deployerKey);
@@ -39,7 +43,7 @@ contract DeployHook is Script {
         //   keccak256(0xff ++ deployer ++ salt ++ initCodeHash) has the correct flag bits
         bytes memory constructorArgs = abi.encode(IPoolManager(poolManager), owner);
         (address hookAddress, bytes32 salt) = HookMiner.find(
-            address(this),            // CREATE2 deployer = this script contract
+            CREATE2_FACTORY,
             flags,
             type(StadiumHook).creationCode,
             constructorArgs
