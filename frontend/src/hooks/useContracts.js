@@ -50,7 +50,7 @@ export function useConvictionDeposit(user, teamId) {
     abi: ConvictionVault_ABI,
     functionName: 'deposits',
     args: [user, teamId],
-    query: { enabled: !!user && teamId !== undefined },
+    query: { enabled: !!user && teamId !== undefined, refetchInterval: 15_000 },
   })
 }
 
@@ -70,7 +70,7 @@ export function useTeamTotalDeposit(teamId) {
     abi: ConvictionVault_ABI,
     functionName: 'teamTotalDeposit',
     args: [teamId],
-    query: { enabled: teamId !== undefined },
+    query: { enabled: teamId !== undefined, refetchInterval: 15_000 },
   })
 }
 
@@ -80,7 +80,7 @@ export function useBackerCount(teamId) {
     abi: ConvictionVault_ABI,
     functionName: 'backerCount',
     args: [teamId],
-    query: { enabled: teamId !== undefined },
+    query: { enabled: teamId !== undefined, refetchInterval: 15_000 },
   })
 }
 
@@ -89,6 +89,7 @@ export function useTotalAliveDeposits() {
     address: ADDRESSES.convictionVault,
     abi: ConvictionVault_ABI,
     functionName: 'totalAliveDeposits',
+    query: { refetchInterval: 15_000 },
   })
 }
 
