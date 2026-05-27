@@ -267,7 +267,9 @@ function DepositForm({ team, usdcBalance, allowance, userAddress, convictionOpen
 
   const parsedAmount   = amount         ? parseUSDC(amount)         : 0n
   const parsedWithdraw = withdrawAmount ? parseUSDC(withdrawAmount) : 0n
-  const needsApproval  = allowance !== undefined && parsedAmount > 0n && allowance < parsedAmount
+  // Default to requiring approval while allowance is still loading (undefined).
+  // Showing Approve is always safe; showing Deposit without allowance causes a revert.
+  const needsApproval  = parsedAmount > 0n && (allowance === undefined || allowance < parsedAmount)
   const maxAmount      = usdcBalance ? formatUSDC(usdcBalance).replace(/,/g, '') : '0'
   const maxWithdraw    = userDeposit ? formatUSDC(userDeposit).replace(/,/g, '') : '0'
   const txPending      = approvePending || depositPending
