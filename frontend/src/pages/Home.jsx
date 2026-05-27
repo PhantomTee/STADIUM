@@ -4,42 +4,6 @@ import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import StadiumHero from '../components/StadiumHero'
 
-/* ─── Football pitch SVG background (used in lower sections) ─────────────── */
-function PitchBackground() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
-      <svg
-        className="absolute top-0 left-0 w-full h-full text-stadium-green"
-        viewBox="0 0 1200 560"
-        preserveAspectRatio="xMidYMid slice"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        opacity="0.07"
-      >
-        <rect x="40" y="20" width="1120" height="520" />
-        <line x1="600" y1="20" x2="600" y2="540" />
-        <circle cx="600" cy="280" r="80" />
-        <circle cx="600" cy="280" r="5" fill="currentColor" />
-        <rect x="40" y="140" width="180" height="280" />
-        <rect x="40" y="210" width="60" height="140" />
-        <circle cx="152" cy="280" r="4" fill="currentColor" />
-        <path d="M 220 195 A 80 80 0 0 1 220 365" />
-        <rect x="980" y="140" width="180" height="280" />
-        <rect x="1100" y="210" width="60" height="140" />
-        <circle cx="1048" cy="280" r="4" fill="currentColor" />
-        <path d="M 980 195 A 80 80 0 0 0 980 365" />
-        <path d="M 40 37 A 18 18 0 0 1 57 20" />
-        <path d="M 1143 20 A 18 18 0 0 1 1160 37" />
-        <path d="M 57 540 A 18 18 0 0 1 40 523" />
-        <path d="M 1160 523 A 18 18 0 0 1 1143 540" />
-      </svg>
-      <div className="absolute inset-0 pitch-fade-x" />
-      <div className="absolute inset-0 pitch-fade-y" />
-    </div>
-  )
-}
-
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function Home() {
   const { isConnected } = useAccount()
@@ -200,8 +164,7 @@ export default function Home() {
 
         {/* ── CTA ───────────────────────────────────────────────────────── */}
         <section className="relative -mx-4 border-t border-stadium-border overflow-hidden">
-          <PitchBackground />
-          <div className="relative z-10 text-center py-24 px-4">
+          <div className="text-center py-24 px-4">
             <div className="rule-label justify-center mb-8">
               <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
               The tournament starts soon

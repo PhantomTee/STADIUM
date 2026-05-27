@@ -94,16 +94,16 @@ export default function Layout({ children }) {
   const [light, setLight] = useTheme()
 
   return (
-    <div className="min-h-screen bg-stadium-dark flex flex-col">
+    <div className="min-h-screen flex flex-col">
       {/* Top Nav */}
-      <header className="border-b border-stadium-border sticky top-0 z-40 bg-stadium-dark/95 backdrop-blur-sm">
+      <header className="border-b border-stadium-border sticky top-0 z-40 backdrop-blur-md" style={{ background: 'rgba(8,14,8,0.92)' }}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
 
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <BallIcon />
-            <span className="font-black text-lg text-stadium-text group-hover:text-stadium-green transition-colors tracking-tight uppercase">
-              STADIUM
+            <span className="text-stadium-text group-hover:text-stadium-green transition-colors" style={{ fontFamily: "'Anton', sans-serif", fontSize: 22, letterSpacing: '-0.02em' }}>
+              11°
             </span>
             <span className="hidden sm:inline text-stadium-muted text-xs ml-1 font-mono">/ World Cup DeFi</span>
           </Link>
@@ -174,12 +174,12 @@ export default function Layout({ children }) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-stadium-border py-8 mt-8">
+      <footer className="border-t border-stadium-border py-8 mt-8" style={{ background: 'rgba(8,14,8,0.7)' }}>
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <BallIcon />
-            <span className="font-black text-sm text-stadium-text uppercase tracking-tight">STADIUM</span>
-            <span className="text-stadium-muted text-xs font-mono ml-2">— Back Your Team. Earn While They Win.</span>
+            <span className="text-stadium-text" style={{ fontFamily: "'Anton', sans-serif", fontSize: 20, letterSpacing: '-0.02em' }}>11°</span>
+            <span className="text-stadium-muted text-xs font-mono ml-2">— Back Your Team. Trade The Match. Win The Cup.</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-stadium-muted font-mono">
             <span>X Layer Testnet · Chain ID 195</span>

@@ -197,98 +197,6 @@ function ScoreBoard({
   )
 }
 
-/* ─── Football pitch background ─────────────────────────────────────────────── */
-
-function PitchField() {
-  return (
-    <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 0 }}>
-      <svg
-        className="w-full h-full"
-        viewBox="0 0 420 680"
-        preserveAspectRatio="xMidYMid slice"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          {/* Alternating grass stripes */}
-          <pattern id="grassStripe" x="0" y="0" width="70" height="680" patternUnits="userSpaceOnUse">
-            <rect width="70" height="680" fill="#1a6e1a" />
-            <rect width="35" height="680" fill="#1e7d1e" />
-          </pattern>
-          {/* Texture noise approximation using turbulence */}
-          <filter id="grassTex" x="0%" y="0%" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise" />
-            <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise" />
-            <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend" />
-            <feComposite in="blend" in2="SourceGraphic" operator="in" />
-          </filter>
-        </defs>
-
-        {/* Grass base with stripes */}
-        <rect width="420" height="680" fill="url(#grassStripe)" />
-
-        {/* Subtle grass texture overlay */}
-        <rect width="420" height="680" fill="rgba(0,0,0,0.06)" />
-
-        {/* ── Pitch markings ── */}
-        <g fill="none" stroke="rgba(255,255,255,0.88)" strokeWidth="2.2" strokeLinejoin="round">
-
-          {/* Outer boundary */}
-          <rect x="22" y="18" width="376" height="644" />
-
-          {/* Center line */}
-          <line x1="22" y1="340" x2="398" y2="340" />
-
-          {/* Center circle */}
-          <circle cx="210" cy="340" r="62" />
-          {/* Center spot */}
-          <circle cx="210" cy="340" r="3.5" fill="rgba(255,255,255,0.88)" stroke="none" />
-
-          {/* ── TOP HALF ── */}
-          {/* Top penalty area */}
-          <rect x="98" y="18" width="224" height="128" />
-          {/* Top 6-yard box */}
-          <rect x="148" y="18" width="124" height="52" />
-          {/* Top penalty spot */}
-          <circle cx="210" cy="98" r="3.5" fill="rgba(255,255,255,0.88)" stroke="none" />
-          {/* Top penalty arc (outside the box) */}
-          <path d="M 155 146 A 62 62 0 0 1 265 146" />
-          {/* Top goal (outside boundary) */}
-          <rect x="168" y="6" width="84" height="14" />
-
-          {/* ── BOTTOM HALF ── */}
-          {/* Bottom penalty area */}
-          <rect x="98" y="534" width="224" height="128" />
-          {/* Bottom 6-yard box */}
-          <rect x="148" y="610" width="124" height="52" />
-          {/* Bottom penalty spot */}
-          <circle cx="210" cy="582" r="3.5" fill="rgba(255,255,255,0.88)" stroke="none" />
-          {/* Bottom penalty arc */}
-          <path d="M 155 534 A 62 62 0 0 0 265 534" />
-          {/* Bottom goal */}
-          <rect x="168" y="660" width="84" height="14" />
-
-          {/* Corner arcs */}
-          <path d="M 22 34 A 16 16 0 0 1 38 18" />
-          <path d="M 382 18 A 16 16 0 0 1 398 34" />
-          <path d="M 38 662 A 16 16 0 0 1 22 646" />
-          <path d="M 398 646 A 16 16 0 0 1 382 662" />
-        </g>
-      </svg>
-
-      {/* Dark vignette overlay so content stays readable */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'radial-gradient(ellipse 90% 70% at 50% 50%, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0.82) 100%)',
-        }}
-      />
-      {/* Top + bottom edge darken */}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.55) 100%)' }} />
-    </div>
-  )
-}
-
 /* ─── Main hero ──────────────────────────────────────────────────────────────── */
 
 export default function StadiumHero() {
@@ -302,10 +210,8 @@ export default function StadiumHero() {
   return (
     <section
       className="relative -mx-4 -mt-8 overflow-hidden flex flex-col items-center justify-center"
-      style={{ height: '100svh', minHeight: 640 }}
+      style={{ height: '100svh', minHeight: 640, background: 'rgba(0,0,0,0.30)', position: 'relative', zIndex: 1 }}
     >
-      {/* Pitch background */}
-      <PitchField />
 
       {/* Content layer */}
       <div
