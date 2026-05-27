@@ -93,6 +93,16 @@ export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [light, setLight] = useTheme()
 
+  // Lock body scroll when overlay is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [mobileOpen])
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Top Nav */}
@@ -146,26 +156,80 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div className="md:hidden border-t border-stadium-border bg-stadium-dark px-4 pb-4">
-            {NAV_ITEMS.map(({ path, label }) => (
-              <Link
-                key={path}
-                to={path}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center px-3 py-3 text-xs font-bold uppercase tracking-widest transition-colors mt-1 ${
-                  location.pathname === path
-                    ? 'text-stadium-green border-l-2 border-stadium-green pl-2'
-                    : 'text-stadium-muted hover:text-stadium-text'
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        )}
       </header>
+
+      {/* Mobile overlay — rendered outside header so it covers full viewport */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-30 flex flex-col"
+          style={{
+            background: 'rgba(4, 8, 4, 0.82)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+          onClick={() => setMobileOpen(false)}
+        >
+          {/* Pitch stripe tint overlay */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, transparent 110px, rgba(0,255,135,0.025) 110px, rgba(0,255,135,0.025) 220px)',
+            }}
+          />
+
+          {/* Content — stop propagation so clicking links doesn't close before navigating */}
+          <div
+            className="relative flex flex-col justify-center flex-1 px-8"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Green rule at top */}
+            <div className="flex items-center gap-3 mb-12">
+              <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
+              <span className="text-xs font-mono text-stadium-muted uppercase tracking-widest">Navigation</span>
+            </div>
+
+            <nav className="space-y-1">
+              {NAV_ITEMS.map(({ path, label }, i) => {
+                const active = location.pathname === path
+                return (
+                  <Link
+                    key={path}
+                    to={path}
+                    onClick={() => setMobileOpen(false)}
+                    style={{ animationDelay: `${i * 40}ms` }}
+                    className={`flex items-center justify-between py-4 border-b transition-all duration-150 ${
+                      active
+                        ? 'border-stadium-green/30 text-stadium-green'
+                        : 'border-stadium-border/40 text-stadium-muted hover:text-stadium-text hover:border-stadium-border'
+                    }`}
+                  >
+                    <span
+                      style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(22px, 6vw, 32px)', letterSpacing: '-0.02em' }}
+                    >
+                      {label}
+                    </span>
+                    {active && (
+                      <span className="text-stadium-green font-mono text-xs">●</span>
+                    )}
+                  </Link>
+                )
+              })}
+            </nav>
+
+            {/* Bottom wallet row */}
+            <div className="mt-12 pt-6 border-t border-stadium-border/40 flex items-center justify-between">
+              <button
+                onClick={() => setLight(l => !l)}
+                className="p-2 text-stadium-muted hover:text-stadium-green transition-colors"
+                aria-label="Toggle theme"
+              >
+                {light ? <MoonIcon /> : <SunIcon />}
+              </button>
+              <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {isConnected && <NetworkBanner />}
 
