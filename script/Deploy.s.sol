@@ -11,6 +11,8 @@ import {StadiumNFT}      from "../src/StadiumNFT.sol";
 import {MatchOracle}     from "../src/MatchOracle.sol";
 import {ConvictionVault} from "../src/ConvictionVault.sol";
 import {VARMarket}       from "../src/VARMarket.sol";
+import {Treasury}        from "../src/Treasury.sol";
+import {TeamFactory}     from "../src/TeamFactory.sol";
 
 /// @notice Deploys the full STADIUM protocol.
 ///
@@ -67,23 +69,27 @@ contract Deploy is Script {
             usdc.mint(deployer, 10_000_000 * 1e6); // 10M USDC
         }
 
-        // 3. ChampionPool
+        // 3. Treasury
+        Treasury treasuryContract = new Treasury(deployer, usdcAddr);
+        console.log("Treasury:", address(treasuryContract));
+
+        // 4. ChampionPool
         ChampionPool champPool = new ChampionPool(usdcAddr, deployer);
         console.log("ChampionPool:", address(champPool));
 
-        // 4. StadiumNFT
+        // 5. StadiumNFT
         StadiumNFT nft = new StadiumNFT(deployer);
         console.log("StadiumNFT:", address(nft));
 
-        // 5. MatchOracle
+        // 6. MatchOracle
         MatchOracle oracle = new MatchOracle(deployer, treasury);
         console.log("MatchOracle:", address(oracle));
 
-        // 6. ConvictionVault (replaces old ConvictionHook accounting)
+        // 7. ConvictionVault
         ConvictionVault vault = new ConvictionVault(usdcAddr, treasury, deployer);
         console.log("ConvictionVault:", address(vault));
 
-        // 7. VARMarket
+        // 8. VARMarket
         VARMarket varMarket = new VARMarket(
             usdcAddr,
             address(oracle),
@@ -93,7 +99,11 @@ contract Deploy is Script {
         );
         console.log("VARMarket:", address(varMarket));
 
-        // 8. Wire addresses
+        // 9. TeamFactory (hook address = address(0) until DeployHook.s.sol is run)
+        TeamFactory teamFactory = new TeamFactory(poolManagerAddr, usdcAddr, address(0), deployer);
+        console.log("TeamFactory:", address(teamFactory));
+
+        // 10. Wire addresses
         vault.setOracle(address(oracle));
         vault.setChampionPool(address(champPool));
         vault.setStadiumNFT(address(nft));
@@ -112,25 +122,32 @@ contract Deploy is Script {
         console.log("Treasury:       ", treasury);
         console.log("PoolManager:    ", poolManagerAddr, demoPoolManager ? "[DEMO]" : "[OFFICIAL]");
         console.log("MockUSDC:       ", usdcAddr);
+        console.log("TreasuryContract:", address(treasuryContract));
         console.log("ChampionPool:   ", address(champPool));
         console.log("StadiumNFT:     ", address(nft));
         console.log("MatchOracle:    ", address(oracle));
         console.log("ConvictionVault:", address(vault));
         console.log("VARMarket:      ", address(varMarket));
+        console.log("TeamFactory:    ", address(teamFactory));
+        console.log("\nNote: Deploy StadiumHook separately via DeployHook.s.sol (requires address mining).");
+        console.log("      After hook deployed, call: teamFactory.setHook(hookAddress)");
 
         // Write deployments.json
         string memory chainIdStr = vm.toString(block.chainid);
         string memory json = string.concat(
             '{\n',
-            '  "chainId": ',        chainIdStr,                          ',\n',
-            '  "demoPoolManager": ', demoPoolManager ? "true" : "false", ',\n',
-            '  "poolManager": "',   vm.toString(poolManagerAddr),        '",\n',
-            '  "mockUSDC": "',      vm.toString(usdcAddr),               '",\n',
-            '  "championPool": "',  vm.toString(address(champPool)),     '",\n',
-            '  "stadiumNFT": "',    vm.toString(address(nft)),           '",\n',
-            '  "matchOracle": "',   vm.toString(address(oracle)),        '",\n',
-            '  "convictionVault": "',vm.toString(address(vault)),        '",\n',
-            '  "varMarket": "',     vm.toString(address(varMarket)),     '"\n',
+            '  "chainId": ',           chainIdStr,                          ',\n',
+            '  "demoPoolManager": ',   demoPoolManager ? "true" : "false",  ',\n',
+            '  "poolManager": "',      vm.toString(poolManagerAddr),        '",\n',
+            '  "mockUSDC": "',         vm.toString(usdcAddr),               '",\n',
+            '  "treasury": "',         vm.toString(address(treasuryContract)), '",\n',
+            '  "championPool": "',     vm.toString(address(champPool)),     '",\n',
+            '  "stadiumNFT": "',       vm.toString(address(nft)),           '",\n',
+            '  "matchOracle": "',      vm.toString(address(oracle)),        '",\n',
+            '  "convictionVault": "',  vm.toString(address(vault)),         '",\n',
+            '  "varMarket": "',        vm.toString(address(varMarket)),     '",\n',
+            '  "teamFactory": "',      vm.toString(address(teamFactory)),   '",\n',
+            '  "stadiumHook": ""',                                           '\n',
             '}'
         );
         vm.writeFile("./deployments.json", json);
