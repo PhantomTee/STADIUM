@@ -11,31 +11,30 @@ interface ITeamFactory {
     function teamPoolId(uint16 teamId) external view returns (bytes32);
 }
 
-/// @notice Registers demo teams in TeamFactory and creates their Uniswap V4 pools.
+/// @notice Registers all 48 World Cup 2026 teams in TeamFactory and creates their Uniswap V4 pools.
 ///
 /// Required env vars:
-///   PRIVATE_KEY              — deployer private key
-///   TEAM_FACTORY_ADDRESS     — deployed TeamFactory address
+///   PRIVATE_KEY              - deployer private key
+///   TEAM_FACTORY_ADDRESS     - deployed TeamFactory address
 ///
 /// Optional:
-///   STADIUM_HOOK_ADDRESS     — if set, updates the factory hook before pool creation
+///   STADIUM_HOOK_ADDRESS     - if set, updates the factory hook before pool creation
 ///
 /// Usage:
 ///   forge script script/CreatePools.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
 contract CreatePools is Script {
-    // 1:1 initial price (token0/token1 = 1)
     uint160 constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
     int24   constant TICK_SPACING   = 60;
 
     function run() external {
-        uint256 deployerKey  = vm.envUint("PRIVATE_KEY");
-        address factoryAddr  = vm.envAddress("TEAM_FACTORY_ADDRESS");
+        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        address factoryAddr = vm.envAddress("TEAM_FACTORY_ADDRESS");
         require(factoryAddr != address(0), "CreatePools: TEAM_FACTORY_ADDRESS not set");
 
         ITeamFactory factory = ITeamFactory(factoryAddr);
-
-        // Optional: update hook address before creating pools
         address hookAddr = _envAddressOr("STADIUM_HOOK_ADDRESS", address(0));
+
+        (uint16[] memory ids, string[] memory names, string[] memory syms) = _teams();
 
         vm.startBroadcast(deployerKey);
 
@@ -44,30 +43,15 @@ contract CreatePools is Script {
             console.log("Hook updated:", hookAddr);
         }
 
-        // ── Register teams ─────────────────────────────────────────────────────
-
-        // World Cup 2026 demo teams
-        _registerTeam(factory, 37, "Argentina", "ARG");
-        _registerTeam(factory, 33, "France",    "FRA");
-        _registerTeam(factory, 9,  "Brazil",    "BRA");
-        _registerTeam(factory, 45, "England",   "ENG");
-        _registerTeam(factory, 1,  "Mexico",    "MEX");
-        _registerTeam(factory, 3,  "South Korea", "KOR");
-        _registerTeam(factory, 26, "Germany",   "GER");
-        _registerTeam(factory, 10, "Spain",     "ESP");
-
-        // ── Create V4 pools (requires hook to be set) ─────────────────────────
+        for (uint256 i = 0; i < ids.length; i++) {
+            _registerTeam(factory, ids[i], names[i], syms[i]);
+        }
 
         if (hookAddr != address(0)) {
-            _createPool(factory, 37);
-            _createPool(factory, 33);
-            _createPool(factory, 9);
-            _createPool(factory, 45);
-            _createPool(factory, 1);
-            _createPool(factory, 3);
-            _createPool(factory, 26);
-            _createPool(factory, 10);
-            console.log("Created V4 pools for all 8 teams");
+            for (uint256 i = 0; i < ids.length; i++) {
+                _createPool(factory, ids[i], names[i]);
+            }
+            console.log("Created V4 pools for all 48 teams");
         } else {
             console.log("Skipped pool creation - STADIUM_HOOK_ADDRESS not set");
             console.log("Set the hook and call createTeamPool() for each team manually.");
@@ -77,34 +61,132 @@ contract CreatePools is Script {
 
         console.log("\n=== TEAM REGISTRATION SUMMARY ===");
         console.log("TeamFactory:", factoryAddr);
-        console.log("Teams registered: Argentina(37), France(33), Brazil(9), England(45)");
-        console.log("                  Mexico(1), South Korea(3), Germany(26), Spain(10)");
+        console.log("Teams registered: 48 (World Cup 2026)");
 
-        // ── Write V4 pool manifest ────────────────────────────────────────────
         if (hookAddr != address(0)) {
-            string memory chainId = vm.toString(block.chainid);
-            string memory pools = string.concat(
-                '{\n',
-                '  "chainId": ', chainId, ',\n',
-                '  "hook": "', vm.toString(hookAddr), '",\n',
-                '  "tickSpacing": ', vm.toString(uint256(uint24(int24(TICK_SPACING)))), ',\n',
-                '  "sqrtPriceX96": "', vm.toString(uint256(SQRT_PRICE_1_1)), '",\n',
-                '  "pools": [\n',
-                _poolEntry(factory, 37, "Argentina", "ARG", true),
-                _poolEntry(factory, 33, "France",    "FRA", true),
-                _poolEntry(factory, 9,  "Brazil",    "BRA", true),
-                _poolEntry(factory, 45, "England",   "ENG", true),
-                _poolEntry(factory, 1,  "Mexico",    "MEX", true),
-                _poolEntry(factory, 3,  "South Korea","KOR", true),
-                _poolEntry(factory, 26, "Germany",   "GER", true),
-                _poolEntry(factory, 10, "Spain",     "ESP", false),
-                '  ]\n',
-                '}'
-            );
-            vm.writeFile("./v4-pools.json", pools);
-            console.log("\nV4 pool manifest written to v4-pools.json");
-            console.log("Copy pool IDs into frontend config for the V4 Hook Engine card.");
+            _writePoolManifest(factory, hookAddr, ids, names, syms);
         }
+    }
+
+    // ── Team list ─────────────────────────────────────────────────────────────
+
+    function _teams() internal pure returns (
+        uint16[] memory ids,
+        string[] memory names,
+        string[] memory syms
+    ) {
+        ids   = new uint16[](48);
+        names = new string[](48);
+        syms  = new string[](48);
+
+        // CONMEBOL (6)
+        ids[0]=9;   names[0]="Brazil";        syms[0]="BRA";
+        ids[1]=37;  names[1]="Argentina";     syms[1]="ARG";
+        ids[2]=5;   names[2]="Uruguay";       syms[2]="URU";
+        ids[3]=6;   names[3]="Colombia";      syms[3]="COL";
+        ids[4]=7;   names[4]="Ecuador";       syms[4]="ECU";
+        ids[5]=8;   names[5]="Chile";         syms[5]="CHI";
+
+        // CONCACAF (6 - includes 3 hosts)
+        ids[6]=1;   names[6]="Mexico";        syms[6]="MEX";
+        ids[7]=2;   names[7]="USA";           syms[7]="USA";
+        ids[8]=4;   names[8]="Canada";        syms[8]="CAN";
+        ids[9]=46;  names[9]="Costa Rica";    syms[9]="CRC";
+        ids[10]=47; names[10]="Panama";       syms[10]="PAN";
+        ids[11]=48; names[11]="Honduras";     syms[11]="HON";
+
+        // UEFA (16)
+        ids[12]=10; names[12]="Spain";        syms[12]="ESP";
+        ids[13]=26; names[13]="Germany";      syms[13]="GER";
+        ids[14]=33; names[14]="France";       syms[14]="FRA";
+        ids[15]=45; names[15]="England";      syms[15]="ENG";
+        ids[16]=11; names[16]="Portugal";     syms[16]="POR";
+        ids[17]=12; names[17]="Netherlands";  syms[17]="NED";
+        ids[18]=13; names[18]="Belgium";      syms[18]="BEL";
+        ids[19]=14; names[19]="Croatia";      syms[19]="CRO";
+        ids[20]=15; names[20]="Serbia";       syms[20]="SRB";
+        ids[21]=16; names[21]="Denmark";      syms[21]="DEN";
+        ids[22]=17; names[22]="Austria";      syms[22]="AUT";
+        ids[23]=18; names[23]="Switzerland";  syms[23]="SUI";
+        ids[24]=19; names[24]="Scotland";     syms[24]="SCO";
+        ids[25]=20; names[25]="Turkey";       syms[25]="TUR";
+        ids[26]=21; names[26]="Poland";       syms[26]="POL";
+        ids[27]=22; names[27]="Slovakia";     syms[27]="SVK";
+
+        // AFC (8)
+        ids[28]=3;  names[28]="South Korea";  syms[28]="KOR";
+        ids[29]=27; names[29]="Japan";        syms[29]="JPN";
+        ids[30]=28; names[30]="Iran";         syms[30]="IRN";
+        ids[31]=29; names[31]="Saudi Arabia"; syms[31]="KSA";
+        ids[32]=30; names[32]="Australia";    syms[32]="AUS";
+        ids[33]=31; names[33]="Uzbekistan";   syms[33]="UZB";
+        ids[34]=32; names[34]="Iraq";         syms[34]="IRQ";
+        ids[35]=34; names[35]="Indonesia";    syms[35]="IDN";
+
+        // CAF (9)
+        ids[36]=35; names[36]="Morocco";      syms[36]="MAR";
+        ids[37]=36; names[37]="Senegal";      syms[37]="SEN";
+        ids[38]=38; names[38]="Egypt";        syms[38]="EGY";
+        ids[39]=39; names[39]="Nigeria";      syms[39]="NGA";
+        ids[40]=40; names[40]="South Africa"; syms[40]="RSA";
+        ids[41]=41; names[41]="Ivory Coast";  syms[41]="CIV";
+        ids[42]=42; names[42]="DR Congo";     syms[42]="COD";
+        ids[43]=43; names[43]="Tunisia";      syms[43]="TUN";
+        ids[44]=44; names[44]="Cameroon";     syms[44]="CMR";
+
+        // OFC (1)
+        ids[45]=49; names[45]="New Zealand";  syms[45]="NZL";
+
+        // Inter-confederation playoffs (2)
+        ids[46]=50; names[46]="Ukraine";      syms[46]="UKR";
+        ids[47]=51; names[47]="Bahrain";      syms[47]="BHR";
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function _registerTeam(ITeamFactory factory, uint16 teamId, string memory name, string memory symbol) internal {
+        try factory.registerTeam(teamId, name, symbol) {
+            address token = factory.teamToken(teamId);
+            console.log(string.concat("Registered ", name, " (", symbol, ")"), token);
+        } catch {
+            console.log(string.concat("Skipped ", name, " - already registered"));
+        }
+    }
+
+    function _createPool(ITeamFactory factory, uint16 teamId, string memory name) internal {
+        try factory.createTeamPool(teamId, TICK_SPACING, SQRT_PRICE_1_1) {
+            bytes32 pid = factory.teamPoolId(teamId);
+            console.log(string.concat("Pool created: ", name, " poolId:"), vm.toString(pid));
+        } catch {
+            console.log(string.concat("Pool creation failed: ", name));
+        }
+    }
+
+    function _writePoolManifest(
+        ITeamFactory factory,
+        address hookAddr,
+        uint16[] memory ids,
+        string[] memory names,
+        string[] memory syms
+    ) internal {
+        string memory header = string.concat(
+            '{\n',
+            '  "chainId": ', vm.toString(block.chainid), ',\n',
+            '  "hook": "', vm.toString(hookAddr), '",\n',
+            '  "tickSpacing": ', vm.toString(uint256(uint24(int24(TICK_SPACING)))), ',\n',
+            '  "sqrtPriceX96": "', vm.toString(uint256(SQRT_PRICE_1_1)), '",\n',
+            '  "pools": [\n'
+        );
+
+        bytes memory entries;
+        for (uint256 i = 0; i < ids.length; i++) {
+            bool comma = (i < ids.length - 1);
+            entries = abi.encodePacked(entries, _poolEntry(factory, ids[i], names[i], syms[i], comma));
+        }
+
+        vm.writeFile("./v4-pools.json", string.concat(header, string(entries), '  ]\n}'));
+        console.log("\nV4 pool manifest written to v4-pools.json");
+        console.log("Copy pool IDs into frontend config for the V4 Hook Engine card.");
     }
 
     function _poolEntry(
@@ -124,25 +206,6 @@ contract CreatePools is Script {
             '","poolId":"', vm.toString(pid), '"}'
         );
         return comma ? string.concat(entry, ',\n') : string.concat(entry, '\n');
-    }
-
-    function _registerTeam(ITeamFactory factory, uint16 teamId, string memory name, string memory symbol) internal {
-        try factory.registerTeam(teamId, name, symbol) {
-            address token = factory.teamToken(teamId);
-            console.log(string.concat("Registered ", name, " (", symbol, ")"), token);
-        } catch {
-            console.log(string.concat("Skipped ", name, " - already registered"));
-        }
-    }
-
-    function _createPool(ITeamFactory factory, uint16 teamId) internal {
-        try factory.createTeamPool(teamId, TICK_SPACING, SQRT_PRICE_1_1) {
-            bytes32 pid = factory.teamPoolId(teamId);
-            console.log(string.concat("Pool created for teamId=", vm.toString(uint256(teamId))));
-            console.log("  poolId:", vm.toString(pid));
-        } catch {
-            console.log(string.concat("Pool creation failed for teamId=", vm.toString(uint256(teamId))));
-        }
     }
 
     function _envAddressOr(string memory key, address fallback_) internal view returns (address) {
