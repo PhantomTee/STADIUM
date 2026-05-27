@@ -132,6 +132,14 @@ export function useConvictionMultiplier(user, teamId) {
   })
 }
 
+export function useConvictionCloseTime() {
+  return useReadContract({
+    address: ADDRESSES.convictionVault,
+    abi: ConvictionVault_ABI,
+    functionName: 'convictionCloseTime',
+  })
+}
+
 // ─── VAR MARKET ──────────────────────────────────────────────────────────────
 
 export function useVARMarket(matchId, marketType) {

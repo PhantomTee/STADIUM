@@ -8,6 +8,7 @@ import {
   useConvictionDeposit, usePendingYield,
   useTeamTotalDeposit, useTeamEliminated, useTeamChampion,
   useBackerCount, useTotalAliveDeposits, usePrincipalClaimed,
+  useConvictionCloseTime,
 } from '../hooks/useContracts'
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
@@ -21,6 +22,10 @@ export default function Conviction() {
   const { data: usdcBalance } = useUSDCBalance(address)
   const { data: allowance }   = useUSDCAllowance(address, ADDRESSES.convictionVault)
   const { data: totalAlive }  = useTotalAliveDeposits()
+  const { data: closeTime }   = useConvictionCloseTime()
+
+  const nowSec = BigInt(Math.floor(Date.now() / 1000))
+  const convictionOpen = !closeTime || closeTime === 0n || nowSec < closeTime
 
   const { writeContract, data: txHash } = useWriteContract()
   const { isLoading: txPending, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
@@ -77,6 +82,25 @@ export default function Conviction() {
           </div>
         )}
       </div>
+
+      {/* Conviction Status Banner */}
+      {closeTime && closeTime > 0n && (
+        convictionOpen ? (
+          <div className="bg-stadium-gold/10 border border-stadium-gold/30 p-4 text-center space-y-1">
+            <div className="text-xs font-bold text-stadium-gold uppercase tracking-widest font-mono">
+              CONVICTION closes at tournament kickoff
+            </div>
+            <div className="text-xs text-stadium-muted font-mono">
+              Back your team before the first whistle &mdash; {new Date(Number(closeTime) * 1000).toLocaleString()}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-red-500/10 border border-red-500/20 p-4 text-center space-y-1">
+            <div className="text-xs font-bold text-red-400 uppercase tracking-widest font-mono">CONVICTION Closed</div>
+            <div className="text-xs text-stadium-muted font-mono">The tournament has kicked off. Deposits and withdrawals are locked.</div>
+          </div>
+        )
+      )}
 
       {/* Stats Strip */}
       <div className="grid grid-cols-3 gap-px bg-stadium-border text-sm">
@@ -153,6 +177,7 @@ export default function Conviction() {
                 onApprove={handleApprove}
                 onDeposit={handleDeposit}
                 userAddress={address}
+                convictionOpen={convictionOpen}
               />
             )}
           </div>
@@ -162,6 +187,8 @@ export default function Conviction() {
             <div className="text-xs font-bold text-stadium-green uppercase tracking-widest">Conviction Mechanics</div>
             <div className="space-y-2">
               {[
+                'CONVICTION closes at tournament kickoff — back your team before the first whistle',
+                'Withdraw anytime before kickoff — locked after',
                 'Earn yield automatically on every elimination',
                 'Claim yield anytime — principal stays locked',
                 'Get 1.5× VAR bonus on your team\'s matches',
@@ -233,17 +260,22 @@ function TeamCard({ team, isSelected, onSelect, userAddress }) {
   )
 }
 
-function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPending, txSuccess, onApprove, onDeposit, userAddress }) {
-  const { data: userDeposit }    = useConvictionDeposit(userAddress, team.id)
-  const { data: pendingYield }   = usePendingYield(userAddress)
-  const { data: eliminated }     = useTeamEliminated(team.id)
-  const { data: champion }       = useTeamChampion(team.id)
+function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPending, txSuccess, onApprove, onDeposit, userAddress, convictionOpen }) {
+  const { data: userDeposit }      = useConvictionDeposit(userAddress, team.id)
+  const { data: pendingYield }     = usePendingYield(userAddress)
+  const { data: eliminated }       = useTeamEliminated(team.id)
+  const { data: champion }         = useTeamChampion(team.id)
   const { data: principalClaimed } = usePrincipalClaimed(userAddress, team.id)
 
-  const { writeContract, data: claimTxHash } = useWriteContract()
-  const { isLoading: claimPending } = useWaitForTransactionReceipt({ hash: claimTxHash })
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const { writeContract, data: claimTxHash }                 = useWriteContract()
+  const { isLoading: claimPending }                          = useWaitForTransactionReceipt({ hash: claimTxHash })
+  const { writeContract: writeWithdraw, data: withdrawHash } = useWriteContract()
+  const { isLoading: withdrawPending, isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash })
 
-  const maxAmount = usdcBalance ? formatUSDC(usdcBalance).replace(/,/g, '') : '0'
+  const maxAmount   = usdcBalance  ? formatUSDC(usdcBalance).replace(/,/g, '')  : '0'
+  const maxWithdraw = userDeposit  ? formatUSDC(userDeposit).replace(/,/g, '')  : '0'
+  const parsedWithdraw = withdrawAmount ? parseUSDC(withdrawAmount) : 0n
 
   function handleClaimEliminated() {
     writeContract({
@@ -260,6 +292,16 @@ function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPe
       abi: ConvictionVault_ABI,
       functionName: 'claimChampionPrincipal',
       args: [team.id],
+    })
+  }
+
+  function handleWithdraw() {
+    if (!parsedWithdraw) return
+    writeWithdraw({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'withdrawConviction',
+      args: [team.id, parsedWithdraw],
     })
   }
 
@@ -321,6 +363,38 @@ function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPe
     )
   }
 
+  // Active team — CONVICTION window closed
+  if (!convictionOpen) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 p-3 bg-stadium-dark border border-stadium-border">
+          <span className="text-3xl">{team.flag}</span>
+          <div>
+            <div className="font-bold text-stadium-text uppercase tracking-tight">{team.name}</div>
+            <div className="text-xs text-stadium-muted font-mono">Group {team.group} · Odds: {team.odds}x</div>
+          </div>
+        </div>
+        <div className="bg-red-500/10 border border-red-500/20 p-4 text-center space-y-2">
+          <div className="text-xs font-bold text-red-400 uppercase tracking-widest font-mono">CONVICTION Closed</div>
+          <div className="text-xs text-stadium-muted font-mono">The tournament has kicked off. Deposits and withdrawals are locked.</div>
+        </div>
+        {userDeposit > 0n && (
+          <div className="bg-stadium-green/10 border border-stadium-green/20 p-3 text-xs font-mono">
+            <div className="flex justify-between text-stadium-green">
+              <span>Your stake</span>
+              <span className="font-bold">${formatUSDC(userDeposit)}</span>
+            </div>
+            <div className="flex justify-between text-stadium-muted mt-1">
+              <span>Pending yield</span>
+              <span>${formatUSDC(pendingYield)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Active team — CONVICTION window open
   return (
     <div className="space-y-4">
       {/* Team header */}
@@ -346,7 +420,7 @@ function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPe
         </div>
       )}
 
-      {/* Amount input */}
+      {/* Deposit input */}
       <div>
         <label className="text-xs font-bold text-stadium-muted uppercase tracking-widest mb-2 block">Amount (USDC)</label>
         <div className="relative">
@@ -383,6 +457,41 @@ function DepositForm({ team, amount, setAmount, usdcBalance, needsApproval, txPe
       {txSuccess && (
         <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
           Conviction deposited successfully
+        </div>
+      )}
+
+      {/* Withdrawal section — only when user has a position */}
+      {userDeposit > 0n && (
+        <div className="border-t border-stadium-border/40 pt-4 space-y-3">
+          <div className="text-xs font-bold text-stadium-muted uppercase tracking-widest">Withdraw Before Kickoff</div>
+          <div className="relative">
+            <input
+              type="number"
+              value={withdrawAmount}
+              onChange={e => setWithdrawAmount(e.target.value)}
+              placeholder="0"
+              min="1"
+              className="input-field pr-16"
+            />
+            <button
+              onClick={() => setWithdrawAmount(maxWithdraw)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stadium-green hover:text-stadium-text uppercase"
+            >
+              MAX
+            </button>
+          </div>
+          <button
+            onClick={handleWithdraw}
+            disabled={withdrawPending || !withdrawAmount || parsedWithdraw === 0n}
+            className="btn-secondary w-full"
+          >
+            {withdrawPending ? 'Withdrawing...' : 'Withdraw'}
+          </button>
+          {withdrawSuccess && (
+            <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
+              Withdrawal successful
+            </div>
+          )}
         </div>
       )}
     </div>

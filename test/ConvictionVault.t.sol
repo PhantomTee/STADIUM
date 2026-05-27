@@ -326,4 +326,52 @@ contract ConvictionVaultTest is Test {
         vm.expectRevert();
         vault.claimChampionPrincipal(TEAM_A);
     }
+
+    // ── Test 16: Deposit blocked after conviction close time ─────────────────
+
+    function test_DepositBlockedAfterCloseTime() public {
+        vault.setConvictionCloseTime(block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 2 hours);
+        vm.prank(alice);
+        vm.expectRevert("CONVICTION_CLOSED");
+        vault.depositConviction(TEAM_A, 100e6);
+    }
+
+    // ── Test 17: Withdraw succeeds before close time ──────────────────────────
+
+    function test_WithdrawBeforeCloseTime() public {
+        vault.setConvictionCloseTime(block.timestamp + 1 hours);
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+        vm.prank(alice);
+        vault.withdrawConviction(TEAM_A, 40e6);
+        assertEq(vault.deposits(alice, TEAM_A),  60e6);
+        assertEq(vault.teamTotalDeposit(TEAM_A), 60e6);
+        assertEq(vault.totalAliveDeposits(),     60e6);
+    }
+
+    // ── Test 18: Withdraw blocked after close time ────────────────────────────
+
+    function test_WithdrawBlockedAfterCloseTime() public {
+        vault.setConvictionCloseTime(block.timestamp + 1 hours);
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+        vm.warp(block.timestamp + 2 hours);
+        vm.prank(alice);
+        vm.expectRevert("CONVICTION_CLOSED");
+        vault.withdrawConviction(TEAM_A, 50e6);
+    }
+
+    // ── Test 19: Full withdraw decrements backerCount ─────────────────────────
+
+    function test_FullWithdrawDecrementsBackerCount() public {
+        vault.setConvictionCloseTime(block.timestamp + 1 hours);
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+        assertEq(vault.backerCount(TEAM_A), 1);
+        vm.prank(alice);
+        vault.withdrawConviction(TEAM_A, 100e6);
+        assertEq(vault.backerCount(TEAM_A), 0);
+        assertEq(vault.deposits(alice, TEAM_A), 0);
+    }
 }

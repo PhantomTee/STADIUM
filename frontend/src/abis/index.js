@@ -46,11 +46,16 @@ export const ConvictionVault_ABI = [
   { inputs: [{ name: "", type: "uint16" }], name: "teamChampion", outputs: [{ name: "", type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "", type: "address" }, { name: "", type: "uint16" }], name: "principalClaimed", outputs: [{ name: "", type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "", type: "address" }], name: "claimableYield", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "convictionCloseTime", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "isConvictionOpen", outputs: [{ name: "", type: "bool" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "_time", type: "uint256" }], name: "setConvictionCloseTime", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "teamId", type: "uint16" }, { name: "amount", type: "uint256" }], name: "withdrawConviction", outputs: [], stateMutability: "nonpayable", type: "function" },
   // ── Events ──
   { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: true, name: "teamId", type: "uint16" }, { name: "amount", type: "uint256" }], name: "ConvictionDeposited", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { name: "amount", type: "uint256" }], name: "YieldClaimed", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: true, name: "teamId", type: "uint16" }, { name: "refund", type: "uint256" }], name: "EliminationClaimed", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: true, name: "teamId", type: "uint16" }, { name: "principal", type: "uint256" }], name: "ChampionClaimed", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: true, name: "teamId", type: "uint16" }, { name: "amount", type: "uint256" }], name: "ConvictionWithdrawn", type: "event" },
 ]
 
 // VARMarket — uint8 outcome constants, pull-based claimVAR / claimPayout

@@ -73,6 +73,9 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
     /// @notice Number of distinct depositors per team
     mapping(uint16 => uint256) public backerCount;
 
+    /// @notice Unix timestamp after which deposits and withdrawals lock (0 = always open)
+    uint256 public convictionCloseTime;
+
     // ─────────────────────────────── Per-user mappings ───────────────────────────────
 
     /// @notice Which teamIds a user has deposited into (for iteration in claimYield / pendingYield)
@@ -100,6 +103,7 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
     event YieldClaimed(address indexed user, uint256 amount);
     event EliminationClaimed(address indexed user, uint16 indexed teamId, uint256 refund);
     event ChampionClaimed(address indexed user, uint16 indexed teamId, uint256 principal);
+    event ConvictionWithdrawn(address indexed user, uint16 indexed teamId, uint256 amount);
 
     // ─────────────────────────────── Modifiers ───────────────────────────────
 
@@ -136,6 +140,14 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
     function setStadiumNFT(address _stadiumNFT) external onlyOwner {
         require(_stadiumNFT != address(0), "ConvictionVault: zero nft");
         stadiumNFT = _stadiumNFT;
+    }
+
+    function setConvictionCloseTime(uint256 _time) external onlyOwner {
+        convictionCloseTime = _time;
+    }
+
+    function isConvictionOpen() external view returns (bool) {
+        return convictionCloseTime == 0 || block.timestamp < convictionCloseTime;
     }
 
     // ─────────────────────────────── Oracle-only functions ───────────────────────────────
@@ -230,6 +242,10 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
     function depositConviction(uint16 teamId, uint256 amount) external nonReentrant {
         require(teamActive[teamId], "ConvictionVault: team not active");
         require(amount > 0,         "ConvictionVault: zero amount");
+        require(
+            convictionCloseTime == 0 || block.timestamp < convictionCloseTime,
+            "CONVICTION_CLOSED"
+        );
 
         // Step 1: flush pending yield before changing the deposit (MasterChef pattern)
         _flushYield(msg.sender, teamId);
@@ -252,6 +268,26 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
         rewardDebt[msg.sender][teamId] = deposits[msg.sender][teamId] * accYieldPerShare / 1e18;
 
         emit ConvictionDeposited(msg.sender, teamId, amount);
+    }
+
+    /// @notice Withdraw USDC conviction before the conviction window closes.
+    function withdrawConviction(uint16 teamId, uint256 amount) external nonReentrant {
+        require(
+            convictionCloseTime == 0 || block.timestamp < convictionCloseTime,
+            "CONVICTION_CLOSED"
+        );
+        require(amount > 0,                               "ConvictionVault: zero amount");
+        require(deposits[msg.sender][teamId] >= amount,   "ConvictionVault: insufficient deposit");
+        _flushYield(msg.sender, teamId);
+        deposits[msg.sender][teamId]  -= amount;
+        teamTotalDeposit[teamId]      -= amount;
+        totalAliveDeposits            -= amount;
+        rewardDebt[msg.sender][teamId] = deposits[msg.sender][teamId] * accYieldPerShare / 1e18;
+        if (deposits[msg.sender][teamId] == 0) {
+            backerCount[teamId]--;
+        }
+        usdc.safeTransfer(msg.sender, amount);
+        emit ConvictionWithdrawn(msg.sender, teamId, amount);
     }
 
     /// @notice Claim all accrued yield across every team the caller has deposited into.
