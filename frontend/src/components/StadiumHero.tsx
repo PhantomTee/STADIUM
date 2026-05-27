@@ -9,7 +9,7 @@ export default function StadiumHero() {
 
   return (
     <section
-      className="-mx-4 -mt-8 overflow-hidden"
+      className="-mx-4 -mt-8 overflow-hidden md:pt-20"
       style={{
         height: '100svh',
         minHeight: 600,
@@ -19,7 +19,7 @@ export default function StadiumHero() {
         justifyContent: 'flex-end',
         paddingLeft: 'clamp(20px, 4vw, 64px)',
         paddingRight: 'clamp(20px, 4vw, 64px)',
-        paddingBottom: 'clamp(32px, 5vh, 56px)',
+        paddingBottom: 'clamp(64px, 12vh, 96px)',
         position: 'relative',
       }}
     >
