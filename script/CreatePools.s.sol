@@ -69,7 +69,7 @@ contract CreatePools is Script {
             _createPool(factory, 10);
             console.log("Created V4 pools for all 8 teams");
         } else {
-            console.log("Skipped pool creation — STADIUM_HOOK_ADDRESS not set");
+            console.log("Skipped pool creation - STADIUM_HOOK_ADDRESS not set");
             console.log("Set the hook and call createTeamPool() for each team manually.");
         }
 
@@ -131,7 +131,7 @@ contract CreatePools is Script {
             address token = factory.teamToken(teamId);
             console.log(string.concat("Registered ", name, " (", symbol, ")"), token);
         } catch {
-            console.log(string.concat("Skipped ", name, " — already registered"));
+            console.log(string.concat("Skipped ", name, " - already registered"));
         }
     }
 
