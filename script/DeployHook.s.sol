@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/libraries/Hooks.sol";
-import {HookMiner} from "@uniswap/v4-periphery/utils/HookMiner.sol";
+import {HookMiner} from "../src/vendor/HookMiner.sol";
 import {StadiumHook} from "../src/StadiumHook.sol";
 
 /// @notice Mines a CREATE2 salt such that the deployed StadiumHook address encodes
