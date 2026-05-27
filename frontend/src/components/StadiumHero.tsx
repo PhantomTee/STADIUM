@@ -1,663 +1,472 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import React from 'react'
 import { Link } from 'react-router-dom'
+import { useAccount } from 'wagmi'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { ArrowRight } from 'lucide-react'
+import { useTotalAliveConvictionLocked, useChampionPoolBalance } from '../hooks/useContracts'
+import { formatUSDC } from '../utils/contracts'
 
-/* ─── Data ───────────────────────────────────────────────────────────────── */
+/* ─── Electronic substitution board ────────────────────────────────────────── */
 
-const HERO_ITEMS = [
-  {
-    id: 'cup',
-    label: 'THE CUP',
-    eyebrow: 'CHAMPION POOL',
-    headline: 'WIN THE CUP',
-    sub: 'Every team token swap seeds the Champion Pool. Back the winner, claim it all when the final whistle blows.',
-    img: '/assets/hero/trophy.svg',
-    accent: '#F9D423',
-    bg: 'rgba(249,212,35,0.06)',
-    border: 'rgba(249,212,35,0.14)',
-  },
-  {
-    id: 'ball',
-    label: 'THE BALL',
-    eyebrow: 'TEAM TOKENS',
-    headline: 'TRADE THE MATCH',
-    sub: 'One ERC-20 per nation. Dynamic fees rise as rounds advance. Uniswap V4 pools live on X Layer.',
-    img: '/assets/hero/soccer-ball.svg',
-    accent: '#4ade80',
-    bg: 'rgba(74,222,128,0.05)',
-    border: 'rgba(74,222,128,0.14)',
-  },
-  {
-    id: 'flags',
-    label: 'THE FLAGS',
-    eyebrow: '48 NATIONS',
-    headline: 'BACK YOUR TEAM',
-    sub: 'Lock USDC conviction behind your nation. Earn Survivor Yield as rivals fall. Multiply VAR prediction returns.',
-    img: '/assets/hero/flags-collage.svg',
-    accent: '#60a5fa',
-    bg: 'rgba(96,165,250,0.05)',
-    border: 'rgba(96,165,250,0.14)',
-  },
-  {
-    id: 'hook',
-    label: 'THE HOOK',
-    eyebrow: 'V4 MATCH ENGINE',
-    headline: 'POWERED BY HOOKS',
-    sub: 'StadiumHook: beforeSwap gates eliminated teams. afterSwap routes protocol fees. Conviction discounts live.',
-    img: '/assets/hero/hook-card.svg',
-    accent: '#a78bfa',
-    bg: 'rgba(167,139,250,0.05)',
-    border: 'rgba(167,139,250,0.14)',
-  },
-] as const
-
-type ItemIndex = 0 | 1 | 2 | 3
-type Role = 'center' | 'left' | 'right' | 'back'
-type NavDir = 'next' | 'prev'
-
-/* ─── Role geometry ─────────────────────────────────────────────────────── */
-
-const N = HERO_ITEMS.length
-
-function getRole(i: number, active: number): Role {
-  if (i === active) return 'center'
-  if (i === (active + 1) % N) return 'right'
-  if (i === (active + N - 1) % N) return 'left'
-  return 'back'
-}
-
-const EASE = 'cubic-bezier(0.4,0,0.2,1)'
-const DURATION = '650ms'
-
-const ROLE_STYLES: Record<Role, React.CSSProperties> = {
-  center: {
-    transform: 'translateX(0) translateY(0) scale(1)',
-    opacity: 1,
-    zIndex: 20,
-    filter: 'none',
-    pointerEvents: 'none',
-  },
-  left: {
-    transform: 'translateX(-62%) translateY(10%) scale(0.7)',
-    opacity: 0.4,
-    zIndex: 10,
-    filter: 'brightness(0.5) saturate(0.6)',
-    pointerEvents: 'auto',
-    cursor: 'pointer',
-  },
-  right: {
-    transform: 'translateX(62%) translateY(10%) scale(0.7)',
-    opacity: 0.4,
-    zIndex: 10,
-    filter: 'brightness(0.5) saturate(0.6)',
-    pointerEvents: 'auto',
-    cursor: 'pointer',
-  },
-  back: {
-    transform: 'translateX(0) translateY(18%) scale(0.5)',
-    opacity: 0,
-    zIndex: 5,
-    filter: 'brightness(0.2)',
-    pointerEvents: 'none',
-  },
-}
-
-/* ─── Main component ────────────────────────────────────────────────────── */
-
-export default function StadiumHero() {
-  const [active, setActive] = useState(0)
-  const [locked, setLocked] = useState(false)
-  const lockRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const navigate = useCallback((dir: NavDir) => {
-    if (locked) return
-    setLocked(true)
-    setActive(prev => dir === 'next' ? (prev + 1) % N : (prev + N - 1) % N)
-    lockRef.current = setTimeout(() => setLocked(false), 700)
-  }, [locked])
-
-  const jumpTo = useCallback((i: number) => {
-    if (locked || i === active) return
-    setLocked(true)
-    setActive(i)
-    lockRef.current = setTimeout(() => setLocked(false), 700)
-  }, [locked, active])
-
-  // Auto-advance every 5s
-  useEffect(() => {
-    const id = setInterval(() => navigate('next'), 5000)
-    return () => clearInterval(id)
-  }, [navigate])
-
-  useEffect(() => () => { if (lockRef.current) clearTimeout(lockRef.current) }, [])
-
-  const item = HERO_ITEMS[active]
-
-  return (
-    <section
-      className="relative -mx-4 -mt-8 overflow-hidden"
-      style={{ height: '100svh', minHeight: 640, background: '#060d0a' }}
-    >
-      {/* Layer 1: pitch lines */}
-      <PitchLines />
-
-      {/* Layer 2: floodlight + accent glows */}
-      <GlowLayer accent={item.accent} />
-
-      {/* Layer 3: film grain */}
-      <GrainOverlay />
-
-      {/* Layer 4: ghost "11°" watermark */}
-      <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
-        style={{ zIndex: 4 }}
-      >
-        <span
-          style={{
-            fontFamily: "'Anton', sans-serif",
-            fontSize: 'clamp(200px, 34vw, 460px)',
-            color: 'rgba(255,255,255,0.016)',
-            lineHeight: 1,
-            letterSpacing: '-0.03em',
-          }}
-        >
-          11°
-        </span>
-      </div>
-
-      {/* Layer 5: stats ticker (desktop) */}
-      <div className="absolute top-0 left-0 right-0 z-30 hidden md:block border-b border-white/5 bg-black/25 backdrop-blur-sm">
-        <StatsTicker accent={item.accent} />
-      </div>
-
-      {/* Layer 6: carousel stage */}
-      <div
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ zIndex: 10 }}
-      >
-        <div style={{ position: 'relative', width: 360, height: 440 }}>
-          {HERO_ITEMS.map((hi, i) => {
-            const role = getRole(i, active)
-            return (
-              <div
-                key={hi.id}
-                onClick={() => {
-                  if (role === 'left') navigate('prev')
-                  else if (role === 'right') navigate('next')
-                }}
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  transition: `all ${DURATION} ${EASE}`,
-                  ...ROLE_STYLES[role],
-                }}
-              >
-                <CarouselCard item={hi} isCenter={role === 'center'} />
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Layer 7: bottom-left info panel */}
-      <BottomLeft item={item} active={active} locked={locked} navigate={navigate} jumpTo={jumpTo} />
-
-      {/* Layer 8: bottom-right CTA */}
-      <BottomRight />
-    </section>
-  )
-}
-
-/* ─── CarouselCard ───────────────────────────────────────────────────────── */
-
-function CarouselCard({
-  item,
-  isCenter,
+function SubBoard({
+  value,
+  label,
+  accent = '#fbbf24',
+  size = 'md',
 }: {
-  item: (typeof HERO_ITEMS)[number]
-  isCenter: boolean
+  value: string
+  label: string
+  accent?: string
+  size?: 'sm' | 'md' | 'lg'
 }) {
+  const fontSize = size === 'lg' ? 52 : size === 'sm' ? 26 : 38
+  const padding = size === 'lg' ? '14px 22px' : size === 'sm' ? '8px 14px' : '10px 18px'
+
   return (
     <div
       style={{
-        width: '100%',
-        height: '100%',
-        borderRadius: 14,
-        overflow: 'hidden',
-        background: item.bg,
-        border: `1px solid ${item.border}`,
-        boxShadow: isCenter
-          ? `0 0 80px ${item.accent}14, 0 28px 80px rgba(0,0,0,0.75)`
-          : '0 8px 32px rgba(0,0,0,0.5)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: '28px 24px',
-        gap: 14,
-        transition: `box-shadow ${DURATION} ${EASE}`,
+        gap: 8,
       }}
     >
-      {/* Top label */}
+      {/* Board body */}
       <div
+        style={{
+          background: 'linear-gradient(180deg, #111 0%, #0a0a0a 100%)',
+          border: '2px solid #222',
+          borderRadius: 5,
+          padding,
+          boxShadow: `0 0 0 1px #333 inset, 0 4px 24px rgba(0,0,0,0.7), 0 0 30px ${accent}15`,
+          position: 'relative',
+          minWidth: size === 'lg' ? 140 : size === 'sm' ? 90 : 110,
+          textAlign: 'center',
+        }}
+      >
+        {/* Inset LED display */}
+        <div
+          style={{
+            background: '#060606',
+            borderRadius: 3,
+            padding: '6px 10px',
+            border: '1px solid #1a1a1a',
+            boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize,
+              fontWeight: 700,
+              color: accent,
+              textShadow: `0 0 8px ${accent}dd, 0 0 20px ${accent}88, 0 0 40px ${accent}44`,
+              letterSpacing: '0.04em',
+              lineHeight: 1,
+              display: 'block',
+            }}
+          >
+            {value}
+          </span>
+        </div>
+
+        {/* Corner screws */}
+        <div style={{ position: 'absolute', top: 4, left: 5, width: 4, height: 4, borderRadius: '50%', background: '#2a2a2a', border: '1px solid #333' }} />
+        <div style={{ position: 'absolute', top: 4, right: 5, width: 4, height: 4, borderRadius: '50%', background: '#2a2a2a', border: '1px solid #333' }} />
+        <div style={{ position: 'absolute', bottom: 4, left: 5, width: 4, height: 4, borderRadius: '50%', background: '#2a2a2a', border: '1px solid #333' }} />
+        <div style={{ position: 'absolute', bottom: 4, right: 5, width: 4, height: 4, borderRadius: '50%', background: '#2a2a2a', border: '1px solid #333' }} />
+      </div>
+
+      {/* Label below board */}
+      <span
         style={{
           fontFamily: 'Inter, sans-serif',
           fontSize: 9,
           fontWeight: 700,
           letterSpacing: '0.22em',
-          color: item.accent,
           textTransform: 'uppercase',
-          opacity: 0.8,
+          color: 'rgba(255,255,255,0.35)',
         }}
       >
-        {item.label}
-      </div>
-
-      {/* Asset image */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '100%',
-          minHeight: 0,
-        }}
-      >
-        <img
-          src={item.img}
-          alt={item.label}
-          draggable={false}
-          style={{
-            maxWidth: '90%',
-            maxHeight: '100%',
-            objectFit: 'contain',
-            userSelect: 'none',
-            display: 'block',
-          }}
-        />
-      </div>
-
-      {/* Bottom eyebrow */}
-      <div
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.16em',
-          color: 'rgba(255,255,255,0.38)',
-          textTransform: 'uppercase',
-        }}
-      >
-        {item.eyebrow}
-      </div>
+        {label}
+      </span>
     </div>
   )
 }
 
-/* ─── BottomLeft panel ───────────────────────────────────────────────────── */
+/* ─── Scoreline board (two teams + score in the middle) ─────────────────────── */
 
-function BottomLeft({
-  item,
-  active,
-  locked,
-  navigate,
-  jumpTo,
+function ScoreBoard({
+  labelA,
+  score,
+  labelB,
+  accent = '#fbbf24',
 }: {
-  item: (typeof HERO_ITEMS)[number]
-  active: number
-  locked: boolean
-  navigate: (d: NavDir) => void
-  jumpTo: (i: number) => void
+  labelA: string
+  score: string
+  labelB: string
+  accent?: string
 }) {
   return (
     <div
-      className="absolute bottom-0 left-0 z-30 p-6 md:p-10"
-      style={{ maxWidth: 500 }}
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        gap: 0,
+        background: 'linear-gradient(180deg, #111 0%, #0a0a0a 100%)',
+        border: '2px solid #222',
+        borderRadius: 6,
+        overflow: 'hidden',
+        boxShadow: `0 0 0 1px #333 inset, 0 6px 32px rgba(0,0,0,0.75), 0 0 40px ${accent}12`,
+      }}
     >
-      {/* Eyebrow label */}
+      {/* Team A */}
       <div
         style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.2em',
-          color: item.accent,
-          textTransform: 'uppercase',
-          marginBottom: 8,
-          transition: `color ${DURATION} ${EASE}`,
+          padding: '10px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(255,255,255,0.02)',
+          borderRight: '1px solid #222',
+          minWidth: 100,
         }}
-      >
-        HOOK-POWERED WORLD CUP MARKETS
-      </div>
-
-      {/* Main headline */}
-      <h1
-        style={{
-          fontFamily: "'Anton', sans-serif",
-          fontSize: 'clamp(32px, 5vw, 68px)',
-          lineHeight: 1,
-          color: '#ffffff',
-          letterSpacing: '-0.01em',
-          margin: 0,
-          transition: `all ${DURATION} ${EASE}`,
-        }}
-      >
-        {item.headline}
-      </h1>
-
-      {/* Description */}
-      <p
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 13,
-          lineHeight: 1.65,
-          color: 'rgba(255,255,255,0.45)',
-          maxWidth: 340,
-          margin: '12px 0 0',
-          transition: `all ${DURATION} ${EASE}`,
-        }}
-      >
-        {item.sub}
-      </p>
-
-      {/* Controls row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22 }}>
-        {/* Dot indicators */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {HERO_ITEMS.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => jumpTo(i)}
-              style={{
-                width: i === active ? 22 : 6,
-                height: 6,
-                borderRadius: 3,
-                background: i === active ? item.accent : 'rgba(255,255,255,0.18)',
-                border: 'none',
-                padding: 0,
-                cursor: i === active ? 'default' : 'pointer',
-                transition: 'all 400ms ease',
-                flexShrink: 0,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Arrow buttons */}
-        <button
-          onClick={() => navigate('prev')}
-          disabled={locked}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
-            border: '1px solid rgba(255,255,255,0.18)',
-            background: 'rgba(255,255,255,0.05)',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: locked ? 'not-allowed' : 'pointer',
-            opacity: locked ? 0.4 : 1,
-            transition: 'border-color 200ms, opacity 200ms',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.5)')}
-          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
-        >
-          <ArrowLeft size={13} />
-        </button>
-        <button
-          onClick={() => navigate('next')}
-          disabled={locked}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
-            border: '1px solid rgba(255,255,255,0.18)',
-            background: 'rgba(255,255,255,0.05)',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: locked ? 'not-allowed' : 'pointer',
-            opacity: locked ? 0.4 : 1,
-            transition: 'border-color 200ms, opacity 200ms',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.5)')}
-          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
-        >
-          <ArrowRight size={13} />
-        </button>
-
-        {/* Counter */}
-        <span
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: '0.12em',
-            color: 'rgba(255,255,255,0.25)',
-          }}
-        >
-          {String(active + 1).padStart(2, '0')}&nbsp;/&nbsp;{String(N).padStart(2, '0')}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-/* ─── BottomRight CTA ────────────────────────────────────────────────────── */
-
-function BottomRight() {
-  return (
-    <div
-      className="absolute bottom-0 right-0 z-30 p-6 md:p-10"
-      style={{ textAlign: 'right' }}
-    >
-      <div
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          color: 'rgba(255,255,255,0.25)',
-          textTransform: 'uppercase',
-          marginBottom: 10,
-        }}
-      >
-        Back Your Team · Trade The Match · Win The Cup
-      </div>
-      <Link
-        to="/conviction"
-        style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 12 }}
-        className="group"
       >
         <span
-          className="group-hover:opacity-80 transition-opacity"
           style={{
             fontFamily: "'Anton', sans-serif",
-            fontSize: 'clamp(22px, 3.8vw, 52px)',
-            color: '#ffffff',
-            lineHeight: 1,
-            letterSpacing: '-0.01em',
+            fontSize: 18,
+            color: 'rgba(255,255,255,0.6)',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
           }}
         >
-          ENTER 11°
+          {labelA}
         </span>
-        <ArrowRight
-          size={Math.min(28, 22)}
-          className="text-white group-hover:opacity-80 transition-opacity"
-          style={{ flexShrink: 0, marginTop: 2 }}
-        />
-      </Link>
+      </div>
+
+      {/* Score */}
+      <div
+        style={{
+          padding: '8px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#060606',
+          borderRight: '1px solid #222',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 36,
+            fontWeight: 700,
+            color: accent,
+            textShadow: `0 0 8px ${accent}cc, 0 0 20px ${accent}88`,
+            letterSpacing: '0.1em',
+            lineHeight: 1,
+          }}
+        >
+          {score}
+        </span>
+      </div>
+
+      {/* Team B */}
+      <div
+        style={{
+          padding: '10px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: 100,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Anton', sans-serif",
+            fontSize: 18,
+            color: 'rgba(255,255,255,0.6)',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {labelB}
+        </span>
+      </div>
     </div>
   )
 }
 
-/* ─── PitchLines ─────────────────────────────────────────────────────────── */
+/* ─── Football pitch background ─────────────────────────────────────────────── */
 
-function PitchLines() {
+function PitchField() {
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2 }}>
+    <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 0 }}>
       <svg
-        className="absolute top-0 left-0 w-full h-full"
-        viewBox="0 0 1200 800"
+        className="w-full h-full"
+        viewBox="0 0 420 680"
         preserveAspectRatio="xMidYMid slice"
-        fill="none"
-        stroke="rgba(74,222,128,0.055)"
-        strokeWidth="1"
+        xmlns="http://www.w3.org/2000/svg"
       >
-        <rect x="60" y="40" width="1080" height="720" />
-        <line x1="600" y1="40" x2="600" y2="760" />
-        <circle cx="600" cy="400" r="100" />
-        <circle cx="600" cy="400" r="5" fill="rgba(74,222,128,0.10)" stroke="none" />
-        {/* Left penalty box */}
-        <rect x="60" y="200" width="200" height="280" />
-        <rect x="60" y="270" width="65" height="140" />
-        <circle cx="190" cy="390" r="4" fill="rgba(74,222,128,0.10)" stroke="none" />
-        <path d="M 260 215 A 85 85 0 0 1 260 465" />
-        {/* Right penalty box */}
-        <rect x="940" y="200" width="200" height="280" />
-        <rect x="1075" y="270" width="65" height="140" />
-        <circle cx="1010" cy="390" r="4" fill="rgba(74,222,128,0.10)" stroke="none" />
-        <path d="M 940 215 A 85 85 0 0 0 940 465" />
-        {/* Corner arcs */}
-        <path d="M 60 56 A 16 16 0 0 1 76 40" />
-        <path d="M 1124 40 A 16 16 0 0 1 1140 56" />
-        <path d="M 76 760 A 16 16 0 0 1 60 744" />
-        <path d="M 1140 744 A 16 16 0 0 1 1124 760" />
+        <defs>
+          {/* Alternating grass stripes */}
+          <pattern id="grassStripe" x="0" y="0" width="70" height="680" patternUnits="userSpaceOnUse">
+            <rect width="70" height="680" fill="#1a6e1a" />
+            <rect width="35" height="680" fill="#1e7d1e" />
+          </pattern>
+          {/* Texture noise approximation using turbulence */}
+          <filter id="grassTex" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise" />
+            <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise" />
+            <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend" />
+            <feComposite in="blend" in2="SourceGraphic" operator="in" />
+          </filter>
+        </defs>
+
+        {/* Grass base with stripes */}
+        <rect width="420" height="680" fill="url(#grassStripe)" />
+
+        {/* Subtle grass texture overlay */}
+        <rect width="420" height="680" fill="rgba(0,0,0,0.06)" />
+
+        {/* ── Pitch markings ── */}
+        <g fill="none" stroke="rgba(255,255,255,0.88)" strokeWidth="2.2" strokeLinejoin="round">
+
+          {/* Outer boundary */}
+          <rect x="22" y="18" width="376" height="644" />
+
+          {/* Center line */}
+          <line x1="22" y1="340" x2="398" y2="340" />
+
+          {/* Center circle */}
+          <circle cx="210" cy="340" r="62" />
+          {/* Center spot */}
+          <circle cx="210" cy="340" r="3.5" fill="rgba(255,255,255,0.88)" stroke="none" />
+
+          {/* ── TOP HALF ── */}
+          {/* Top penalty area */}
+          <rect x="98" y="18" width="224" height="128" />
+          {/* Top 6-yard box */}
+          <rect x="148" y="18" width="124" height="52" />
+          {/* Top penalty spot */}
+          <circle cx="210" cy="98" r="3.5" fill="rgba(255,255,255,0.88)" stroke="none" />
+          {/* Top penalty arc (outside the box) */}
+          <path d="M 155 146 A 62 62 0 0 1 265 146" />
+          {/* Top goal (outside boundary) */}
+          <rect x="168" y="6" width="84" height="14" />
+
+          {/* ── BOTTOM HALF ── */}
+          {/* Bottom penalty area */}
+          <rect x="98" y="534" width="224" height="128" />
+          {/* Bottom 6-yard box */}
+          <rect x="148" y="610" width="124" height="52" />
+          {/* Bottom penalty spot */}
+          <circle cx="210" cy="582" r="3.5" fill="rgba(255,255,255,0.88)" stroke="none" />
+          {/* Bottom penalty arc */}
+          <path d="M 155 534 A 62 62 0 0 0 265 534" />
+          {/* Bottom goal */}
+          <rect x="168" y="660" width="84" height="14" />
+
+          {/* Corner arcs */}
+          <path d="M 22 34 A 16 16 0 0 1 38 18" />
+          <path d="M 382 18 A 16 16 0 0 1 398 34" />
+          <path d="M 38 662 A 16 16 0 0 1 22 646" />
+          <path d="M 398 646 A 16 16 0 0 1 382 662" />
+        </g>
       </svg>
-      {/* Radial vignette */}
+
+      {/* Dark vignette overlay so content stays readable */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(ellipse 80% 60% at 50% 50%, transparent 25%, rgba(6,13,10,0.75) 100%)',
+          background: 'radial-gradient(ellipse 90% 70% at 50% 50%, rgba(0,0,0,0.48) 0%, rgba(0,0,0,0.82) 100%)',
         }}
       />
+      {/* Top + bottom edge darken */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.55) 100%)' }} />
     </div>
   )
 }
 
-/* ─── GlowLayer ──────────────────────────────────────────────────────────── */
+/* ─── Main hero ──────────────────────────────────────────────────────────────── */
 
-function GlowLayer({ accent }: { accent: string }) {
-  return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }}>
-      {/* Top-left floodlight */}
-      <div
-        style={{
-          position: 'absolute',
-          top: -120,
-          left: '18%',
-          width: 400,
-          height: 400,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(74,222,128,0.07) 0%, transparent 65%)',
-          filter: 'blur(50px)',
-        }}
-      />
-      {/* Top-right floodlight */}
-      <div
-        style={{
-          position: 'absolute',
-          top: -120,
-          right: '18%',
-          width: 400,
-          height: 400,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(74,222,128,0.07) 0%, transparent 65%)',
-          filter: 'blur(50px)',
-        }}
-      />
-      {/* Center accent glow — follows active item color */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '10%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 600,
-          height: 600,
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${accent}0e 0%, transparent 60%)`,
-          filter: 'blur(70px)',
-          transition: `background ${DURATION} ${EASE}`,
-        }}
-      />
-    </div>
-  )
-}
+export default function StadiumHero() {
+  const { isConnected } = useAccount()
+  const { data: totalLocked } = useTotalAliveConvictionLocked()
+  const { data: champPool } = useChampionPoolBalance()
 
-/* ─── GrainOverlay ───────────────────────────────────────────────────────── */
-
-function GrainOverlay() {
-  return (
-    <div
-      className="absolute inset-0 pointer-events-none"
-      style={{
-        zIndex: 5,
-        opacity: 0.3,
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E")`,
-        backgroundSize: '160px 160px',
-        mixBlendMode: 'overlay',
-      }}
-    />
-  )
-}
-
-/* ─── StatsTicker ────────────────────────────────────────────────────────── */
-
-function StatsTicker({ accent }: { accent: string }) {
-  const items = [
-    '48 TEAMS',
-    '104 MATCHES',
-    'V4 HOOK POOLS',
-    'CHAMPION POOL LIVE',
-    'CONVICTION VAULT',
-    'VAR PREDICTION MARKETS',
-    'X LAYER TESTNET',
-    'UNISWAP V4 HOOKS',
-  ]
-  const doubled = [...items, ...items]
+  const lockedDisplay = totalLocked ? `$${formatUSDC(totalLocked)}` : '$0'
+  const poolDisplay = champPool ? `$${formatUSDC(champPool)}` : '$0'
 
   return (
-    <div style={{ overflow: 'hidden', height: 30, display: 'flex', alignItems: 'center' }}>
+    <section
+      className="relative -mx-4 -mt-8 overflow-hidden flex flex-col items-center justify-center"
+      style={{ height: '100svh', minHeight: 640 }}
+    >
+      {/* Pitch background */}
+      <PitchField />
+
+      {/* Content layer */}
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          whiteSpace: 'nowrap',
-          animation: 'stadiumTicker 30s linear infinite',
-        }}
+        className="relative flex flex-col items-center text-center px-4 w-full"
+        style={{ zIndex: 10, gap: 0 }}
       >
-        {doubled.map((item, i) => (
-          <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
-            <span
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.3)',
-                paddingLeft: 28,
-                paddingRight: 28,
-              }}
-            >
-              {item}
-            </span>
-            <span style={{ color: accent, fontSize: 8, transition: `color ${DURATION} ${EASE}` }}>·</span>
+
+        {/* Badge */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'rgba(0,0,0,0.55)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 999,
+            padding: '5px 16px',
+            marginBottom: 20,
+          }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80', flexShrink: 0, display: 'inline-block' }} />
+          <span
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.55)',
+            }}
+          >
+            Uniswap V4 · X Layer Testnet · World Cup 2026
           </span>
-        ))}
+        </div>
+
+        {/* 11° headline */}
+        <h1
+          style={{
+            fontFamily: "'Anton', sans-serif",
+            fontSize: 'clamp(96px, 20vw, 200px)',
+            lineHeight: 0.9,
+            color: '#ffffff',
+            letterSpacing: '-0.03em',
+            margin: 0,
+            textShadow: '0 4px 60px rgba(0,0,0,0.6)',
+          }}
+        >
+          11°
+        </h1>
+
+        {/* Tagline */}
+        <p
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 'clamp(12px, 2vw, 16px)',
+            fontWeight: 500,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.5)',
+            margin: '18px 0 0',
+          }}
+        >
+          Back Your Team &nbsp;·&nbsp; Trade The Match &nbsp;·&nbsp; Win The Cup
+        </p>
+
+        {/* ── Electronic substitution boards ── */}
+        <div
+          className="flex flex-wrap items-end justify-center"
+          style={{ gap: 16, marginTop: 40 }}
+        >
+          <SubBoard value="48" label="Nations" accent="#4ade80" size="md" />
+          <SubBoard value="104" label="Matches" accent="#4ade80" size="md" />
+          <SubBoard value={lockedDisplay} label="Conviction Locked" accent="#fbbf24" size="md" />
+          <SubBoard value={poolDisplay} label="Champion Pool" accent="#fbbf24" size="md" />
+        </div>
+
+        {/* ── Score display ── */}
+        <div style={{ marginTop: 28 }}>
+          <ScoreBoard
+            labelA="CONVICTION"
+            score="0 — 0"
+            labelB="VAR"
+            accent="#4ade80"
+          />
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 9,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.25)',
+              marginTop: 8,
+              textAlign: 'center',
+            }}
+          >
+            World Cup 2026 · Group Stage · Kick-off TBC
+          </div>
+        </div>
+
+        {/* ── CTA buttons ── */}
+        <div
+          className="flex flex-wrap items-center justify-center"
+          style={{ gap: 12, marginTop: 36 }}
+        >
+          {!isConnected ? (
+            <ConnectButton label="Connect Wallet" />
+          ) : (
+            <>
+              <Link
+                to="/conviction"
+                style={{ textDecoration: 'none' }}
+              >
+                <button
+                  style={{
+                    fontFamily: "'Anton', sans-serif",
+                    fontSize: 16,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: '#000',
+                    background: '#4ade80',
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '14px 32px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  Back a Team <ArrowRight size={16} />
+                </button>
+              </Link>
+              <Link
+                to="/var"
+                style={{ textDecoration: 'none' }}
+              >
+                <button
+                  style={{
+                    fontFamily: "'Anton', sans-serif",
+                    fontSize: 16,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: '#fff',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 4,
+                    padding: '14px 32px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  Predict Matches <ArrowRight size={16} />
+                </button>
+              </Link>
+            </>
+          )}
+        </div>
+
       </div>
-      <style>{`
-        @keyframes stadiumTicker {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
-    </div>
+    </section>
   )
 }
