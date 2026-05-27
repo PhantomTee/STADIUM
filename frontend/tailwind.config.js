@@ -19,7 +19,8 @@ export default {
         }
       },
       fontFamily: {
-        display: ['Space Grotesk', 'sans-serif'],
+        display: ['Anton', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       animation: {

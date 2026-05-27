@@ -2,10 +2,9 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { useTotalAliveConvictionLocked, useChampionPoolBalance } from '../hooks/useContracts'
-import { formatUSDC } from '../utils/contracts'
+import StadiumHero from '../components/StadiumHero'
 
-/* ─── Football pitch SVG background ──────────────────────────────────────── */
+/* ─── Football pitch SVG background (used in lower sections) ─────────────── */
 function PitchBackground() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
@@ -18,70 +17,25 @@ function PitchBackground() {
         strokeWidth="1.2"
         opacity="0.07"
       >
-        {/* Field outline */}
         <rect x="40" y="20" width="1120" height="520" />
-        {/* Center line */}
         <line x1="600" y1="20" x2="600" y2="540" />
-        {/* Center circle */}
         <circle cx="600" cy="280" r="80" />
-        {/* Center spot */}
         <circle cx="600" cy="280" r="5" fill="currentColor" />
-        {/* Left penalty box */}
         <rect x="40" y="140" width="180" height="280" />
-        {/* Left 6-yard box */}
         <rect x="40" y="210" width="60" height="140" />
-        {/* Left penalty spot */}
         <circle cx="152" cy="280" r="4" fill="currentColor" />
-        {/* Left penalty arc */}
         <path d="M 220 195 A 80 80 0 0 1 220 365" />
-        {/* Right penalty box */}
         <rect x="980" y="140" width="180" height="280" />
-        {/* Right 6-yard box */}
         <rect x="1100" y="210" width="60" height="140" />
-        {/* Right penalty spot */}
         <circle cx="1048" cy="280" r="4" fill="currentColor" />
-        {/* Right penalty arc */}
         <path d="M 980 195 A 80 80 0 0 0 980 365" />
-        {/* Corner arcs */}
         <path d="M 40 37 A 18 18 0 0 1 57 20" />
         <path d="M 1143 20 A 18 18 0 0 1 1160 37" />
         <path d="M 57 540 A 18 18 0 0 1 40 523" />
         <path d="M 1160 523 A 18 18 0 0 1 1143 540" />
       </svg>
-      {/* Horizontal fade */}
       <div className="absolute inset-0 pitch-fade-x" />
-      {/* Vertical fade */}
       <div className="absolute inset-0 pitch-fade-y" />
-    </div>
-  )
-}
-
-/* ─── Live stats ticker ───────────────────────────────────────────────────── */
-function StatsTicker({ totalLocked, champPool }) {
-  const items = [
-    `$${formatUSDC(totalLocked || 0)} TOTAL LOCKED`,
-    '48 TEAMS COMPETING',
-    `$${formatUSDC(champPool || 0)} CHAMPION POOL`,
-    '10% SURVIVOR YIELD RATE',
-    'UNISWAP V4 HOOKS',
-    'X LAYER TESTNET',
-    '$0 MIN. DEPOSIT',
-    'WORLD CUP 2026',
-  ]
-  const doubled = [...items, ...items]
-
-  return (
-    <div className="border-y border-stadium-border bg-stadium-card/50 ticker-track">
-      <div className="ticker-inner py-3">
-        {doubled.map((item, i) => (
-          <span key={i} className="flex items-center">
-            <span className="text-xs font-mono font-bold text-stadium-muted uppercase tracking-widest whitespace-nowrap px-8">
-              {item}
-            </span>
-            <span className="text-stadium-green text-xs">·</span>
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
@@ -89,78 +43,12 @@ function StatsTicker({ totalLocked, champPool }) {
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function Home() {
   const { isConnected } = useAccount()
-  const { data: totalLocked } = useTotalAliveConvictionLocked()
-  const { data: champPool }   = useChampionPoolBalance()
 
   return (
     <div>
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[88vh] -mx-4 -mt-8 flex items-center border-b border-stadium-border overflow-hidden">
-        <PitchBackground />
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full py-20">
-          <div className="grid lg:grid-cols-5 gap-12 items-center">
-
-            {/* Left: Typography */}
-            <div className="lg:col-span-3">
-              <div className="rule-label mb-8">
-                <div className="h-px w-10 bg-stadium-green flex-shrink-0" />
-                World Cup 2026 — Powered by Uniswap V4 on X Layer
-              </div>
-
-              <h1>
-                <div className="text-display text-stadium-text">BACK YOUR</div>
-                <div className="text-display text-stadium-green">TEAM.</div>
-              </h1>
-
-              <div className="mt-6 mb-10 max-w-xl">
-                <div className="h-px w-full bg-stadium-border mb-6" />
-                <p className="text-stadium-muted text-lg leading-relaxed">
-                  Lock conviction behind your World Cup team. Earn Survivor Yield as rivals fall.
-                  Win the Champion Pool when the final whistle blows.
-                </p>
-              </div>
-
-              {!isConnected ? (
-                <div className="flex flex-col items-start gap-4">
-                  <ConnectButton label="Connect Wallet to Play" />
-                  <p className="text-stadium-muted text-xs font-mono">Chain ID 195 · Native gas: OKB</p>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3">
-                  <Link to="/conviction" className="btn-primary px-10 py-4 text-sm">
-                    Start Backing
-                  </Link>
-                  <Link to="/var" className="btn-secondary px-10 py-4 text-sm">
-                    Predict Matches
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Live stats */}
-            <div className="lg:col-span-2 grid grid-cols-2 gap-3">
-              {[
-                { label: 'Total Conviction Locked',  value: `$${formatUSDC(totalLocked || 0)}`, accent: 'border-l-stadium-green' },
-                { label: 'Champion Pool',            value: `$${formatUSDC(champPool  || 0)}`,  accent: 'border-l-stadium-gold'  },
-                { label: 'Teams Remaining',          value: '48',                                accent: 'border-l-stadium-green' },
-                { label: 'Survivor Yield Rate',      value: '10%',                               accent: 'border-l-stadium-gold'  },
-              ].map(s => (
-                <div key={s.label} className={`card border-l-2 ${s.accent} pl-5`}>
-                  <div className="text-3xl font-black text-stadium-text tracking-tight">{s.value}</div>
-                  <div className="text-xs text-stadium-muted uppercase tracking-widest mt-2 font-medium leading-tight">{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Ticker ────────────────────────────────────────────────────────── */}
-      <div className="-mx-4">
-        <StatsTicker totalLocked={totalLocked} champPool={champPool} />
-      </div>
+      <StadiumHero />
 
       <div className="space-y-24 mt-20">
 

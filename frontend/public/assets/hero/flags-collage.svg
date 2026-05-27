@@ -1,0 +1,87 @@
+<svg viewBox="0 0 360 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="fs"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.4)"/></filter>
+    <clipPath id="fr0"><rect x="0" y="0" width="54" height="36" rx="3"/></clipPath>
+    <clipPath id="fr1"><rect x="0" y="0" width="54" height="36" rx="3"/></clipPath>
+  </defs>
+
+  <!-- 6 columns × 5 rows = 30 flag cells, 6px gap -->
+  <!-- Col width: 54, Row height: 36, Gap: 6 -->
+  <!-- Total: 6*54 + 5*6 = 354, 5*36 + 4*6 = 204, centered in 360×240 -->
+
+  <g transform="translate(3, 18)" filter="url(#fs)">
+
+    <!-- ROW 1 -->
+    <!-- Brazil: green + yellow + blue -->
+    <g transform="translate(0,0)"><rect width="54" height="36" rx="3" fill="#009B3A"/><polygon points="27,4 50,18 27,32 4,18" fill="#FEDF00"/><circle cx="27" cy="18" r="9" fill="#002776"/><rect x="18" y="16" width="18" height="4" fill="white" transform="rotate(-10 27 18)"/></g>
+    <!-- Argentina: light blue + white stripes -->
+    <g transform="translate(60,0)"><rect width="54" height="36" rx="3" fill="#74ACDF"/><rect y="11" width="54" height="14" fill="white"/><circle cx="27" cy="18" r="6" fill="#F6B40E"/><circle cx="27" cy="18" r="4" fill="#843511"/></g>
+    <!-- France: blue white red tricolour -->
+    <g transform="translate(120,0)"><rect width="54" height="36" rx="3" fill="#ED2939"/><rect width="36" height="36" fill="white"/><rect width="18" height="36" fill="#002395"/></g>
+    <!-- Germany: black red gold -->
+    <g transform="translate(180,0)"><rect width="54" height="36" rx="3" fill="#FFCE00"/><rect width="54" height="24" fill="#DD0000"/><rect width="54" height="12" fill="#000000"/></g>
+    <!-- England: white with red cross -->
+    <g transform="translate(240,0)"><rect width="54" height="36" rx="3" fill="white"/><rect x="24" width="6" height="36" fill="#CF1020"/><rect y="15" width="54" height="6" fill="#CF1020"/></g>
+    <!-- Spain: red yellow red -->
+    <g transform="translate(300,0)"><rect width="54" height="36" rx="3" fill="#AA151B"/><rect y="9" width="54" height="18" fill="#F1BF00"/></g>
+
+    <!-- ROW 2 -->
+    <!-- Portugal: green + red split -->
+    <g transform="translate(0,42)"><rect width="54" height="36" rx="3" fill="#D21034"/><rect width="21" height="36" fill="#006600"/><circle cx="21" cy="18" r="7" fill="#D21034" stroke="#F7D116" stroke-width="1.5"/></g>
+    <!-- Netherlands: red white blue -->
+    <g transform="translate(60,42)"><rect width="54" height="36" rx="3" fill="#21468B"/><rect width="54" height="24" fill="white"/><rect width="54" height="12" fill="#AE1C28"/></g>
+    <!-- Belgium: black yellow red tricolour -->
+    <g transform="translate(120,42)"><rect width="54" height="36" rx="3" fill="#EF3340"/><rect width="36" height="36" fill="#FFD90C"/><rect width="18" height="36" fill="#000000"/></g>
+    <!-- USA: stars & stripes simplified -->
+    <g transform="translate(180,42)"><rect width="54" height="36" rx="3" fill="white"/><rect y="0" width="54" height="4" fill="#B22234"/><rect y="8" width="54" height="4" fill="#B22234"/><rect y="16" width="54" height="4" fill="#B22234"/><rect y="24" width="54" height="4" fill="#B22234"/><rect y="32" width="54" height="4" fill="#B22234"/><rect width="22" height="20" fill="#3C3B6E"/></g>
+    <!-- Mexico: green white red tricolour -->
+    <g transform="translate(240,42)"><rect width="54" height="36" rx="3" fill="#CE1126"/><rect width="36" height="36" fill="white"/><rect width="18" height="36" fill="#006847"/><ellipse cx="27" cy="18" rx="5" ry="6" fill="#8B4513" stroke="#A0522D" stroke-width="0.5"/></g>
+    <!-- Japan: white + red circle -->
+    <g transform="translate(300,42)"><rect width="54" height="36" rx="3" fill="white"/><circle cx="27" cy="18" r="10" fill="#BC002D"/></g>
+
+    <!-- ROW 3 -->
+    <!-- Morocco: red with green star -->
+    <g transform="translate(0,84)"><rect width="54" height="36" rx="3" fill="#C1272D"/><polygon points="27,10 29.5,17 37,17 31.5,21.5 33.5,29 27,24.5 20.5,29 22.5,21.5 17,17 24.5,17" fill="none" stroke="#006233" stroke-width="2"/></g>
+    <!-- Senegal: green yellow red with stars -->
+    <g transform="translate(60,84)"><rect width="54" height="36" rx="3" fill="#00853F"/><rect x="18" width="18" height="36" fill="#FDEF42"/><rect x="36" width="18" height="36" fill="#E31B23"/><polygon points="27,11 28.8,16.6 34.7,16.6 30,20 31.8,25.6 27,22.2 22.2,25.6 24,20 19.3,16.6 25.2,16.6" fill="#00853F"/></g>
+    <!-- South Korea: white + taegeuk -->
+    <g transform="translate(120,84)"><rect width="54" height="36" rx="3" fill="white"/><circle cx="27" cy="18" r="9" fill="#CD2E3A"/><path d="M18,18 A9,9 0 0,1 27,9 A4.5,4.5 0 0,1 27,18 A4.5,4.5 0 0,0 27,27 A9,9 0 0,1 18,18Z" fill="#0047A0"/></g>
+    <!-- Australia: dark blue + Union Jack + stars -->
+    <g transform="translate(180,84)"><rect width="54" height="36" rx="3" fill="#00008B"/><rect width="27" height="18" fill="#00008B"/><line x1="0" y1="0" x2="27" y2="18" stroke="white" stroke-width="3"/><line x1="27" y1="0" x2="0" y2="18" stroke="white" stroke-width="3"/><line x1="13.5" y1="0" x2="13.5" y2="18" stroke="white" stroke-width="3"/><line x1="0" y1="9" x2="27" y2="9" stroke="white" stroke-width="3"/><line x1="0" y1="0" x2="27" y2="18" stroke="#CC0000" stroke-width="1.5"/><line x1="27" y1="0" x2="0" y2="18" stroke="#CC0000" stroke-width="1.5"/><circle cx="40" cy="28" r="3" fill="white"/><circle cx="48" cy="22" r="2.5" fill="white"/><circle cx="44" cy="14" r="2" fill="white"/></g>
+    <!-- Colombia: yellow + blue + red -->
+    <g transform="translate(240,84)"><rect width="54" height="36" rx="3" fill="#CE1126"/><rect width="54" height="24" fill="#003087"/><rect width="54" height="16" fill="#FCD116"/></g>
+    <!-- Uruguay: blue + white stripes -->
+    <g transform="translate(300,84)"><rect width="54" height="36" rx="3" fill="white"/><rect y="0" width="54" height="4" fill="#75AADB"/><rect y="8" width="54" height="4" fill="#75AADB"/><rect y="16" width="54" height="4" fill="#75AADB"/><rect y="24" width="54" height="4" fill="#75AADB"/><rect y="32" width="54" height="4" fill="#75AADB"/><rect width="27" height="20" fill="white"/><circle cx="13.5" cy="10" r="4" fill="#F4C430" stroke="#F4C430"/></g>
+
+    <!-- ROW 4 -->
+    <!-- Switzerland: red + white cross -->
+    <g transform="translate(0,126)"><rect width="54" height="36" rx="3" fill="#D52B1E"/><rect x="23" y="9" width="8" height="18" fill="white"/><rect x="14" y="14" width="26" height="8" fill="white"/></g>
+    <!-- Turkey: red + crescent + star -->
+    <g transform="translate(60,126)"><rect width="54" height="36" rx="3" fill="#E30A17"/><circle cx="22" cy="18" r="9" fill="#E30A17"/><circle cx="25" cy="18" r="7" fill="#E30A17" stroke="white" stroke-width="6"/><polygon points="34,12 35.2,15.6 39,15.6 36,18 37.2,21.6 34,19.2 30.8,21.6 32,18 29,15.6 32.8,15.6" fill="white"/></g>
+    <!-- Canada: red + maple leaf simplified -->
+    <g transform="translate(120,126)"><rect width="54" height="36" rx="3" fill="white"/><rect width="14" height="36" fill="#FF0000"/><rect x="40" width="14" height="36" fill="#FF0000"/><polygon points="27,7 29.5,13 36,12 31,17.5 33.5,24 27,20.5 20.5,24 23,17.5 18,12 24.5,13" fill="#FF0000"/></g>
+    <!-- Iran: green white red + emblem -->
+    <g transform="translate(180,126)"><rect width="54" height="36" rx="3" fill="#239F40"/><rect y="11" width="54" height="14" fill="white"/><rect y="25" width="54" height="11" fill="#DA0000"/><circle cx="27" cy="18" r="5" fill="#DA0000"/></g>
+    <!-- Saudi Arabia: green + sword/text -->
+    <g transform="translate(240,126)"><rect width="54" height="36" rx="3" fill="#006C35"/><rect x="8" y="22" width="38" height="3" rx="1.5" fill="white"/><path d="M12 26 L42 26 L42 30 L12 30 Z" fill="white"/></g>
+    <!-- Croatia: red white blue checks -->
+    <g transform="translate(300,126)"><rect width="54" height="36" rx="3" fill="#0093DD"/><rect width="54" height="24" fill="white"/><rect width="54" height="12" fill="#EE1020"/><g fill="none" stroke="#EE1020" stroke-width="0.5"><rect x="20" y="0" width="7" height="7"/><rect x="27" y="0" width="7" height="7"/><rect x="20" y="7" width="7" height="7"/><rect x="27" y="7" width="7" height="7"/><rect x="23.5" y="3.5" width="7" height="7" fill="#EE1020" stroke="none" opacity="0.5"/></g></g>
+
+    <!-- ROW 5 -->
+    <!-- Ghana: red gold green + black star -->
+    <g transform="translate(0,168)"><rect width="54" height="36" rx="3" fill="#006B3F"/><rect width="54" height="24" fill="#FCD116"/><rect width="54" height="12" fill="#CF0921"/><polygon points="27,11 28.8,16.6 34.7,16.6 30,20 31.8,25.6 27,22.2 22.2,25.6 24,20 19.3,16.6 25.2,16.6" fill="black"/></g>
+    <!-- Egypt: red white black + eagle -->
+    <g transform="translate(60,168)"><rect width="54" height="36" rx="3" fill="#000000"/><rect width="54" height="24" fill="white"/><rect width="54" height="12" fill="#CE1126"/><ellipse cx="27" cy="18" rx="5" ry="4" fill="#C09300" stroke="#C09300" stroke-width="0.5"/></g>
+    <!-- Norway: red + blue white cross -->
+    <g transform="translate(120,168)"><rect width="54" height="36" rx="3" fill="#EF2B2D"/><rect x="15" width="6" height="36" fill="white"/><rect y="15" width="54" height="6" fill="white"/><rect x="16.5" width="3" height="36" fill="#002868"/><rect y="16.5" width="54" height="3" fill="#002868"/></g>
+    <!-- Ecuador: yellow + blue + red -->
+    <g transform="translate(180,168)"><rect width="54" height="36" rx="3" fill="#EF3340"/><rect width="54" height="24" fill="#0072CE"/><rect width="54" height="14" fill="#FFD100"/></g>
+    <!-- Qatar: maroon + white serrated -->
+    <g transform="translate(240,168)"><rect width="54" height="36" rx="3" fill="#8D1B3D"/><rect width="16" height="36" fill="white"/><polygon points="16,0 22,3 16,6 22,9 16,12 22,15 16,18 22,21 16,24 22,27 16,30 22,33 16,36 0,36 0,0" fill="white"/></g>
+    <!-- DR Congo: blue + red diagonal + yellow star -->
+    <g transform="translate(300,168)"><rect width="54" height="36" rx="3" fill="#007FFF"/><line x1="0" y1="36" x2="54" y2="0" stroke="#CE1126" stroke-width="8"/><polygon points="6,6 7.5,10.5 12,10.5 8.5,13 10,17.5 6,15 2,17.5 3.5,13 0,10.5 4.5,10.5" fill="#F7D618"/></g>
+  </g>
+
+  <!-- Subtle border overlay -->
+  <rect x="1" y="1" width="358" height="238" rx="8" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+</svg>
