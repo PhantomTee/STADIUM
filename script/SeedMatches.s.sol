@@ -25,7 +25,7 @@ contract SeedMatches is Script {
 
         uint256 now_ = block.timestamp;
 
-        // Match 1: Mexico (1) vs Argentina (37) — Group stage — 1h from now
+        // Match 1: Mexico (1) vs Argentina (37) - Group stage - 1h from now
         // externalFixtureId = 1001 (placeholder for API sync)
         oracle.createOrUpdateMatch(
             1001,           // externalFixtureId
@@ -35,9 +35,9 @@ contract SeedMatches is Script {
             now_ + 1 hours,
             MatchOracle.Stage.GROUP
         );
-        console.log("Match 1: Mexico vs Argentina — VAR window can open now");
+        console.log("Match 1: Mexico vs Argentina - VAR window can open now");
 
-        // Match 2: South Korea (3) vs Austria (39) — Group stage — 2h from now
+        // Match 2: South Korea (3) vs Austria (39) - Group stage - 2h from now
         oracle.createOrUpdateMatch(
             1002,
             2,
@@ -48,7 +48,7 @@ contract SeedMatches is Script {
         );
         console.log("Match 2: South Korea vs Austria");
 
-        // Match 3: France (33) vs Brazil (9) — Round of 16 — 4h from now
+        // Match 3: France (33) vs Brazil (9) - Round of 16 - 4h from now
         oracle.createOrUpdateMatch(
             1003,
             3,
@@ -66,7 +66,7 @@ contract SeedMatches is Script {
         vm.stopBroadcast();
 
         console.log("\n=== MATCH SEED COMPLETE ===");
-        console.log("Match 1: Mexico(1) vs Argentina(37) — VAR OPEN");
+        console.log("Match 1: Mexico(1) vs Argentina(37) - VAR OPEN");
         console.log("Match 2: S.Korea(3) vs Austria(39)  — upcoming");
         console.log("Match 3: France(33) vs Brazil(9)    — upcoming (Round of 16)");
         console.log("\nDemo flow:");
