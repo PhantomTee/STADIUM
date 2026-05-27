@@ -52,7 +52,7 @@ contract DeployHook is Script {
         vm.startBroadcast(deployerKey);
 
         StadiumHook hook = new StadiumHook{salt: salt}(IPoolManager(poolManager), owner);
-        require(address(hook) == hookAddress, "DeployHook: address mismatch — re-run mining");
+        require(address(hook) == hookAddress, "DeployHook: address mismatch - re-run mining");
 
         vm.stopBroadcast();
 
