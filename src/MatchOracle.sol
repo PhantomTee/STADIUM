@@ -78,6 +78,9 @@ contract MatchOracle is Ownable {
     mapping(uint256 => bool)   public matchExists;
     uint256[] public matchIds;
 
+    /// @notice Current tournament stage for each team (mirrors Stage enum values)
+    mapping(uint16 => uint8) public teamCurrentStage;
+
     address public convictionVault;
     address public varMarket;
     address public championPool;
@@ -113,6 +116,14 @@ contract MatchOracle is Ownable {
         convictionVault = _vault;
         varMarket       = _varMarket;
         championPool    = _champPool;
+    }
+
+    /// @notice Update the current tournament stage for a team as they advance.
+    ///         0=GROUP, 1=ROUND_OF_32, 2=ROUND_OF_16, 3=QUARTER_FINAL, 4=SEMI_FINAL, 5=FINAL
+    function updateTeamStage(uint16 teamId, uint8 stage) external onlyOwner {
+        require(teams[teamId].registered, "Oracle: team not registered");
+        require(stage <= 5, "Oracle: invalid stage");
+        teamCurrentStage[teamId] = stage;
     }
 
     // ─────────────────────────────── Admin: team registry ───────────────────────────────
@@ -355,12 +366,8 @@ contract MatchOracle is Ownable {
         return teams[teamId].eliminated;
     }
 
-    /// @notice Returns the tournament stage for a team (stubbed: returns 0 = GROUP for now).
-    ///         Future versions will track per-team stage progression.
+    /// @notice Returns the current tournament stage for a team.
     function getTeamStage(uint16 teamId) external view returns (uint8) {
-        // Stage is stored per-match. This stub returns GROUP (0) for all teams.
-        // Production: derive from latest match involving this team.
-        teamId; // suppress unused warning
-        return 0;
+        return teamCurrentStage[teamId];
     }
 }

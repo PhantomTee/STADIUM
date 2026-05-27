@@ -20,23 +20,41 @@ contract Treasury is Ownable {
     /// @notice Per-source accumulated total
     mapping(string => uint256) public sourceTotal;
 
+    /// @notice Addresses authorized to call receiveFor (protocol contracts only)
+    mapping(address => bool) public authorized;
+
     // ─────────────────────────────── Events ───────────────────────────────
 
     event TreasuryReceived(address indexed from, uint256 amount, string source);
     event TreasuryWithdrawn(address indexed to, uint256 amount);
+    event AuthorizationUpdated(address indexed addr, bool status);
 
     // ─────────────────────────────── Constructor ───────────────────────────────
+
+    modifier onlyAuthorized() {
+        require(authorized[msg.sender], "Treasury: not authorized");
+        _;
+    }
 
     constructor(address _owner, address _usdc) Ownable(_owner) {
         require(_usdc != address(0), "Treasury: zero usdc");
         usdc = IERC20(_usdc);
     }
 
+    // ─────────────────────────────── Authorization ───────────────────────────────
+
+    /// @notice Grant or revoke authorization to call receiveFor.
+    function setAuthorized(address _addr, bool _status) external onlyOwner {
+        require(_addr != address(0), "Treasury: zero address");
+        authorized[_addr] = _status;
+        emit AuthorizationUpdated(_addr, _status);
+    }
+
     // ─────────────────────────────── Inbound recording ───────────────────────────────
 
-    /// @notice Anyone can call this to record an inbound deposit (tokens must already be here).
-    ///         Emits TreasuryReceived and updates cumulative totals.
-    function receiveFor(string calldata source, uint256 amount) external {
+    /// @notice Called by authorized protocol contracts to record an inbound deposit
+    ///         (tokens must already be here). Emits TreasuryReceived and updates cumulative totals.
+    function receiveFor(string calldata source, uint256 amount) external onlyAuthorized {
         totalReceived += amount;
         sourceTotal[source] += amount;
         emit TreasuryReceived(msg.sender, amount, source);

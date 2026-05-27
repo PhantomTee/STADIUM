@@ -302,31 +302,6 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
 
     /// @notice Claim full principal for champion team backers.
     ///         Mints a ChampionNFT (non-reverting on failure).
-    function claimChampionPrincipal(uint16 teamId) external nonReentrant {
-        require(teamChampion[teamId],                  "ConvictionVault: team not champion");
-        require(!principalClaimed[msg.sender][teamId], "ConvictionVault: already claimed");
-        require(deposits[msg.sender][teamId] > 0,      "ConvictionVault: no deposit");
-
-        // CEI: mark claimed before transfer
-        principalClaimed[msg.sender][teamId] = true;
-
-        uint256 principal = deposits[msg.sender][teamId];
-        usdc.safeTransfer(msg.sender, principal);
-
-        // Non-reverting: NFT failure must NOT block the principal return
-        if (stadiumNFT != address(0)) {
-            try IStadiumNFT(stadiumNFT).mintChampionNFT(
-                msg.sender,
-                teamName[teamId],
-                principal,
-                0  // totalEarned passed as 0; yield is claimed separately via claimYield()
-            ) {} catch {}
-        }
-
-        emit ChampionClaimed(msg.sender, teamId, principal);
-    }
-
-    /// @notice Alias for claimChampionPrincipal (preferred name going forward).
     function claimChampionPosition(uint16 teamId) external nonReentrant {
         require(teamChampion[teamId],                  "ConvictionVault: team not champion");
         require(!principalClaimed[msg.sender][teamId], "ConvictionVault: already claimed");

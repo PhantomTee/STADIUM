@@ -91,6 +91,11 @@ contract VARMarket is ReentrancyGuard {
     /// @notice Whether the user has already pulled their payout/refund for this market
     mapping(uint256 => mapping(uint8 => mapping(address => bool))) public claimed;
 
+    /// @notice Per-user weighted contribution per outcome (amount * mult / 100 at bet time)
+    mapping(uint256 => mapping(uint8 => mapping(address => mapping(uint8 => uint256)))) public betWeighted;
+    /// @notice Running total weighted per outcome — pre-computed in placeBet, used in settleMarket
+    mapping(uint256 => mapping(uint8 => mapping(uint8 => uint256))) public totalWeightedPerOutcome;
+
     // ─────────────────────────────── Events ───────────────────────────────
 
     event MarketsOpened(uint256 indexed matchId, uint16 teamAId, uint16 teamBId);
@@ -215,19 +220,8 @@ contract VARMarket is ReentrancyGuard {
             usdc.safeTransfer(treasury, toTreasury);
         }
 
-        // ── Iterate participants to compute totalWeightedWinning ──
-        //    This single pass determines each winner's proportional share of toWinnersPool.
-        address[] storage parts = participants[matchId][marketType];
-        uint256 totalWeighted = 0;
-        for (uint256 i = 0; i < parts.length; i++) {
-            address p = parts[i];
-            uint256 winBet = betAmount[matchId][marketType][p][correctOutcome];
-            if (winBet > 0) {
-                uint256 mult = betMultiplier[matchId][marketType][p];
-                if (mult == 0) mult = 100; // safety fallback
-                totalWeighted += winBet * mult / 100;
-            }
-        }
+        // totalWeightedWinning was pre-computed incrementally in placeBet — no loop needed
+        uint256 totalWeighted = totalWeightedPerOutcome[matchId][marketType][correctOutcome];
 
         // Store settled state for pull-based claims
         m.toWinnersPool        = toWinnersPool;
@@ -273,6 +267,11 @@ contract VARMarket is ReentrancyGuard {
         betAmount[matchId][marketType][msg.sender][outcome] += amount;
         outcomePool[matchId][marketType][outcome]           += amount;
 
+        // Pre-compute weighted contribution for gas-free settle
+        uint256 weighted = amount * newMult / 100;
+        betWeighted[matchId][marketType][msg.sender][outcome] += weighted;
+        totalWeightedPerOutcome[matchId][marketType][outcome] += weighted;
+
         emit BetPlaced(matchId, marketType, msg.sender, outcome, amount);
     }
 
@@ -283,92 +282,42 @@ contract VARMarket is ReentrancyGuard {
     ///         (weighted by conviction multiplier). Losers receive a 10% refund.
     function claimPayout(uint256 matchId, uint8 marketType) external nonReentrant {
         require(marketType < 4, "VARMarket: invalid market type");
-        MarketState storage m = markets[matchId][marketType];
-        require(m.settled, "VARMarket: market not settled");
-        require(!claimed[matchId][marketType][msg.sender], "VARMarket: already claimed");
-
-        claimed[matchId][marketType][msg.sender] = true;
-
-        uint8   correct  = m.correctOutcome;
-        uint256 winBet   = betAmount[matchId][marketType][msg.sender][correct];
-
-        // Sum all losing bets for this user
-        uint256 loseBet = 0;
-        for (uint8 o = 1; o <= 6; o++) {
-            if (o != correct) {
-                loseBet += betAmount[matchId][marketType][msg.sender][o];
-            }
-        }
-
-        uint256 payout = 0;
-
-        // ── Winner share ──
-        if (winBet > 0 && m.totalWeightedWinning > 0) {
-            uint256 mult = betMultiplier[matchId][marketType][msg.sender];
-            if (mult == 0) mult = 100;
-            uint256 weighted    = winBet * mult / 100;
-            uint256 earnedShare = weighted * m.toWinnersPool / m.totalWeightedWinning;
-            payout += winBet + earnedShare; // principal back + pro-rata winnings
-        } else if (winBet > 0) {
-            // Winner but no losers (totalWeightedWinning == 0) — just return the bet
-            payout += winBet;
-        }
-
-        // ── Loser 10% refund ──
-        if (loseBet > 0) {
-            payout += loseBet * 10 / 100; // 10% refund on losing bets
-        }
-
-        if (payout > 0) {
-            usdc.safeTransfer(msg.sender, payout);
-        }
-
-        emit PayoutClaimed(msg.sender, matchId, marketType, payout);
-        emit VARClaimed(msg.sender, matchId, marketType, payout); // backwards-compat
+        _doClaim(msg.sender, matchId, marketType);
     }
 
     /// @notice Backwards-compatible alias for claimPayout.
-    ///         Uses a separate claimed flag check in claimPayout, so calling either once
-    ///         marks the position as claimed — do not call both.
     function claimVAR(uint256 matchId, uint8 marketType) external nonReentrant {
         require(marketType < 4, "VARMarket: invalid market type");
+        _doClaim(msg.sender, matchId, marketType);
+    }
+
+    function _doClaim(address caller, uint256 matchId, uint8 marketType) private {
         MarketState storage m = markets[matchId][marketType];
         require(m.settled, "VARMarket: market not settled");
-        require(!claimed[matchId][marketType][msg.sender], "VARMarket: already claimed");
-
-        claimed[matchId][marketType][msg.sender] = true;
+        require(!claimed[matchId][marketType][caller], "VARMarket: already claimed");
+        claimed[matchId][marketType][caller] = true;
 
         uint8   correct  = m.correctOutcome;
-        uint256 winBet   = betAmount[matchId][marketType][msg.sender][correct];
-
-        uint256 loseBet = 0;
+        uint256 winBet   = betAmount[matchId][marketType][caller][correct];
+        uint256 loseBet  = 0;
         for (uint8 o = 1; o <= 6; o++) {
-            if (o != correct) {
-                loseBet += betAmount[matchId][marketType][msg.sender][o];
-            }
+            if (o != correct) loseBet += betAmount[matchId][marketType][caller][o];
         }
 
         uint256 payout = 0;
-
         if (winBet > 0 && m.totalWeightedWinning > 0) {
-            uint256 mult = betMultiplier[matchId][marketType][msg.sender];
-            if (mult == 0) mult = 100;
-            uint256 weighted    = winBet * mult / 100;
-            uint256 earnedShare = weighted * m.toWinnersPool / m.totalWeightedWinning;
+            uint256 userWeighted = betWeighted[matchId][marketType][caller][correct];
+            uint256 earnedShare  = userWeighted * m.toWinnersPool / m.totalWeightedWinning;
             payout += winBet + earnedShare;
         } else if (winBet > 0) {
             payout += winBet;
         }
+        if (loseBet > 0) payout += loseBet * 10 / 100;
 
-        if (loseBet > 0) {
-            payout += loseBet * 10 / 100;
-        }
+        if (payout > 0) usdc.safeTransfer(caller, payout);
 
-        if (payout > 0) {
-            usdc.safeTransfer(msg.sender, payout);
-        }
-
-        emit VARClaimed(msg.sender, matchId, marketType, payout);
+        emit PayoutClaimed(caller, matchId, marketType, payout);
+        emit VARClaimed(caller, matchId, marketType, payout);
     }
 
     // ─────────────────────────────── View functions ───────────────────────────────

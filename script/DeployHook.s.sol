@@ -65,5 +65,24 @@ contract DeployHook is Script {
         console.log("1. Set STADIUM_HOOK_ADDRESS=", address(hook));
         console.log("2. Call teamFactory.setHook(", address(hook), ")");
         console.log("3. Run CreatePools.s.sol to initialize team pools");
+
+        // ── Update deployments.json with hook address ─────────────────────────
+        // Read existing file so other fields are preserved (best-effort; new file if absent)
+        string memory hookAddr  = vm.toString(address(hook));
+        string memory pmAddr    = vm.toString(poolManager);
+        string memory chainId   = vm.toString(block.chainid);
+        // Write a minimal hook-info file alongside deployments.json
+        string memory hookJson = string.concat(
+            '{\n',
+            '  "chainId": ',       chainId,    ',\n',
+            '  "poolManager": "',  pmAddr,     '",\n',
+            '  "stadiumHook": "',  hookAddr,   '",\n',
+            '  "hookFlags": "beforeSwap|afterSwap|beforeAddLiquidity|afterAddLiquidity",\n',
+            '  "hookSalt": "',     vm.toString(salt), '"\n',
+            '}'
+        );
+        vm.writeFile("./hook-deployment.json", hookJson);
+        console.log("\nHook info written to hook-deployment.json");
+        console.log("Merge stadiumHook address into deployments.json manually or via jq.");
     }
 }

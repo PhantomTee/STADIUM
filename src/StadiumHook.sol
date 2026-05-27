@@ -24,9 +24,8 @@ interface IConvictionVault {
     function getActiveConviction(address user, uint16 teamId) external view returns (bool);
 }
 
-interface IChampionPool {
-    function recordFor(uint256 amount, string calldata source) external;
-}
+// ChampionPool is funded by ConvictionVault.settleElimination() — not the hook.
+// Hook only tracks notional fees for display (feeRoutedToChampPool accumulator).
 
 /// @notice Core Uniswap V4 hook for the STADIUM protocol.
 ///
@@ -257,14 +256,12 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
         ps.totalVolumeUSDC += absVol;
         teamMomentum[ps.teamId] += absVol;
 
-        // Route protocol fee
+        // Notional protocol fee — accumulates for display; actual ChampionPool funding
+        // comes from ConvictionVault.settleElimination() which transfers real USDC.
         if (protocolFeeBps > 0) {
             uint256 fee = absVol * protocolFeeBps / 10000;
-            if (fee > 0 && championPool != address(0)) {
-                // ChampionPool must hold the USDC already (transferred by PoolManager settlement)
-                // We record the fee accounting; actual token movement is handled by the pool
+            if (fee > 0) {
                 ps.feeRoutedToChampPool += fee;
-                try IChampionPool(championPool).recordFor(fee, "hook") {} catch {}
                 emit ChampionFeeRouted(ps.teamId, fee);
             }
         }

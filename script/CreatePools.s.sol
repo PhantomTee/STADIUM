@@ -79,6 +79,51 @@ contract CreatePools is Script {
         console.log("TeamFactory:", factoryAddr);
         console.log("Teams registered: Argentina(37), France(33), Brazil(9), England(45)");
         console.log("                  Mexico(1), South Korea(3), Germany(26), Spain(10)");
+
+        // ── Write V4 pool manifest ────────────────────────────────────────────
+        if (hookAddr != address(0)) {
+            string memory chainId = vm.toString(block.chainid);
+            string memory pools = string.concat(
+                '{\n',
+                '  "chainId": ', chainId, ',\n',
+                '  "hook": "', vm.toString(hookAddr), '",\n',
+                '  "tickSpacing": ', vm.toString(uint256(uint24(int24(TICK_SPACING)))), ',\n',
+                '  "sqrtPriceX96": "', vm.toString(uint256(SQRT_PRICE_1_1)), '",\n',
+                '  "pools": [\n',
+                _poolEntry(factory, 37, "Argentina", "ARG", true),
+                _poolEntry(factory, 33, "France",    "FRA", true),
+                _poolEntry(factory, 9,  "Brazil",    "BRA", true),
+                _poolEntry(factory, 45, "England",   "ENG", true),
+                _poolEntry(factory, 1,  "Mexico",    "MEX", true),
+                _poolEntry(factory, 3,  "South Korea","KOR", true),
+                _poolEntry(factory, 26, "Germany",   "GER", true),
+                _poolEntry(factory, 10, "Spain",     "ESP", false),
+                '  ]\n',
+                '}'
+            );
+            vm.writeFile("./v4-pools.json", pools);
+            console.log("\nV4 pool manifest written to v4-pools.json");
+            console.log("Copy pool IDs into frontend config for the V4 Hook Engine card.");
+        }
+    }
+
+    function _poolEntry(
+        ITeamFactory factory,
+        uint16 teamId,
+        string memory name,
+        string memory symbol,
+        bool comma
+    ) internal view returns (string memory) {
+        bytes32 pid   = factory.teamPoolId(teamId);
+        address token = factory.teamToken(teamId);
+        string memory entry = string.concat(
+            '    {"teamId":', vm.toString(uint256(teamId)),
+            ',"name":"', name,
+            '","symbol":"', symbol,
+            '","token":"', vm.toString(token),
+            '","poolId":"', vm.toString(pid), '"}'
+        );
+        return comma ? string.concat(entry, ',\n') : string.concat(entry, '\n');
     }
 
     function _registerTeam(ITeamFactory factory, uint16 teamId, string memory name, string memory symbol) internal {

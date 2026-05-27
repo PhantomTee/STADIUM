@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import StadiumHero from '../components/StadiumHero'
+import V4HookEngine from '../components/V4HookEngine'
 
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function Home() {
@@ -73,9 +74,9 @@ export default function Home() {
               <div className="space-y-3 mb-8">
                 {[
                   ['45%', 'To winning pool (weighted by conviction)'],
-                  ['25%', 'Flows to Champion Pool'],
+                  ['22.5%', 'Flows to Champion Pool'],
                   ['10%', 'Refunded to each loser'],
-                  ['20%', 'Protocol Treasury'],
+                  ['22.5%', 'Protocol Treasury'],
                 ].map(([pct, label]) => (
                   <div key={pct} className="flex items-start gap-3">
                     <span className="text-blue-400 font-bold font-mono text-sm w-10 flex-shrink-0">{pct}</span>
@@ -118,6 +119,9 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        {/* ── V4 Hook Engine ────────────────────────────────────────────── */}
+        <V4HookEngine />
 
         {/* ── Survivor Yield Formula ────────────────────────────────────── */}
         <section className="grid md:grid-cols-2 gap-12 items-start">
