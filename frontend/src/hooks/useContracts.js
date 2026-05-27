@@ -258,3 +258,15 @@ export function useChampClaimed(user, teamId) {
     query: { enabled: !!user && teamId !== undefined },
   })
 }
+
+// ─── Legacy aliases (used by Home.jsx) ───────────────────────────────────────
+
+export const useTotalAliveConvictionLocked = useTotalAliveDeposits
+
+export function useChampionPoolBalance() {
+  return useReadContract({
+    address: ADDRESSES.championPool,
+    abi: ChampionPool_ABI,
+    functionName: 'totalAccumulated',
+  })
+}
