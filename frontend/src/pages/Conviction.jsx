@@ -4,7 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS, formatUSDC, parseUSDC } from '../utils/contracts'
 import { MockUSDC_ABI, ConvictionVault_ABI } from '../abis'
 import {
-  useUSDCBalance, useUSDCAllowance,
+  useUSDCBalance, useUSDCAllowance, useFaucetCooldown,
   useConvictionDeposit, usePendingYield,
   useTeamTotalDeposit, useTeamEliminated, useTeamChampion,
   useBackerCount, useTotalAliveDeposits, usePrincipalClaimed,
@@ -18,17 +18,29 @@ export default function Conviction() {
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [filterGroup, setFilterGroup]   = useState('ALL')
 
-  const { data: usdcBalance } = useUSDCBalance(address)
-  const { data: allowance }   = useUSDCAllowance(address, ADDRESSES.convictionVault)
-  const { data: totalAlive }  = useTotalAliveDeposits()
-  const { data: closeTime }   = useConvictionCloseTime()
+  const { data: usdcBalance }    = useUSDCBalance(address)
+  const { data: allowance }      = useUSDCAllowance(address, ADDRESSES.convictionVault)
+  const { data: totalAlive }     = useTotalAliveDeposits()
+  const { data: closeTime }      = useConvictionCloseTime()
+  const { data: lastFaucetTime } = useFaucetCooldown(address)
 
   // Faucet has its own isolated write hook so it never bleeds into DepositForm
   const { writeContract: writeFaucet, data: faucetHash } = useWriteContract()
-  const { isLoading: faucetPending } = useWaitForTransactionReceipt({ hash: faucetHash })
+  const { isLoading: faucetPending, isSuccess: faucetSuccess } = useWaitForTransactionReceipt({ hash: faucetHash })
 
   const nowSec = BigInt(Math.floor(Date.now() / 1000))
   const convictionOpen = !closeTime || closeTime === 0n || nowSec < closeTime
+
+  const FAUCET_COOLDOWN = 24n * 60n * 60n
+  const faucetReady = !lastFaucetTime || nowSec >= lastFaucetTime + FAUCET_COOLDOWN
+  const faucetUnlocksAt = lastFaucetTime ? lastFaucetTime + FAUCET_COOLDOWN : null
+  const faucetCooldownLabel = (() => {
+    if (!faucetUnlocksAt || faucetReady) return null
+    const secsLeft = Number(faucetUnlocksAt - nowSec)
+    const h = Math.floor(secsLeft / 3600)
+    const m = Math.floor((secsLeft % 3600) / 60)
+    return h > 0 ? `${h}h ${m}m` : `${m}m`
+  })()
 
   const filteredTeams = filterGroup === 'ALL'
     ? WORLD_CUP_TEAMS
@@ -58,8 +70,14 @@ export default function Conviction() {
           <div className="flex flex-col items-end gap-2">
             <div className="text-xs text-stadium-muted font-mono uppercase tracking-widest">Wallet Balance</div>
             <div className="text-2xl font-black text-stadium-text">${formatUSDC(usdcBalance)}</div>
-            <button onClick={handleFaucet} disabled={faucetPending} className="btn-secondary text-xs py-1.5 px-4">
-              {faucetPending ? 'Claiming…' : 'Claim 1,000 USDC'}
+            <button
+              onClick={handleFaucet}
+              disabled={faucetPending || !faucetReady}
+              className="btn-secondary text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {faucetPending  ? 'Claiming…'
+               : !faucetReady ? `Cooldown ${faucetCooldownLabel}`
+               : 'Claim 1,000 USDC'}
             </button>
           </div>
         )}

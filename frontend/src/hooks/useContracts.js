@@ -32,6 +32,16 @@ export function useUSDCAllowance(owner, spender) {
   })
 }
 
+export function useFaucetCooldown(address) {
+  return useReadContract({
+    address: ADDRESSES.mockUSDC,
+    abi: MockUSDC_ABI,
+    functionName: 'lastFaucetTime',
+    args: [address],
+    query: { enabled: !!address },
+  })
+}
+
 // ─── CONVICTION VAULT ────────────────────────────────────────────────────────
 
 export function useConvictionDeposit(user, teamId) {
