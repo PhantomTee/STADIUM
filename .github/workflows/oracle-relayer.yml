@@ -1,0 +1,45 @@
+name: Oracle Relayer
+
+on:
+  schedule:
+    # Poll every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      fixture_id:
+        description: 'API-Football fixture ID to force-process'
+        required: false
+      dry_run:
+        description: 'Dry run (no on-chain transactions)'
+        required: false
+        default: 'false'
+
+jobs:
+  relay:
+    name: Sync fixtures and post results
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      API_FOOTBALL_BASE: https://v3.football.api-sports.io
+      WORLD_CUP_LEAGUE: 1 # FIFA World Cup league ID on API-Football
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install cast (Foundry)
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Fetch and process fixtures
+        env:
+          API_FOOTBALL_KEY:  ${{ secrets.API_FOOTBALL_KEY }}
+          ORACLE_PRIVATE_KEY: ${{ secrets.ORACLE_PRIVATE_KEY }}
+          XLAYER_RPC_URL:    ${{ secrets.XLAYER_RPC_URL }}
+          MATCH_ORACLE_ADDR: ${{ secrets.MATCH_ORACLE_ADDRESS }}
+          FORCE_FIXTURE_ID:  ${{ github.event.inputs.fixture_id }}
+          DRY_RUN:           ${{ github.event.inputs.dry_run || 'false' }}
+        run: node .github/scripts/oracle-relay.js

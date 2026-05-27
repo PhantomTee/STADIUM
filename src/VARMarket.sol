@@ -6,7 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IConvictionVault {
-    function getConvictionMultiplier(address user, uint16 teamId) external view returns (uint256);
+    /// @notice Returns 150 if user has active conviction on EITHER teamA or teamB, else 100.
+    function getConvictionMultiplier(address user, uint16 teamA, uint16 teamB) external view returns (uint256);
 }
 
 interface IChampionPoolVAR {
@@ -96,6 +97,8 @@ contract VARMarket is ReentrancyGuard {
     event MarketsClosed(uint256 indexed matchId);
     event BetPlaced(uint256 indexed matchId, uint8 marketType, address indexed user, uint8 outcome, uint256 amount);
     event MarketSettled(uint256 indexed matchId, uint8 marketType, uint8 correctOutcome, uint256 toWinnersPool);
+    event PayoutClaimed(address indexed user, uint256 indexed matchId, uint8 marketType, uint256 payout);
+    // Backwards-compat alias
     event VARClaimed(address indexed user, uint256 indexed matchId, uint8 marketType, uint256 payout);
 
     // ─────────────────────────────── Modifiers ───────────────────────────────
@@ -278,7 +281,7 @@ contract VARMarket is ReentrancyGuard {
     /// @notice Pull-based payout for a settled market.
     ///         Winners receive their bet back plus a pro-rata share of toWinnersPool
     ///         (weighted by conviction multiplier). Losers receive a 10% refund.
-    function claimVAR(uint256 matchId, uint8 marketType) external nonReentrant {
+    function claimPayout(uint256 matchId, uint8 marketType) external nonReentrant {
         require(marketType < 4, "VARMarket: invalid market type");
         MarketState storage m = markets[matchId][marketType];
         require(m.settled, "VARMarket: market not settled");
@@ -303,7 +306,7 @@ contract VARMarket is ReentrancyGuard {
         if (winBet > 0 && m.totalWeightedWinning > 0) {
             uint256 mult = betMultiplier[matchId][marketType][msg.sender];
             if (mult == 0) mult = 100;
-            uint256 weighted   = winBet * mult / 100;
+            uint256 weighted    = winBet * mult / 100;
             uint256 earnedShare = weighted * m.toWinnersPool / m.totalWeightedWinning;
             payout += winBet + earnedShare; // principal back + pro-rata winnings
         } else if (winBet > 0) {
@@ -314,6 +317,51 @@ contract VARMarket is ReentrancyGuard {
         // ── Loser 10% refund ──
         if (loseBet > 0) {
             payout += loseBet * 10 / 100; // 10% refund on losing bets
+        }
+
+        if (payout > 0) {
+            usdc.safeTransfer(msg.sender, payout);
+        }
+
+        emit PayoutClaimed(msg.sender, matchId, marketType, payout);
+        emit VARClaimed(msg.sender, matchId, marketType, payout); // backwards-compat
+    }
+
+    /// @notice Backwards-compatible alias for claimPayout.
+    ///         Uses a separate claimed flag check in claimPayout, so calling either once
+    ///         marks the position as claimed — do not call both.
+    function claimVAR(uint256 matchId, uint8 marketType) external nonReentrant {
+        require(marketType < 4, "VARMarket: invalid market type");
+        MarketState storage m = markets[matchId][marketType];
+        require(m.settled, "VARMarket: market not settled");
+        require(!claimed[matchId][marketType][msg.sender], "VARMarket: already claimed");
+
+        claimed[matchId][marketType][msg.sender] = true;
+
+        uint8   correct  = m.correctOutcome;
+        uint256 winBet   = betAmount[matchId][marketType][msg.sender][correct];
+
+        uint256 loseBet = 0;
+        for (uint8 o = 1; o <= 6; o++) {
+            if (o != correct) {
+                loseBet += betAmount[matchId][marketType][msg.sender][o];
+            }
+        }
+
+        uint256 payout = 0;
+
+        if (winBet > 0 && m.totalWeightedWinning > 0) {
+            uint256 mult = betMultiplier[matchId][marketType][msg.sender];
+            if (mult == 0) mult = 100;
+            uint256 weighted    = winBet * mult / 100;
+            uint256 earnedShare = weighted * m.toWinnersPool / m.totalWeightedWinning;
+            payout += winBet + earnedShare;
+        } else if (winBet > 0) {
+            payout += winBet;
+        }
+
+        if (loseBet > 0) {
+            payout += loseBet * 10 / 100;
         }
 
         if (payout > 0) {
@@ -365,9 +413,10 @@ contract VARMarket is ReentrancyGuard {
         return false;
     }
 
-    /// @dev Determine the relevant teamId for conviction multiplier lookup.
-    ///      Only MatchWinner and FirstGoal have team-linked conviction;
-    ///      other market types and draws always return 100.
+    /// @dev Determine the conviction multiplier for a user on a given market.
+    ///      For MatchWinner and FirstGoal: uses both team IDs so conviction on either team
+    ///      qualifies for the 1.5× boost.
+    ///      For other market types or draws/no-goal outcomes: returns 100 (no boost).
     function _getMultiplier(
         address user,
         uint256 /*matchId*/,
@@ -379,16 +428,12 @@ contract VARMarket is ReentrancyGuard {
         if (vault == address(0)) return 100;
         if (marketType != MARKET_MATCH_WINNER && marketType != MARKET_FIRST_GOAL) return 100;
 
-        uint16 relevantTeam;
-        if (outcome == OUTCOME_TEAM_A) {
-            relevantTeam = teamAId;
-        } else if (outcome == OUTCOME_TEAM_B) {
-            relevantTeam = teamBId;
-        } else {
-            return 100; // DRAW or NO_GOAL — no conviction team
+        // For team-specific outcomes, use both teamIds — conviction on either team qualifies
+        if (outcome == OUTCOME_TEAM_A || outcome == OUTCOME_TEAM_B) {
+            if (teamAId == 0 && teamBId == 0) return 100;
+            return IConvictionVault(vault).getConvictionMultiplier(user, teamAId, teamBId);
         }
 
-        if (relevantTeam == 0) return 100;
-        return IConvictionVault(vault).getConvictionMultiplier(user, relevantTeam);
+        return 100; // DRAW or NO_GOAL — no conviction boost
     }
 }

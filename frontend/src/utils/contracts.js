@@ -11,6 +11,8 @@ export const ADDRESSES = {
   championPool:    import.meta.env.VITE_CHAMPION_POOL_ADDRESS     || ZERO,
   stadiumNFT:      import.meta.env.VITE_STADIUM_NFT_ADDRESS       || ZERO,
   stadiumHook:     import.meta.env.VITE_STADIUM_HOOK_ADDRESS      || ZERO,
+  teamFactory:     import.meta.env.VITE_TEAM_FACTORY_ADDRESS      || ZERO,
+  treasury:        import.meta.env.VITE_TREASURY_ADDRESS          || ZERO,
 }
 
 // Chain config — sourced from .env so it can be switched without rebuilding

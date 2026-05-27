@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {ConvictionVault} from "../src/ConvictionVault.sol";
 import {MockUSDC}        from "../src/MockUSDC.sol";
 
-/// @notice 9 tests covering the MasterChef accumulator logic for ConvictionVault
+/// @notice Tests covering the MasterChef accumulator logic and new view functions for ConvictionVault
 contract ConvictionVaultTest is Test {
     MockUSDC        usdc;
     ConvictionVault vault;
@@ -216,5 +216,114 @@ contract ConvictionVaultTest is Test {
 
         // settleElimination must use < 100k gas regardless of backer count
         assertLt(gasUsed, 100_000, "settleElimination should not loop over backers");
+    }
+
+    // ── Test 10: getActiveConviction returns true for active depositor ────────
+
+    function test_GetActiveConviction_True() public {
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+
+        assertTrue(vault.getActiveConviction(alice, TEAM_A), "Active conviction should be true");
+    }
+
+    // ── Test 11: getActiveConviction returns false after elimination ──────────
+
+    function test_GetActiveConviction_FalseAfterElimination() public {
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+
+        vm.prank(bob);
+        vault.depositConviction(TEAM_B, 100e6); // alive team (so totalAliveDeposits doesn't go to 0)
+
+        vm.prank(oracle);
+        vault.settleElimination(TEAM_A);
+
+        assertFalse(vault.getActiveConviction(alice, TEAM_A), "Conviction should be inactive after elimination");
+    }
+
+    // ── Test 12: getConvictionMultiplier with two teams ───────────────────────
+
+    function test_GetConvictionMultiplier_TwoTeams() public {
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6); // alice backs team A
+
+        // Alice has conviction on teamA, not teamB
+        assertEq(vault.getConvictionMultiplier(alice, TEAM_A, TEAM_B), 150, "Should be 150 (teamA active)");
+        assertEq(vault.getConvictionMultiplier(alice, TEAM_B, TEAM_C), 100, "Should be 100 (neither team active)");
+
+        // Bob has no conviction anywhere
+        assertEq(vault.getConvictionMultiplier(bob, TEAM_A, TEAM_B), 100, "Bob should get 100");
+
+        // Bob deposits on team B
+        vm.prank(bob);
+        vault.depositConviction(TEAM_B, 50e6);
+        assertEq(vault.getConvictionMultiplier(bob, TEAM_A, TEAM_B), 150, "Bob with teamB conviction should get 150");
+    }
+
+    // ── Test 13: getUserPosition returns correct composite view ──────────────
+
+    function test_GetUserPosition() public {
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 200e6);
+
+        vm.prank(bob);
+        vault.depositConviction(TEAM_B, 100e6); // will eliminate to generate yield
+
+        vm.prank(oracle);
+        vault.settleElimination(TEAM_B);
+
+        ConvictionVault.UserPosition memory pos = vault.getUserPosition(alice, TEAM_A);
+
+        assertEq(pos.deposited,  200e6);
+        assertGt(pos.pendingYield, 0,     "Alice should have pending yield");
+        assertFalse(pos.principalClaimed, "Principal not yet claimed");
+        assertTrue(pos.teamActive,        "Team A is still active");
+        assertFalse(pos.teamEliminated,   "Team A not eliminated");
+        assertFalse(pos.teamChampion,     "Team A not champion");
+    }
+
+    // ── Test 14: claimChampionPosition (alias) works correctly ───────────────
+
+    function test_ClaimChampionPosition() public {
+        address champPool = makeAddr("champPool");
+        vm.prank(deployer);
+        vault.setChampionPool(champPool);
+
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 500e6);
+
+        vm.prank(oracle);
+        vault.setChampion(TEAM_A);
+
+        uint256 balBefore = usdc.balanceOf(alice);
+        vm.prank(alice);
+        vault.claimChampionPosition(TEAM_A);
+        uint256 balAfter = usdc.balanceOf(alice);
+
+        assertEq(balAfter - balBefore, 500e6, "Should get full principal back");
+        assertTrue(vault.principalClaimed(alice, TEAM_A), "Principal should be marked claimed");
+    }
+
+    // ── Test 15: claimChampionPosition and claimChampionPrincipal both mark claimed ──
+
+    function test_ClaimChampionPosition_CannotDoubleClaimWithAlias() public {
+        address champPool = makeAddr("champPool");
+        vm.prank(deployer);
+        vault.setChampionPool(champPool);
+
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+
+        vm.prank(oracle);
+        vault.setChampion(TEAM_A);
+
+        vm.prank(alice);
+        vault.claimChampionPosition(TEAM_A);
+
+        // Second claim via original function should revert
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.claimChampionPrincipal(TEAM_A);
     }
 }

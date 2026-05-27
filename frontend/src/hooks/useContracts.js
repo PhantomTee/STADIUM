@@ -6,6 +6,8 @@ import {
   VARMarket_ABI,
   MatchOracle_ABI,
   ChampionPool_ABI,
+  StadiumHook_ABI,
+  TeamFactory_ABI,
 } from '../abis'
 
 // ─── USDC ────────────────────────────────────────────────────────────────────
@@ -256,6 +258,86 @@ export function useChampClaimed(user, teamId) {
     functionName: 'champClaimed',
     args: [user, teamId],
     query: { enabled: !!user && teamId !== undefined },
+  })
+}
+
+// ─── STADIUM HOOK ────────────────────────────────────────────────────────────
+
+export function useHookPaused() {
+  return useReadContract({
+    address: ADDRESSES.stadiumHook,
+    abi: StadiumHook_ABI,
+    functionName: 'paused',
+  })
+}
+
+export function useTeamMomentum(teamId) {
+  return useReadContract({
+    address: ADDRESSES.stadiumHook,
+    abi: StadiumHook_ABI,
+    functionName: 'teamMomentum',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function useHookPoolState(poolId) {
+  return useReadContract({
+    address: ADDRESSES.stadiumHook,
+    abi: StadiumHook_ABI,
+    functionName: 'poolState',
+    args: [poolId],
+    query: { enabled: !!poolId },
+  })
+}
+
+export function useHookTeamPoolId(teamId) {
+  return useReadContract({
+    address: ADDRESSES.stadiumHook,
+    abi: StadiumHook_ABI,
+    functionName: 'teamPoolId',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function useHookFeeConfig() {
+  return useReadContract({
+    address: ADDRESSES.stadiumHook,
+    abi: StadiumHook_ABI,
+    functionName: 'feeConfig',
+  })
+}
+
+// ─── TEAM FACTORY ────────────────────────────────────────────────────────────
+
+export function useFactoryTeamToken(teamId) {
+  return useReadContract({
+    address: ADDRESSES.teamFactory,
+    abi: TeamFactory_ABI,
+    functionName: 'teamToken',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function useFactoryTeamPoolId(teamId) {
+  return useReadContract({
+    address: ADDRESSES.teamFactory,
+    abi: TeamFactory_ABI,
+    functionName: 'teamPoolId',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
+  })
+}
+
+export function useFactoryTeamInfo(teamId) {
+  return useReadContract({
+    address: ADDRESSES.teamFactory,
+    abi: TeamFactory_ABI,
+    functionName: 'getTeamInfo',
+    args: [teamId],
+    query: { enabled: teamId !== undefined },
   })
 }
 

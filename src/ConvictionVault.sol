@@ -326,6 +326,29 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
         emit ChampionClaimed(msg.sender, teamId, principal);
     }
 
+    /// @notice Alias for claimChampionPrincipal (preferred name going forward).
+    function claimChampionPosition(uint16 teamId) external nonReentrant {
+        require(teamChampion[teamId],                  "ConvictionVault: team not champion");
+        require(!principalClaimed[msg.sender][teamId], "ConvictionVault: already claimed");
+        require(deposits[msg.sender][teamId] > 0,      "ConvictionVault: no deposit");
+
+        principalClaimed[msg.sender][teamId] = true;
+
+        uint256 principal = deposits[msg.sender][teamId];
+        usdc.safeTransfer(msg.sender, principal);
+
+        if (stadiumNFT != address(0)) {
+            try IStadiumNFT(stadiumNFT).mintChampionNFT(
+                msg.sender,
+                teamName[teamId],
+                principal,
+                0
+            ) {} catch {}
+        }
+
+        emit ChampionClaimed(msg.sender, teamId, principal);
+    }
+
     // ─────────────────────────────── View functions ───────────────────────────────
 
     /// @notice Total pending yield for a user across all their teams, including already-buffered amount.
@@ -337,10 +360,26 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
         total += claimableYield[user];
     }
 
+    /// @notice Returns true if the user has an active (non-zero, team-alive) conviction deposit.
+    ///         Used by StadiumHook to apply conviction fee discount.
+    function getActiveConviction(address user, uint16 teamId) external view returns (bool) {
+        return deposits[user][teamId] > 0 && teamActive[teamId];
+    }
+
     /// @notice Returns 150 (1.5×) if user has an active conviction deposit on teamId, else 100 (1×).
-    ///         Used by VARMarket to compute the conviction multiplier on bets.
+    ///         Used by VARMarket to compute the conviction multiplier on bets (single-team version).
     function getConvictionMultiplier(address user, uint16 teamId) external view returns (uint256) {
         if (deposits[user][teamId] > 0 && teamActive[teamId]) {
+            return 150;
+        }
+        return 100;
+    }
+
+    /// @notice Returns 150 if user has active conviction on EITHER teamA or teamB, else 100.
+    ///         Used by VARMarket when both teams are relevant (match-level multiplier).
+    function getConvictionMultiplier(address user, uint16 teamA, uint16 teamB) external view returns (uint256) {
+        if ((deposits[user][teamA] > 0 && teamActive[teamA]) ||
+            (deposits[user][teamB] > 0 && teamActive[teamB])) {
             return 150;
         }
         return 100;
@@ -350,6 +389,27 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
     ///         deposits are never zeroed after claim, so this reflects the original deposit.
     function getUserDeposit(address user, uint16 teamId) external view returns (uint256) {
         return deposits[user][teamId];
+    }
+
+    // ─────────────────────────────── Composite view ───────────────────────────────
+
+    struct UserPosition {
+        uint256 deposited;
+        uint256 pendingYield;
+        bool    principalClaimed;
+        bool    teamActive;
+        bool    teamEliminated;
+        bool    teamChampion;
+    }
+
+    /// @notice Returns a combined view of a user's position for a given team.
+    function getUserPosition(address user, uint16 teamId) external view returns (UserPosition memory pos) {
+        pos.deposited       = deposits[user][teamId];
+        pos.pendingYield    = _computePending(user, teamId) + claimableYield[user];
+        pos.principalClaimed = principalClaimed[user][teamId];
+        pos.teamActive      = teamActive[teamId];
+        pos.teamEliminated  = teamEliminated[teamId];
+        pos.teamChampion    = teamChampion[teamId];
     }
 
     // ─────────────────────────────── Internal helpers ───────────────────────────────

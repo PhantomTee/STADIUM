@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {VARMarket}      from "../src/VARMarket.sol";
 import {MockUSDC}       from "../src/MockUSDC.sol";
 
-/// @notice 6 tests covering VAR market mechanics with uint8 outcomes and pull-based claims
+/// @notice Tests covering VAR market mechanics with uint8 outcomes and pull-based claims
 contract VARMarketTest is Test {
     MockUSDC   usdc;
     VARMarket  varMarket;
@@ -96,9 +96,27 @@ contract VARMarketTest is Test {
         assertEq(toWinnersPool, 90e6);
     }
 
-    // ── Test 4: Winner claims bet + proportional share ────────────────────────
+    // ── Test 4: Winner claims bet + proportional share via claimPayout ───────
 
-    function test_Winner_ClaimVAR() public {
+    function test_Winner_ClaimPayout() public {
+        vm.prank(alice); varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_A, 100e6);
+        vm.prank(bob);   varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_B, 200e6);
+
+        vm.prank(oracle); varMarket.closeMarkets(MATCH_ID);
+        vm.prank(oracle); varMarket.settleMarket(MATCH_ID, MARKET_WIN, OUTCOME_A);
+
+        uint256 balBefore = usdc.balanceOf(alice);
+        vm.prank(alice);
+        varMarket.claimPayout(MATCH_ID, MARKET_WIN);
+        uint256 balAfter = usdc.balanceOf(alice);
+
+        // Alice is the only winner: gets bet (100e6) + entire toWinnersPool (90e6)
+        assertApproxEqAbs(balAfter - balBefore, 190e6, 1, "Alice payout mismatch");
+    }
+
+    // ── Test 4b: claimVAR backwards-compat alias still works ─────────────────
+
+    function test_Winner_ClaimVAR_Alias() public {
         vm.prank(alice); varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_A, 100e6);
         vm.prank(bob);   varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_B, 200e6);
 
@@ -110,11 +128,10 @@ contract VARMarketTest is Test {
         varMarket.claimVAR(MATCH_ID, MARKET_WIN);
         uint256 balAfter = usdc.balanceOf(alice);
 
-        // Alice is the only winner: gets bet (100e6) + entire toWinnersPool (90e6)
-        assertApproxEqAbs(balAfter - balBefore, 190e6, 1, "Alice payout mismatch");
+        assertApproxEqAbs(balAfter - balBefore, 190e6, 1, "Alice payout via claimVAR mismatch");
     }
 
-    // ── Test 5: Loser gets 10% refund on claimVAR ────────────────────────────
+    // ── Test 5: Loser gets 10% refund on claimPayout ─────────────────────────
 
     function test_Loser_Gets10PctRefund() public {
         vm.prank(alice); varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_A, 100e6);
@@ -125,16 +142,30 @@ contract VARMarketTest is Test {
 
         uint256 balBefore = usdc.balanceOf(bob);
         vm.prank(bob);
-        varMarket.claimVAR(MATCH_ID, MARKET_WIN);
+        varMarket.claimPayout(MATCH_ID, MARKET_WIN);
         uint256 balAfter = usdc.balanceOf(bob);
 
         // Bob loses 200e6. Refund = 200e6 * 10% = 20e6
         assertApproxEqAbs(balAfter - balBefore, 20e6, 1, "Bob refund mismatch");
     }
 
-    // ── Test 6: Double claim reverts ─────────────────────────────────────────
+    // ── Test 6: Double claim via claimPayout reverts ──────────────────────────
 
     function test_DoubleClaim_Reverts() public {
+        vm.prank(alice); varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_A, 100e6);
+        vm.prank(oracle); varMarket.closeMarkets(MATCH_ID);
+        vm.prank(oracle); varMarket.settleMarket(MATCH_ID, MARKET_WIN, OUTCOME_A);
+
+        vm.prank(alice); varMarket.claimPayout(MATCH_ID, MARKET_WIN);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        varMarket.claimPayout(MATCH_ID, MARKET_WIN);
+    }
+
+    // ── Test 7: Cannot claim both claimVAR and claimPayout ───────────────────
+
+    function test_CannotClaimBothAliases() public {
         vm.prank(alice); varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_A, 100e6);
         vm.prank(oracle); varMarket.closeMarkets(MATCH_ID);
         vm.prank(oracle); varMarket.settleMarket(MATCH_ID, MARKET_WIN, OUTCOME_A);
@@ -143,6 +174,79 @@ contract VARMarketTest is Test {
 
         vm.prank(alice);
         vm.expectRevert();
-        varMarket.claimVAR(MATCH_ID, MARKET_WIN);
+        varMarket.claimPayout(MATCH_ID, MARKET_WIN);
+    }
+
+    // ── Test 8: Multiplier affects winner's proportional share ────────────────
+    //    Verify the multiplier boosts share of toWinnersPool (net winnings), not the principal.
+
+    function test_Multiplier_AffectsNetWinnings() public {
+        // Deploy a vault mock that returns 150 for alice, 100 for bob
+        MockConvictionVault cvault = new MockConvictionVault();
+        cvault.setMultiplier(alice, 1, 2, 150); // alice has conviction
+        // bob gets 100 by default
+
+        VARMarket market2 = new VARMarket(
+            address(usdc),
+            oracle,
+            address(cvault),
+            treasury,
+            championPool
+        );
+
+        usdc.mint(alice, 1_000e6);
+        usdc.mint(bob,   1_000e6);
+        vm.prank(alice); usdc.approve(address(market2), type(uint256).max);
+        vm.prank(bob);   usdc.approve(address(market2), type(uint256).max);
+
+        uint256 matchId2 = 2002;
+        vm.prank(oracle); market2.openMarketsWithTeams(matchId2, 1, 2);
+
+        vm.prank(alice); market2.placeBet(matchId2, MARKET_WIN, OUTCOME_A, 100e6);
+        vm.prank(bob);   market2.placeBet(matchId2, MARKET_WIN, OUTCOME_A, 100e6);
+
+        // Add a loser so there's a pool to distribute
+        address loser = makeAddr("loser");
+        usdc.mint(loser, 200e6);
+        vm.prank(loser); usdc.approve(address(market2), type(uint256).max);
+        vm.prank(loser); market2.placeBet(matchId2, MARKET_WIN, OUTCOME_B, 200e6);
+
+        vm.prank(oracle); market2.closeMarkets(matchId2);
+        vm.prank(oracle); market2.settleMarket(matchId2, MARKET_WIN, OUTCOME_A);
+
+        // toWinnersPool: losingPool=200e6, loserRefund=20e6, remaining=180e6, toWinners=90e6
+        // Alice weighted = 100e6 * 150/100 = 150e6
+        // Bob   weighted = 100e6 * 100/100 = 100e6
+        // Total weighted = 250e6
+        // Alice earnedShare = 150/250 * 90e6 = 54e6
+        // Bob   earnedShare = 100/250 * 90e6 = 36e6
+
+        uint256 aliceBefore = usdc.balanceOf(alice);
+        vm.prank(alice); market2.claimPayout(matchId2, MARKET_WIN);
+        uint256 aliceGain = usdc.balanceOf(alice) - aliceBefore;
+        // Alice: principal 100e6 + earnedShare 54e6 = 154e6
+        assertApproxEqAbs(aliceGain, 154e6, 1, "Alice multiplier gain mismatch");
+
+        uint256 bobBefore = usdc.balanceOf(bob);
+        vm.prank(bob); market2.claimPayout(matchId2, MARKET_WIN);
+        uint256 bobGain = usdc.balanceOf(bob) - bobBefore;
+        // Bob: principal 100e6 + earnedShare 36e6 = 136e6
+        assertApproxEqAbs(bobGain, 136e6, 1, "Bob non-multiplier gain mismatch");
+    }
+}
+
+/// @notice Minimal mock for IConvictionVault (two-team signature).
+contract MockConvictionVault {
+    // mapping: user => teamA => teamB => multiplier
+    mapping(address => mapping(uint16 => mapping(uint16 => uint256))) public mult;
+
+    function setMultiplier(address user, uint16 a, uint16 b, uint256 m) external {
+        mult[user][a][b] = m;
+        mult[user][b][a] = m; // symmetric
+    }
+
+    function getConvictionMultiplier(address user, uint16 teamA, uint16 teamB) external view returns (uint256) {
+        uint256 m = mult[user][teamA][teamB];
+        return m == 0 ? 100 : m;
     }
 }

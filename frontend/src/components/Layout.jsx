@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: '/',            label: 'Home'        },
   { path: '/conviction',  label: 'CONVICTION'  },
   { path: '/var',         label: 'VAR'         },
+  { path: '/trade',       label: 'Trade'       },
   { path: '/portfolio',   label: 'Portfolio'   },
   { path: '/leaderboard', label: 'Leaderboard' },
   { path: '/nfts',        label: 'NFTs'        },

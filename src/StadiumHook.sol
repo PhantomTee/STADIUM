@@ -9,151 +9,349 @@ import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/types/BeforeSwapDelta.sol";
 import {Hooks} from "@uniswap/v4-core/libraries/Hooks.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IConvictionVaultHook {
-    function teamActive(uint16 teamId) external view returns (bool);
-    function teamEliminated(uint16 teamId) external view returns (bool);
+// ─────────────────────────────── External interfaces ───────────────────────────────
+
+interface IMatchOracle {
+    function isTeamEliminated(uint16 teamId) external view returns (bool);
+    function getTeamStage(uint16 teamId) external view returns (uint8);
 }
 
-interface IChampionPoolHook {
-    function recordDeposit(uint256 amount) external;
+interface IConvictionVault {
+    function getActiveConviction(address user, uint16 teamId) external view returns (bool);
 }
 
-/// @notice Minimal Uniswap V4 hook for STADIUM.
-///         Contains ONLY V4 hook logic — all CONVICTION accounting lives in ConvictionVault.
+interface IChampionPool {
+    function recordFor(uint256 amount, string calldata source) external;
+}
+
+/// @notice Core Uniswap V4 hook for the STADIUM protocol.
 ///
-/// NOTE: For testnet demo, deploy with a MockPoolManager if no official v4 exists.
-///       Hook address must be mined so its bits encode the required permissions
-///       (beforeSwap, afterSwap, beforeAddLiquidity).
-contract StadiumHook is BaseHook, Ownable {
+/// Permissions:
+///   beforeSwap, afterSwap, beforeAddLiquidity, afterAddLiquidity
+///
+/// Hook logic:
+///   - beforeSwap: blocks eliminated teams and paused trading; returns dynamic fee
+///   - afterSwap:  routes a protocol fee to ChampionPool and updates team momentum
+///   - beforeAddLiquidity: blocks adding liquidity to eliminated team pools
+///   - afterAddLiquidity:  records liquidity additions
+///
+/// Hook address must be mined so its address bits encode the Hooks flags.
+/// Use DeployHook.s.sol (HookMiner.find) for correct CREATE2 salt.
+contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
     using SafeERC20 for IERC20;
 
+    // ─────────────────────────────── Custom errors ───────────────────────────────
+
+    error PoolNotRegistered();
+    error TeamEliminated();
+    error TradingPaused();
+    error NotOwner();
+    error ZeroAddress();
+    error PoolAlreadyRegistered();
+
+    // ─────────────────────────────── Structs ───────────────────────────────
+
+    struct FeeConfig {
+        uint24 groupStageFee;      // e.g. 3000 = 0.3%
+        uint24 knockoutFee;        // e.g. 5000
+        uint24 finalFee;           // e.g. 10000
+        uint24 convictionDiscount; // bps reduction for conviction holders
+    }
+
+    struct PoolState {
+        uint16  teamId;
+        bool    registered;
+        bool    active;
+        uint256 totalVolumeUSDC;
+        uint256 feeRoutedToChampPool;
+    }
+
     // ─────────────────────────────── State ───────────────────────────────
 
-    IConvictionVaultHook public vault;
-    IChampionPoolHook    public champPool;
-    IERC20 public usdc;
+    mapping(bytes32 => PoolState) public poolState;   // poolId bytes32 => state
+    mapping(uint16 => uint256)   public teamMomentum; // teamId => momentum score
+    mapping(uint16 => bytes32)   public teamPoolId;   // teamId => poolId
 
-    /// @notice Which teamId is associated with each registered pool
-    mapping(PoolId => uint16) public poolTeamId;
-    mapping(PoolId => bool)   public poolRegistered;
+    address public oracle;
+    address public championPool;
+    address public convictionVault;
+    address public treasury;
 
-    /// @notice Basis points (out of 10_000) of the USDC hook balance to forward to ChampionPool per swap
-    uint256 public swapFeeBps; // default 30 = 0.3%
+    uint24 public protocolFeeBps; // basis points of swap volume routed to champion pool (max 1000)
+    FeeConfig public feeConfig;
+    bool public paused;
 
     // ─────────────────────────────── Events ───────────────────────────────
 
-    event PoolRegistered(PoolId indexed poolId, uint16 teamId);
-    event ChampionFeeRouted(PoolId indexed poolId, uint256 amount);
+    event PoolRegistered(bytes32 indexed poolId, uint16 indexed teamId);
+    event TeamSwap(address indexed user, uint16 indexed teamId, int256 amount0, int256 amount1);
+    event TeamMomentumUpdated(uint16 indexed teamId, uint256 newMomentum);
+    event ChampionFeeRouted(uint16 indexed teamId, uint256 amount);
+    event SwapBlocked(uint16 indexed teamId, uint8 reason);
+    event TeamLiquidityAdded(address indexed user, uint16 indexed teamId, uint256 amount);
 
     // ─────────────────────────────── Constructor ───────────────────────────────
 
-    constructor(
-        IPoolManager _poolManager,
-        address _vault,
-        address _champPool,
-        address _usdc,
-        address _owner
-    ) BaseHook(_poolManager) Ownable(_owner) {
-        vault     = IConvictionVaultHook(_vault);
-        champPool = IChampionPoolHook(_champPool);
-        usdc      = IERC20(_usdc);
-        swapFeeBps = 30; // 0.3%
+    constructor(IPoolManager _poolManager, address _owner)
+        BaseHook(_poolManager)
+        Ownable(_owner)
+    {
+        // Default fee config
+        feeConfig = FeeConfig({
+            groupStageFee:      3000,
+            knockoutFee:        5000,
+            finalFee:           10000,
+            convictionDiscount: 500
+        });
+        protocolFeeBps = 30; // 0.3%
     }
 
     // ─────────────────────────────── Hook permissions ───────────────────────────────
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize:              false,
-            afterInitialize:               false,
-            beforeAddLiquidity:            true,
-            afterAddLiquidity:             false,
-            beforeRemoveLiquidity:         false,
-            afterRemoveLiquidity:          false,
-            beforeSwap:                    true,
-            afterSwap:                     true,
-            beforeDonate:                  false,
-            afterDonate:                   false,
-            beforeSwapReturnDelta:         false,
-            afterSwapReturnDelta:          false,
-            afterAddLiquidityReturnDelta:  false,
+            beforeInitialize:               false,
+            afterInitialize:                false,
+            beforeAddLiquidity:             true,
+            afterAddLiquidity:              true,
+            beforeRemoveLiquidity:          false,
+            afterRemoveLiquidity:           false,
+            beforeSwap:                     true,
+            afterSwap:                      true,
+            beforeDonate:                   false,
+            afterDonate:                    false,
+            beforeSwapReturnDelta:          false,
+            afterSwapReturnDelta:           false,
+            afterAddLiquidityReturnDelta:   false,
             afterRemoveLiquidityReturnDelta: false
         });
     }
 
-    // ─────────────────────────────── Admin ───────────────────────────────
+    // ─────────────────────────────── Admin setters ───────────────────────────────
 
-    /// @notice Associate a pool with a team ID so hook logic can look up team status.
-    function registerPool(PoolKey calldata key, uint16 teamId) external onlyOwner {
-        PoolId pid = key.toId();
-        require(!poolRegistered[pid], "Hook: pool already registered");
-        poolRegistered[pid] = true;
-        poolTeamId[pid]     = teamId;
-        emit PoolRegistered(pid, teamId);
+    function setOracle(address _oracle) external onlyOwner {
+        if (_oracle == address(0)) revert ZeroAddress();
+        oracle = _oracle;
     }
 
-    /// @notice Update the protocol fee forwarded to ChampionPool on each swap (max 10%).
-    function setSwapFeeBps(uint256 _bps) external onlyOwner {
-        require(_bps <= 1000, "Hook: fee too high"); // max 10%
-        swapFeeBps = _bps;
+    function setChampionPool(address _championPool) external onlyOwner {
+        if (_championPool == address(0)) revert ZeroAddress();
+        championPool = _championPool;
+    }
+
+    function setConvictionVault(address _convictionVault) external onlyOwner {
+        if (_convictionVault == address(0)) revert ZeroAddress();
+        convictionVault = _convictionVault;
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert ZeroAddress();
+        treasury = _treasury;
+    }
+
+    function setProtocolFeeBps(uint24 _feeBps) external onlyOwner {
+        require(_feeBps <= 1000, "StadiumHook: fee > 10%");
+        protocolFeeBps = _feeBps;
+    }
+
+    function setFeeConfig(FeeConfig calldata _cfg) external onlyOwner {
+        feeConfig = _cfg;
+    }
+
+    function pause() external onlyOwner {
+        paused = true;
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+    }
+
+    /// @notice Register a V4 pool to a team. Pool must already be initialized via PoolManager.
+    function registerPool(PoolKey calldata key, uint16 teamId) external onlyOwner {
+        bytes32 pid = PoolId.unwrap(key.toId());
+        if (poolState[pid].registered) revert PoolAlreadyRegistered();
+
+        poolState[pid] = PoolState({
+            teamId:               teamId,
+            registered:           true,
+            active:               true,
+            totalVolumeUSDC:      0,
+            feeRoutedToChampPool: 0
+        });
+        teamPoolId[teamId] = pid;
+
+        emit PoolRegistered(pid, teamId);
     }
 
     // ─────────────────────────────── Hook callbacks ───────────────────────────────
 
-    /// @dev Block swaps on pools where the team has been eliminated.
+    /// @dev Called before every swap. Validates pool registration, pause state, team elimination,
+    ///      and returns a dynamic fee.
     function beforeSwap(
-        address,
+        address sender,
         PoolKey calldata key,
         IPoolManager.SwapParams calldata,
         bytes calldata
-    ) external override onlyPoolManager returns (bytes4, BeforeSwapDelta, uint24) {
-        PoolId pid = key.toId();
-        if (poolRegistered[pid]) {
-            uint16 tid = poolTeamId[pid];
-            require(!vault.teamEliminated(tid), "Hook: team eliminated");
+    )
+        external
+        override
+        onlyPoolManager
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        bytes32 pid = PoolId.unwrap(key.toId());
+        PoolState storage ps = poolState[pid];
+
+        if (!ps.registered) revert PoolNotRegistered();
+
+        if (paused) {
+            emit SwapBlocked(ps.teamId, 0);
+            revert TradingPaused();
         }
-        return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+
+        // Check oracle for team elimination
+        if (oracle != address(0)) {
+            try IMatchOracle(oracle).isTeamEliminated(ps.teamId) returns (bool elim) {
+                if (elim) {
+                    emit SwapBlocked(ps.teamId, 1);
+                    revert TeamEliminated();
+                }
+            } catch {}
+        }
+
+        uint24 dynamicFee = _getDynamicFee(ps.teamId, sender);
+
+        return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, dynamicFee);
     }
 
-    /// @dev After each swap, forward a protocol fee slice of any USDC held by the hook to ChampionPool.
+    /// @dev Called after every swap. Routes protocol fee to ChampionPool and updates team momentum.
     function afterSwap(
-        address,
+        address sender,
         PoolKey calldata key,
         IPoolManager.SwapParams calldata,
-        BalanceDelta,
+        BalanceDelta delta,
         bytes calldata
-    ) external override onlyPoolManager returns (bytes4, int128) {
-        PoolId pid = key.toId();
-        if (poolRegistered[pid] && swapFeeBps > 0) {
-            uint256 bal = usdc.balanceOf(address(this));
-            if (bal > 0) {
-                uint256 fee = bal * swapFeeBps / 10000;
-                if (fee > 0 && address(champPool) != address(0)) {
-                    usdc.safeTransfer(address(champPool), fee);
-                    champPool.recordDeposit(fee);
-                    emit ChampionFeeRouted(pid, fee);
-                }
+    )
+        external
+        override
+        onlyPoolManager
+        returns (bytes4, int128)
+    {
+        bytes32 pid = PoolId.unwrap(key.toId());
+        PoolState storage ps = poolState[pid];
+
+        if (!ps.registered) {
+            return (BaseHook.afterSwap.selector, 0);
+        }
+
+        // Compute absolute volume from delta (use amount0 as USDC proxy)
+        int256 amt0 = delta.amount0();
+        int256 amt1 = delta.amount1();
+        uint256 absVol = amt0 < 0 ? uint256(-amt0) : uint256(amt0);
+
+        // Update momentum and volume
+        ps.totalVolumeUSDC += absVol;
+        teamMomentum[ps.teamId] += absVol;
+
+        // Route protocol fee
+        if (protocolFeeBps > 0) {
+            uint256 fee = absVol * protocolFeeBps / 10000;
+            if (fee > 0 && championPool != address(0)) {
+                // ChampionPool must hold the USDC already (transferred by PoolManager settlement)
+                // We record the fee accounting; actual token movement is handled by the pool
+                ps.feeRoutedToChampPool += fee;
+                try IChampionPool(championPool).recordFor(fee, "hook") {} catch {}
+                emit ChampionFeeRouted(ps.teamId, fee);
             }
         }
+
+        emit TeamSwap(sender, ps.teamId, amt0, amt1);
+        emit TeamMomentumUpdated(ps.teamId, teamMomentum[ps.teamId]);
+
         return (BaseHook.afterSwap.selector, 0);
     }
 
-    /// @dev Only allow adding liquidity to pools with active (non-eliminated) teams.
+    /// @dev Block adding liquidity to eliminated team pools.
     function beforeAddLiquidity(
-        address,
+        address sender,
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) external override onlyPoolManager returns (bytes4) {
-        PoolId pid = key.toId();
-        if (poolRegistered[pid]) {
-            uint16 tid = poolTeamId[pid];
-            require(vault.teamActive(tid) && !vault.teamEliminated(tid), "Hook: team not active");
+    )
+        external
+        override
+        onlyPoolManager
+        returns (bytes4)
+    {
+        bytes32 pid = PoolId.unwrap(key.toId());
+        PoolState storage ps = poolState[pid];
+
+        if (!ps.registered) revert PoolNotRegistered();
+
+        if (oracle != address(0)) {
+            try IMatchOracle(oracle).isTeamEliminated(ps.teamId) returns (bool elim) {
+                if (elim) {
+                    emit SwapBlocked(ps.teamId, 1);
+                    revert TeamEliminated();
+                }
+            } catch {}
         }
+
+        emit TeamLiquidityAdded(sender, ps.teamId, 0);
+
         return BaseHook.beforeAddLiquidity.selector;
+    }
+
+    /// @dev Update stats after liquidity is added.
+    function afterAddLiquidity(
+        address,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata,
+        BalanceDelta,
+        BalanceDelta,
+        bytes calldata
+    )
+        external
+        override
+        onlyPoolManager
+        returns (bytes4, BalanceDelta)
+    {
+        // No additional logic needed; stats are updated in beforeAddLiquidity
+        return (BaseHook.afterAddLiquidity.selector, BalanceDelta.wrap(0));
+    }
+
+    // ─────────────────────────────── Internal helpers ───────────────────────────────
+
+    /// @dev Determine dynamic fee based on tournament stage and conviction status.
+    ///      Stage 0 = GROUP, 1-2 = KNOCKOUT, 3+ = FINAL bracket.
+    function _getDynamicFee(uint16 teamId, address swapper) internal view returns (uint24) {
+        uint24 baseFee = feeConfig.groupStageFee; // default: group stage
+
+        if (oracle != address(0)) {
+            try IMatchOracle(oracle).getTeamStage(teamId) returns (uint8 stage) {
+                if (stage == 0) {
+                    baseFee = feeConfig.groupStageFee;
+                } else if (stage >= 1 && stage <= 4) {
+                    baseFee = feeConfig.knockoutFee;
+                } else {
+                    baseFee = feeConfig.finalFee;
+                }
+            } catch {}
+        }
+
+        // Apply conviction discount if user has active conviction on this team
+        if (convictionVault != address(0) && feeConfig.convictionDiscount > 0) {
+            try IConvictionVault(convictionVault).getActiveConviction(swapper, teamId) returns (bool active) {
+                if (active && baseFee > feeConfig.convictionDiscount) {
+                    baseFee -= feeConfig.convictionDiscount;
+                }
+            } catch {}
+        }
+
+        return baseFee;
     }
 }

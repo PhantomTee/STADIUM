@@ -50,7 +50,11 @@ contract ChampionPool is Ownable, ReentrancyGuard {
 
     // ─────────────────────────────── Events ───────────────────────────────
 
+    /// @notice Per-source accumulated totals (for recordFor)
+    mapping(string => uint256) public sourceTotal;
+
     event Deposited(address indexed from, uint256 amount);
+    event DepositedFrom(address indexed from, uint256 amount, string source);
     event ChampionDeclared(uint16 indexed teamId, uint256 poolSnapshot, uint256 totalStake);
     event ChampionShareClaimed(address indexed user, uint16 indexed teamId, uint256 share);
 
@@ -105,6 +109,25 @@ contract ChampionPool is Ownable, ReentrancyGuard {
     function recordDeposit(uint256 amount) external onlyAuthorized {
         totalAccumulated += amount;
         emit Deposited(msg.sender, amount);
+    }
+
+    /// @notice Record a sourced deposit (tokens must already be transferred to this contract).
+    ///         Called by StadiumHook with source = "hook". Tracks per-source totals.
+    function recordFor(uint256 amount, string calldata source) external onlyAuthorized {
+        totalAccumulated += amount;
+        sourceTotal[source] += amount;
+        emit DepositedFrom(msg.sender, amount, source);
+    }
+
+    /// @notice Grant authorization to an additional address (e.g. StadiumHook).
+    function addAuthorized(address _addr) external onlyOwner {
+        require(_addr != address(0), "ChampionPool: zero address");
+        authorized[_addr] = true;
+    }
+
+    /// @notice Revoke authorization from an address.
+    function removeAuthorized(address _addr) external onlyOwner {
+        authorized[_addr] = false;
     }
 
     // ─────────────────────────────── Oracle ───────────────────────────────

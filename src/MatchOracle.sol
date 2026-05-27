@@ -30,6 +30,17 @@ interface IChampionPool {
 ///   2. IConvictionVault.setChampion() SECOND — enables principal claims
 contract MatchOracle is Ownable {
 
+    // ─────────────────────────────── Enums ───────────────────────────────
+
+    enum Stage {
+        GROUP,
+        ROUND_OF_32,
+        ROUND_OF_16,
+        QUARTER_FINAL,
+        SEMI_FINAL,
+        FINAL
+    }
+
     // ─────────────────────────────── Structs ───────────────────────────────
 
     struct Team {
@@ -44,16 +55,18 @@ contract MatchOracle is Ownable {
         uint256 matchId;
         uint16  teamAId;
         uint16  teamBId;
-        string  teamAName;   // kept for display / events
+        string  teamAName;          // kept for display / events
         string  teamBName;
         uint256 kickoffTime;
         bool    varOpen;
         bool    varClosed;
         bool    settled;
-        uint8   winner;      // Outcome: TEAM_A(1), TEAM_B(2), DRAW(3)
-        uint8   firstGoal;   // Outcome: TEAM_A(1), TEAM_B(2), NO_GOAL(6)
+        uint8   winner;             // Outcome: TEAM_A(1), TEAM_B(2), DRAW(3)
+        uint8   firstGoal;          // Outcome: TEAM_A(1), TEAM_B(2), NO_GOAL(6)
         bool    redCard;
         bool    extraTime;
+        Stage   stage;              // Tournament stage for this match
+        uint256 externalFixtureId;  // External API fixture ID for data syncing
     }
 
     // ─────────────────────────────── State ───────────────────────────────
@@ -134,6 +147,53 @@ contract MatchOracle is Ownable {
         uint16  teamBId,
         uint256 kickoffTime
     ) external onlyOwner {
+        _createMatch(matchId, teamAId, teamBId, kickoffTime, Stage.GROUP, 0);
+    }
+
+    /// @notice Create a match with an explicit stage.
+    function createMatch(
+        uint256 matchId,
+        uint16  teamAId,
+        uint16  teamBId,
+        uint256 kickoffTime,
+        Stage   stage
+    ) external onlyOwner {
+        _createMatch(matchId, teamAId, teamBId, kickoffTime, stage, 0);
+    }
+
+    /// @notice Create or update a match using an external fixture ID.
+    ///         If matchId already exists, updates kickoffTime and stage only.
+    ///         If matchId does not exist, creates it.
+    function createOrUpdateMatch(
+        uint256 externalFixtureId,
+        uint256 matchId,
+        uint16  teamAId,
+        uint16  teamBId,
+        uint256 kickoffTime,
+        Stage   stage
+    ) external onlyOwner {
+        require(matchId != 0, "Oracle: matchId zero");
+
+        if (matchExists[matchId]) {
+            // Update mutable fields only — do not change teams or settled state
+            Match storage m = _matches[matchId];
+            m.kickoffTime        = kickoffTime;
+            m.stage              = stage;
+            m.externalFixtureId  = externalFixtureId;
+        } else {
+            _createMatch(matchId, teamAId, teamBId, kickoffTime, stage, externalFixtureId);
+        }
+    }
+
+    /// @dev Internal: create a new match record.
+    function _createMatch(
+        uint256 matchId,
+        uint16  teamAId,
+        uint16  teamBId,
+        uint256 kickoffTime,
+        Stage   stage,
+        uint256 externalFixtureId
+    ) internal {
         require(matchId != 0,                    "Oracle: matchId zero");
         require(!matchExists[matchId],           "Oracle: match exists");
         require(teams[teamAId].registered,       "Oracle: teamA not registered");
@@ -142,19 +202,21 @@ contract MatchOracle is Ownable {
 
         matchExists[matchId] = true;
         _matches[matchId] = Match({
-            matchId:     matchId,
-            teamAId:     teamAId,
-            teamBId:     teamBId,
-            teamAName:   teams[teamAId].name,
-            teamBName:   teams[teamBId].name,
-            kickoffTime: kickoffTime,
-            varOpen:     false,
-            varClosed:   false,
-            settled:     false,
-            winner:      0,
-            firstGoal:   0,
-            redCard:     false,
-            extraTime:   false
+            matchId:           matchId,
+            teamAId:           teamAId,
+            teamBId:           teamBId,
+            teamAName:         teams[teamAId].name,
+            teamBName:         teams[teamBId].name,
+            kickoffTime:       kickoffTime,
+            varOpen:           false,
+            varClosed:         false,
+            settled:           false,
+            winner:            0,
+            firstGoal:         0,
+            redCard:           false,
+            extraTime:         false,
+            stage:             stage,
+            externalFixtureId: externalFixtureId
         });
         matchIds.push(matchId);
 
@@ -286,5 +348,19 @@ contract MatchOracle is Ownable {
     /// @notice Convenience accessor for a team's display name.
     function teamNameOf(uint16 teamId) external view returns (string memory) {
         return teams[teamId].name;
+    }
+
+    /// @notice Returns whether a team has been eliminated. Used by StadiumHook.
+    function isTeamEliminated(uint16 teamId) external view returns (bool) {
+        return teams[teamId].eliminated;
+    }
+
+    /// @notice Returns the tournament stage for a team (stubbed: returns 0 = GROUP for now).
+    ///         Future versions will track per-team stage progression.
+    function getTeamStage(uint16 teamId) external view returns (uint8) {
+        // Stage is stored per-match. This stub returns GROUP (0) for all teams.
+        // Production: derive from latest match involving this team.
+        teamId; // suppress unused warning
+        return 0;
     }
 }
