@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC } from '../utils/contracts'
+import { useReadContracts } from 'wagmi'
+import { WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC, ADDRESSES } from '../utils/contracts'
+import { ConvictionVault_ABI } from '../abis'
 import {
-  useTeamTotalDeposit, useBackerCount, useTeamEliminated,
+  useTeamEliminated,
   useTotalAliveDeposits, useChampionPoolData,
 } from '../hooks/useContracts'
 
@@ -43,6 +45,40 @@ function TeamsLeaderboard() {
   const { data: totalAlive } = useTotalAliveDeposits()
   const [sortBy, setSortBy]  = useState('locked')
 
+  // Batch-read all 48 teams in two multicalls so we have data to sort by
+  const { data: lockedResults } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.map(t => ({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'teamTotalDeposit',
+      args: [t.id],
+    })),
+    query: { refetchInterval: 15_000 },
+  })
+
+  const { data: backerResults } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.map(t => ({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'backerCount',
+      args: [t.id],
+    })),
+    query: { refetchInterval: 15_000 },
+  })
+
+  // Merge on-chain data then sort
+  const sorted = WORLD_CUP_TEAMS
+    .map((team, i) => ({
+      ...team,
+      locked:  lockedResults?.[i]?.result  ?? 0n,
+      backers: backerResults?.[i]?.result  ?? 0n,
+    }))
+    .sort((a, b) => {
+      const av = sortBy === 'locked' ? a.locked  : a.backers
+      const bv = sortBy === 'locked' ? b.locked  : b.backers
+      return bv > av ? 1 : bv < av ? -1 : 0
+    })
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -69,22 +105,27 @@ function TeamsLeaderboard() {
       <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-mono text-stadium-muted uppercase tracking-widest border-b border-stadium-border mb-px">
         <div className="col-span-1">#</div>
         <div className="col-span-5">Team</div>
+        <div className="col-span-3 text-right">Backers</div>
         <div className="col-span-3 text-right">Locked</div>
-        <div className="col-span-3 text-right">Share</div>
       </div>
 
       <div className="space-y-px bg-stadium-border">
-        {WORLD_CUP_TEAMS.map((team, i) => (
-          <TeamLeaderboardRow key={team.id} team={team} rank={i + 1} totalAlive={totalAlive} />
+        {sorted.map((team, i) => (
+          <TeamLeaderboardRow
+            key={team.id}
+            team={team}
+            rank={i + 1}
+            locked={team.locked}
+            backers={team.backers}
+            totalAlive={totalAlive}
+          />
         ))}
       </div>
     </div>
   )
 }
 
-function TeamLeaderboardRow({ team, rank, totalAlive }) {
-  const { data: locked }    = useTeamTotalDeposit(team.id)
-  const { data: backers }   = useBackerCount(team.id)
+function TeamLeaderboardRow({ team, rank, locked, backers, totalAlive }) {
   const { data: eliminated } = useTeamEliminated(team.id)
 
   const pct = totalAlive && locked && totalAlive > 0n
@@ -95,10 +136,16 @@ function TeamLeaderboardRow({ team, rank, totalAlive }) {
     <div className={`bg-stadium-card grid grid-cols-12 gap-4 items-center px-4 py-3 border-l-2 transition-colors ${
       eliminated
         ? 'border-l-transparent opacity-40'
+        : rank === 1
+        ? 'border-l-stadium-green bg-stadium-green/5'
         : 'border-l-transparent hover:border-l-stadium-green/40 hover:bg-stadium-dark'
     }`}>
-      <div className="col-span-1 text-stadium-muted font-mono text-xs text-center">
-        {eliminated ? '×' : rank}
+      <div className="col-span-1 font-mono text-xs text-center">
+        {eliminated
+          ? <span className="text-stadium-muted">×</span>
+          : rank === 1
+          ? <span className="text-stadium-green font-bold">1</span>
+          : <span className="text-stadium-muted">{rank}</span>}
       </div>
       <div className="col-span-5 flex items-center gap-2">
         <span className="text-lg">{team.flag}</span>
@@ -109,14 +156,14 @@ function TeamLeaderboardRow({ team, rank, totalAlive }) {
           </div>
         </div>
       </div>
-      <div className="col-span-3">
-        <div className="w-full bg-stadium-border h-1 mb-1">
+      <div className="col-span-3 text-right">
+        <div className="font-bold text-stadium-text text-sm font-mono">{backers?.toString() ?? '0'}</div>
+        <div className="w-full bg-stadium-border h-1 mt-1">
           <div
             className={`h-1 transition-all ${eliminated ? 'bg-stadium-muted' : 'bg-stadium-green'}`}
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
         </div>
-        <div className="text-xs text-stadium-muted font-mono text-right">{backers?.toString() || 0} backers</div>
       </div>
       <div className="col-span-3 text-right">
         <div className="font-bold text-stadium-text text-sm font-mono">${formatUSDC(locked)}</div>
