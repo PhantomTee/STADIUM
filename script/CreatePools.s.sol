@@ -20,6 +20,10 @@ interface ITeamFactory {
 /// Optional:
 ///   STADIUM_HOOK_ADDRESS     - if set, updates the factory hook before pool creation
 ///
+/// Team source of truth: config/teams.json (keep in sync with _teams() below).
+/// Placeholder entries (isPlaceholder=true in JSON) are registered on-chain but pools
+/// for them will be skipped until the real team name/code is back-filled.
+///
 /// Usage:
 ///   forge script script/CreatePools.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
 contract CreatePools is Script {
@@ -69,6 +73,9 @@ contract CreatePools is Script {
     }
 
     // ── Team list ─────────────────────────────────────────────────────────────
+    // Source of truth: config/teams.json — update both files together.
+    // isPlaceholder entries (UEFA Playoff 1-4, IC Playoff Winner 1-2) must be
+    // replaced with confirmed team names once the draw is finalised.
 
     function _teams() internal pure returns (
         uint16[] memory ids,
@@ -80,66 +87,68 @@ contract CreatePools is Script {
         syms  = new string[](48);
 
         // CONMEBOL (6)
-        ids[0]=9;   names[0]="Brazil";        syms[0]="BRA";
-        ids[1]=37;  names[1]="Argentina";     syms[1]="ARG";
-        ids[2]=5;   names[2]="Uruguay";       syms[2]="URU";
-        ids[3]=6;   names[3]="Colombia";      syms[3]="COL";
-        ids[4]=7;   names[4]="Ecuador";       syms[4]="ECU";
-        ids[5]=8;   names[5]="Chile";         syms[5]="CHI";
+        ids[0]=9;   names[0]="Brazil";          syms[0]="BRA";
+        ids[1]=37;  names[1]="Argentina";        syms[1]="ARG";
+        ids[2]=5;   names[2]="Uruguay";          syms[2]="URU";
+        ids[3]=6;   names[3]="Colombia";         syms[3]="COL";
+        ids[4]=7;   names[4]="Ecuador";          syms[4]="ECU";
+        ids[5]=8;   names[5]="Paraguay";         syms[5]="PAR";
 
-        // CONCACAF (6 - includes 3 hosts)
-        ids[6]=1;   names[6]="Mexico";        syms[6]="MEX";
-        ids[7]=2;   names[7]="USA";           syms[7]="USA";
-        ids[8]=4;   names[8]="Canada";        syms[8]="CAN";
-        ids[9]=46;  names[9]="Costa Rica";    syms[9]="CRC";
-        ids[10]=47; names[10]="Panama";       syms[10]="PAN";
-        ids[11]=48; names[11]="Honduras";     syms[11]="HON";
+        // CONCACAF (6 - USA/Mexico/Canada are hosts)
+        ids[6]=1;   names[6]="Mexico";           syms[6]="MEX";
+        ids[7]=2;   names[7]="USA";              syms[7]="USA";
+        ids[8]=4;   names[8]="Canada";           syms[8]="CAN";
+        ids[9]=47;  names[9]="Panama";           syms[9]="PAN";
+        ids[10]=46; names[10]="Curacao";         syms[10]="CUW";
+        ids[11]=48; names[11]="Haiti";           syms[11]="HAI";
 
-        // UEFA (16)
-        ids[12]=10; names[12]="Spain";        syms[12]="ESP";
-        ids[13]=26; names[13]="Germany";      syms[13]="GER";
-        ids[14]=33; names[14]="France";       syms[14]="FRA";
-        ids[15]=45; names[15]="England";      syms[15]="ENG";
-        ids[16]=11; names[16]="Portugal";     syms[16]="POR";
-        ids[17]=12; names[17]="Netherlands";  syms[17]="NED";
-        ids[18]=13; names[18]="Belgium";      syms[18]="BEL";
-        ids[19]=14; names[19]="Croatia";      syms[19]="CRO";
-        ids[20]=15; names[20]="Serbia";       syms[20]="SRB";
-        ids[21]=16; names[21]="Denmark";      syms[21]="DEN";
-        ids[22]=17; names[22]="Austria";      syms[22]="AUT";
-        ids[23]=18; names[23]="Switzerland";  syms[23]="SUI";
-        ids[24]=19; names[24]="Scotland";     syms[24]="SCO";
-        ids[25]=20; names[25]="Turkey";       syms[25]="TUR";
-        ids[26]=21; names[26]="Poland";       syms[26]="POL";
-        ids[27]=22; names[27]="Slovakia";     syms[27]="SVK";
+        // UEFA direct qualifiers (12)
+        ids[12]=10; names[12]="Spain";           syms[12]="ESP";
+        ids[13]=26; names[13]="Germany";         syms[13]="GER";
+        ids[14]=33; names[14]="France";          syms[14]="FRA";
+        ids[15]=45; names[15]="England";         syms[15]="ENG";
+        ids[16]=11; names[16]="Portugal";        syms[16]="POR";
+        ids[17]=12; names[17]="Netherlands";     syms[17]="NED";
+        ids[18]=13; names[18]="Belgium";         syms[18]="BEL";
+        ids[19]=14; names[19]="Croatia";         syms[19]="CRO";
+        ids[20]=15; names[20]="Norway";          syms[20]="NOR";
+        ids[21]=17; names[21]="Austria";         syms[21]="AUT";
+        ids[22]=18; names[22]="Switzerland";     syms[22]="SUI";
+        ids[23]=19; names[23]="Scotland";        syms[23]="SCO";
+
+        // UEFA playoff winners (4) - isPlaceholder; replace when confirmed
+        ids[24]=60; names[24]="UEFA Playoff 1";  syms[24]="UP1";
+        ids[25]=61; names[25]="UEFA Playoff 2";  syms[25]="UP2";
+        ids[26]=62; names[26]="UEFA Playoff 3";  syms[26]="UP3";
+        ids[27]=63; names[27]="UEFA Playoff 4";  syms[27]="UP4";
 
         // AFC (8)
-        ids[28]=3;  names[28]="South Korea";  syms[28]="KOR";
-        ids[29]=27; names[29]="Japan";        syms[29]="JPN";
-        ids[30]=28; names[30]="Iran";         syms[30]="IRN";
-        ids[31]=29; names[31]="Saudi Arabia"; syms[31]="KSA";
-        ids[32]=30; names[32]="Australia";    syms[32]="AUS";
-        ids[33]=31; names[33]="Uzbekistan";   syms[33]="UZB";
-        ids[34]=32; names[34]="Iraq";         syms[34]="IRQ";
-        ids[35]=34; names[35]="Indonesia";    syms[35]="IDN";
+        ids[28]=3;  names[28]="South Korea";     syms[28]="KOR";
+        ids[29]=27; names[29]="Japan";           syms[29]="JPN";
+        ids[30]=28; names[30]="Iran";            syms[30]="IRN";
+        ids[31]=29; names[31]="Saudi Arabia";    syms[31]="KSA";
+        ids[32]=30; names[32]="Australia";       syms[32]="AUS";
+        ids[33]=31; names[33]="Uzbekistan";      syms[33]="UZB";
+        ids[34]=32; names[34]="Jordan";          syms[34]="JOR";
+        ids[35]=34; names[35]="Qatar";           syms[35]="QAT";
 
         // CAF (9)
-        ids[36]=35; names[36]="Morocco";      syms[36]="MAR";
-        ids[37]=36; names[37]="Senegal";      syms[37]="SEN";
-        ids[38]=38; names[38]="Egypt";        syms[38]="EGY";
-        ids[39]=39; names[39]="Nigeria";      syms[39]="NGA";
-        ids[40]=40; names[40]="South Africa"; syms[40]="RSA";
-        ids[41]=41; names[41]="Ivory Coast";  syms[41]="CIV";
-        ids[42]=42; names[42]="DR Congo";     syms[42]="COD";
-        ids[43]=43; names[43]="Tunisia";      syms[43]="TUN";
-        ids[44]=44; names[44]="Cameroon";     syms[44]="CMR";
+        ids[36]=35; names[36]="Morocco";         syms[36]="MAR";
+        ids[37]=36; names[37]="Senegal";         syms[37]="SEN";
+        ids[38]=38; names[38]="Egypt";           syms[38]="EGY";
+        ids[39]=39; names[39]="Ghana";           syms[39]="GHA";
+        ids[40]=40; names[40]="South Africa";    syms[40]="RSA";
+        ids[41]=41; names[41]="Ivory Coast";     syms[41]="CIV";
+        ids[42]=42; names[42]="Algeria";         syms[42]="ALG";
+        ids[43]=43; names[43]="Tunisia";         syms[43]="TUN";
+        ids[44]=44; names[44]="Cape Verde";      syms[44]="CPV";
 
         // OFC (1)
-        ids[45]=49; names[45]="New Zealand";  syms[45]="NZL";
+        ids[45]=49; names[45]="New Zealand";     syms[45]="NZL";
 
-        // Inter-confederation playoffs (2)
-        ids[46]=50; names[46]="Ukraine";      syms[46]="UKR";
-        ids[47]=51; names[47]="Bahrain";      syms[47]="BHR";
+        // Inter-confederation playoff winners (2) - isPlaceholder; replace when confirmed
+        ids[46]=64; names[46]="IC Playoff Winner 1"; syms[46]="IP1";
+        ids[47]=65; names[47]="IC Playoff Winner 2"; syms[47]="IP2";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -156,7 +165,7 @@ contract CreatePools is Script {
     function _createPool(ITeamFactory factory, uint16 teamId, string memory name) internal {
         try factory.createTeamPool(teamId, TICK_SPACING, SQRT_PRICE_1_1) {
             bytes32 pid = factory.teamPoolId(teamId);
-            console.log(string.concat("Pool created: ", name, " poolId:"), vm.toString(pid));
+            console.log(string.concat("Pool created: ", name), vm.toString(pid));
         } catch {
             console.log(string.concat("Pool creation failed: ", name));
         }
