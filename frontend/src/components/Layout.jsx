@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi'
 
 const NAV_ITEMS = [
   { path: '/',            label: 'Home'        },
+  { path: '/scores',      label: 'Scores'      },
   { path: '/conviction',  label: 'CONVICTION'  },
   { path: '/var',         label: 'VAR'         },
   { path: '/trade',       label: 'Trade'       },

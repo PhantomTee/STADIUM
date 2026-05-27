@@ -1,0 +1,157 @@
+name: Deploy Contracts
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Target network"
+        required: true
+        default: "xlayer_testnet"
+        type: choice
+        options:
+          - xlayer_testnet
+          - xlayer_mainnet
+      step:
+        description: "Which step to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all               # Deploy.s.sol + DeployHook.s.sol + CreatePools.s.sol
+          - core_only         # Deploy.s.sol only
+          - hook_only         # DeployHook.s.sol only (needs POOL_MANAGER_ADDRESS secret)
+          - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
+          - seed_teams        # SeedTeams.s.sol + SeedMatches.s.sol
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.network }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to commit deployments.json back to the branch
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: claude/jolly-einstein-SEDia
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install forge dependencies
+        run: forge install
+
+      - name: Set RPC URL
+        run: |
+          if [ "${{ github.event.inputs.network }}" = "xlayer_mainnet" ]; then
+            echo "RPC_URL=${{ secrets.XLAYER_MAINNET_RPC_URL }}" >> $GITHUB_ENV
+          else
+            echo "RPC_URL=${{ secrets.XLAYER_TESTNET_RPC_URL }}" >> $GITHUB_ENV
+          fi
+
+      # ── Step: Deploy core contracts ────────────────────────────────────────
+      - name: Deploy core contracts (Deploy.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'core_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          TREASURY_ADDRESS: ${{ secrets.TREASURY_ADDRESS }}
+        run: |
+          forge script script/Deploy.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Deploy StadiumHook (CREATE2 salt mining) ─────────────────────
+      - name: Deploy StadiumHook (DeployHook.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          POOL_MANAGER_ADDRESS: ${{ secrets.POOL_MANAGER_ADDRESS }}
+        run: |
+          # If POOL_MANAGER_ADDRESS not set as secret, read from deployments.json
+          if [ -z "$POOL_MANAGER_ADDRESS" ] && [ -f deployments.json ]; then
+            export POOL_MANAGER_ADDRESS=$(python3 -c "import sys,json; d=json.load(open('deployments.json')); print(d['poolManager'])")
+          fi
+          forge script script/DeployHook.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Register teams + create V4 pools ─────────────────────────────
+      - name: Create V4 pools (CreatePools.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'pools_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export TEAM_FACTORY_ADDRESS=$(python3 -c "import sys,json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json; d=json.load(open('hook-deployment.json')); print(d['stadiumHook'])")
+          forge script script/CreatePools.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Seed teams + matches via oracle ──────────────────────────────
+      - name: Seed teams and matches
+        if: ${{ github.event.inputs.step == 'seed_teams' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export MATCH_ORACLE_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['matchOracle'])")
+          forge script script/SeedTeams.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY || true
+          forge script script/SeedMatches.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY || true
+
+      # ── Merge hook address into deployments.json ───────────────────────────
+      - name: Merge hook-deployment.json into deployments.json
+        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') }}
+        run: |
+          if [ -f hook-deployment.json ] && [ -f deployments.json ]; then
+            python3 - <<'EOF'
+          import json
+          with open('deployments.json') as f:
+              d = json.load(f)
+          with open('hook-deployment.json') as f:
+              h = json.load(f)
+          d['stadiumHook'] = h.get('stadiumHook', '')
+          d['poolManager']  = h.get('poolManager', d.get('poolManager',''))
+          with open('deployments.json', 'w') as f:
+              json.dump(d, f, indent=2)
+          print("Merged hook address into deployments.json")
+          EOF
+          fi
+
+      # ── Commit deployment artifacts back to branch ─────────────────────────
+      - name: Commit deployment artifacts
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Copy deployments.json into frontend config
+          if [ -f deployments.json ]; then
+            cp deployments.json frontend/src/config/deployments/xlayer.json
+          fi
+
+          git add deployments.json hook-deployment.json v4-pools.json \
+                  frontend/src/config/deployments/xlayer.json 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: update deployment artifacts [${{ github.event.inputs.network }}]"
+          git push
+
+      # ── Print summary ──────────────────────────────────────────────────────
+      - name: Print deployment summary
+        if: always()
+        run: |
+          echo "=== DEPLOYMENT SUMMARY ==="
+          cat deployments.json 2>/dev/null || echo "deployments.json not found"
+          echo ""
+          cat hook-deployment.json 2>/dev/null || echo "hook-deployment.json not found"
+          echo ""
+          cat v4-pools.json 2>/dev/null || echo "v4-pools.json not found"
