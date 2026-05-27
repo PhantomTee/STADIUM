@@ -1,0 +1,16 @@
+{
+  "chainId": 1952,
+  "hook": "0xC529f376Af39fa58Da592447Cc659cdD58bb4cc0",
+  "tickSpacing": 60,
+  "sqrtPriceX96": "79228162514264337593543950336",
+  "pools": [
+    {"teamId":37,"name":"Argentina","symbol":"ARG","token":"0xd4AF166c6ff37bA3cE87916F1bb57c50C8E02f55","poolId":"0xd887a4b4f84d8b140ac80d0eecbf54e2c70e8d0fea1d67e71eb43db247f617a0"},
+    {"teamId":33,"name":"France","symbol":"FRA","token":"0x319130069ECa9bb0B6B6A3D229Ae9C8ca77E898A","poolId":"0x8ab0e772a94a36bc62e1d1ce07bb9cd61f62c208c43df31b27e083d4b866f514"},
+    {"teamId":9,"name":"Brazil","symbol":"BRA","token":"0xcF0F3a4E2b70fEC2bbE1a7411CcF5144123C6b1a","poolId":"0x018c3eda0db48bf09ada732da6e759a3bb7043a0eed3410c6943577e22aa401e"},
+    {"teamId":45,"name":"England","symbol":"ENG","token":"0x26F719eF7F457773601b51c60866194dEA98AB0d","poolId":"0x3344cc9cc014c90ab9e3c0dc9a2c0302ea0203ecd7d388d2617f0b19896d47bc"},
+    {"teamId":1,"name":"Mexico","symbol":"MEX","token":"0x5e61Dd8708608110C7Ae52819fc10f4A4e07E290","poolId":"0x55dc38365dfe1a0549ad7bdf86352d7c1c5b92f9fc53e164fa11f98096c39ee2"},
+    {"teamId":3,"name":"South Korea","symbol":"KOR","token":"0x482cd6656806f124Df91f3bd83D75E5b8274f2D7","poolId":"0xbe87bf94340a566a1d9d8d65c4dd492d0ef65a7337862e40d7e1d0de819d82f7"},
+    {"teamId":26,"name":"Germany","symbol":"GER","token":"0x3f4Adcc372f4cA67ecd96a822557cb8b53B64891","poolId":"0x0e7bb23bc8e6a4f189f082333651fa714775f40ccd0677c7ac811bfdf3810e09"},
+    {"teamId":10,"name":"Spain","symbol":"ESP","token":"0x4F2eE012881BAC07825f4E89c22f4C8644915628","poolId":"0x568b169ddf8a9a47e16e48f0e362fdae83bc5a14ed74b6e40f841c1c27f0a5b6"}
+  ]
+}

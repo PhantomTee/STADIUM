@@ -1,0 +1,7 @@
+{
+  "chainId": 1952,
+  "poolManager": "0xb5E3F0eeE2094c764808de784398eAf1Cd25A4ec",
+  "stadiumHook": "0xC529f376Af39fa58Da592447Cc659cdD58bb4cc0",
+  "hookFlags": "beforeSwap|afterSwap|beforeAddLiquidity|afterAddLiquidity",
+  "hookSalt": "0x0000000000000000000000000000000000000000000000000000000000000d1e"
+}
