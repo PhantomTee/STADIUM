@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {Test, console} from "forge-std/Test.sol";
 
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
-import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/types/PoolOperation.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/types/Currency.sol";
@@ -170,8 +169,8 @@ contract StadiumHookTest is Test {
         hook.registerPool(baseKey, teamId);
     }
 
-    function _makeSwapParams(bool zeroForOne) internal pure returns (SwapParams memory) {
-        return SwapParams({
+    function _makeSwapParams(bool zeroForOne) internal pure returns (IPoolManager.SwapParams memory) {
+        return IPoolManager.SwapParams({
             zeroForOne:        zeroForOne,
             amountSpecified:   -1000e6, // exact input: 1000 USDC
             sqrtPriceLimitX96: zeroForOne
@@ -215,7 +214,7 @@ contract StadiumHookTest is Test {
 
     function test_UnregisteredPool_Reverts() public {
         // Do NOT register the pool
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         vm.expectRevert(StadiumHook.PoolNotRegistered.selector);
@@ -228,7 +227,7 @@ contract StadiumHookTest is Test {
         _registerPool(TEAM_ARG);
         oracle.setEliminated(TEAM_ARG, true);
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         vm.expectRevert(StadiumHook.TeamEliminated.selector);
@@ -243,7 +242,7 @@ contract StadiumHookTest is Test {
         vm.prank(owner);
         hook.pause();
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         vm.expectRevert(StadiumHook.TradingPaused.selector);
@@ -260,7 +259,7 @@ contract StadiumHookTest is Test {
         vm.prank(owner);
         hook.unpause();
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         (bytes4 selector,,) = hook.beforeSwap(address(this), baseKey, params, "");
@@ -272,7 +271,7 @@ contract StadiumHookTest is Test {
     function test_BeforeSwap_ReturnsSelector() public {
         _registerPool(TEAM_ARG);
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         (bytes4 selector, BeforeSwapDelta delta, uint24 fee) = hook.beforeSwap(address(this), baseKey, params, "");
@@ -291,7 +290,7 @@ contract StadiumHookTest is Test {
         address swapper = makeAddr("swapper");
         convVault.setConviction(swapper, TEAM_ARG, true);
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         (, , uint24 fee) = hook.beforeSwap(swapper, baseKey, params, "");
@@ -314,7 +313,7 @@ contract StadiumHookTest is Test {
         int256 packed = (int256(int128(-1000e6)) << 128) | int256(int128(500e6));
         BalanceDelta delta = BalanceDelta.wrap(packed);
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         vm.prank(poolManager);
         hook.afterSwap(address(this), baseKey, params, delta, "");
@@ -334,7 +333,7 @@ contract StadiumHookTest is Test {
         int256 packed2 = (int256(int128(-1000e6)) << 128) | int256(int128(500e6));
         BalanceDelta delta = BalanceDelta.wrap(packed2);
 
-        SwapParams memory params = _makeSwapParams(true);
+        IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
         uint256 callsBefore = champPool.callCount();
 
@@ -353,7 +352,7 @@ contract StadiumHookTest is Test {
         _registerPool(TEAM_ARG);
         oracle.setEliminated(TEAM_ARG, true);
 
-        ModifyLiquidityParams memory params = ModifyLiquidityParams({
+        IPoolManager.ModifyLiquidityParams memory params = IPoolManager.ModifyLiquidityParams({
             tickLower:      -600,
             tickUpper:       600,
             liquidityDelta:  1e18,

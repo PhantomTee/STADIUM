@@ -10,7 +10,6 @@ import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta} from "@uniswap/v4-core/types/BeforeSwapDelta.sol";
 import {Hooks} from "@uniswap/v4-core/libraries/Hooks.sol";
-import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/types/PoolOperation.sol";
 
 abstract contract BaseHook is IHooks {
     error NotPoolManager();
@@ -36,29 +35,29 @@ abstract contract BaseHook is IHooks {
         external virtual returns (bytes4) { revert HookNotImplemented(); }
 
     function beforeAddLiquidity(
-        address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata
+        address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata
     ) external virtual returns (bytes4) { revert HookNotImplemented(); }
 
     function afterAddLiquidity(
-        address, PoolKey calldata, ModifyLiquidityParams calldata,
+        address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta, BalanceDelta, bytes calldata
     ) external virtual returns (bytes4, BalanceDelta) { revert HookNotImplemented(); }
 
     function beforeRemoveLiquidity(
-        address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata
+        address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata
     ) external virtual returns (bytes4) { revert HookNotImplemented(); }
 
     function afterRemoveLiquidity(
-        address, PoolKey calldata, ModifyLiquidityParams calldata,
+        address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta, BalanceDelta, bytes calldata
     ) external virtual returns (bytes4, BalanceDelta) { revert HookNotImplemented(); }
 
     function beforeSwap(
-        address, PoolKey calldata, SwapParams calldata, bytes calldata
+        address, PoolKey calldata, IPoolManager.SwapParams calldata, bytes calldata
     ) external virtual returns (bytes4, BeforeSwapDelta, uint24) { revert HookNotImplemented(); }
 
     function afterSwap(
-        address, PoolKey calldata, SwapParams calldata, BalanceDelta, bytes calldata
+        address, PoolKey calldata, IPoolManager.SwapParams calldata, BalanceDelta, bytes calldata
     ) external virtual returns (bytes4, int128) { revert HookNotImplemented(); }
 
     function beforeDonate(
