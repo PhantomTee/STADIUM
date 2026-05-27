@@ -247,7 +247,7 @@ export default function Layout({ children }) {
             <span className="text-stadium-muted text-xs font-mono ml-2">— Back Your Team. Trade The Match. Win The Cup.</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-stadium-muted font-mono">
-            <span>X Layer Testnet · Chain ID 195</span>
+            <span>X Layer Testnet · Chain ID 1952</span>
             <span className="h-3 w-px bg-stadium-border" />
             <a
               href="https://web3.okx.com/explorer/xlayer-test"

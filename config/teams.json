@@ -41,7 +41,7 @@
 
   {"id": 33, "name": "France",        "code": "FRA", "flag": "🇫🇷", "group": "I", "confederation": "UEFA",     "isHost": false, "isPlaceholder": false},
   {"id": 34, "name": "Senegal",       "code": "SEN", "flag": "🇸🇳", "group": "I", "confederation": "CAF",      "isHost": false, "isPlaceholder": false},
-  {"id": 35, "name": "IC Playoff 1",  "code": "IP1", "flag": "🏳️",  "group": "I", "confederation": "TBD",      "isHost": false, "isPlaceholder": true},
+  {"id": 35, "name": "Iraq",          "code": "IRQ", "flag": "🇮🇶", "group": "I", "confederation": "AFC",      "isHost": false, "isPlaceholder": false},
   {"id": 36, "name": "Norway",        "code": "NOR", "flag": "🇳🇴", "group": "I", "confederation": "UEFA",     "isHost": false, "isPlaceholder": false},
 
   {"id": 37, "name": "Argentina",     "code": "ARG", "flag": "🇦🇷", "group": "J", "confederation": "CONMEBOL", "isHost": false, "isPlaceholder": false},
@@ -50,7 +50,7 @@
   {"id": 40, "name": "Jordan",        "code": "JOR", "flag": "🇯🇴", "group": "J", "confederation": "AFC",      "isHost": false, "isPlaceholder": false},
 
   {"id": 41, "name": "Portugal",      "code": "POR", "flag": "🇵🇹", "group": "K", "confederation": "UEFA",     "isHost": false, "isPlaceholder": false},
-  {"id": 42, "name": "IC Playoff 2",  "code": "IP2", "flag": "🏳️",  "group": "K", "confederation": "TBD",      "isHost": false, "isPlaceholder": true},
+  {"id": 42, "name": "Congo DR",      "code": "COD", "flag": "🇨🇩", "group": "K", "confederation": "CAF",      "isHost": false, "isPlaceholder": false},
   {"id": 43, "name": "Uzbekistan",    "code": "UZB", "flag": "🇺🇿", "group": "K", "confederation": "AFC",      "isHost": false, "isPlaceholder": false},
   {"id": 44, "name": "Colombia",      "code": "COL", "flag": "🇨🇴", "group": "K", "confederation": "CONMEBOL", "isHost": false, "isPlaceholder": false},
 

@@ -101,7 +101,7 @@ export const WORLD_CUP_TEAMS = [
   // Group I (ids 33-36)
   { id: 33, name: "France",         flag: "🇫🇷", group: "I", odds: "5.0"   },
   { id: 34, name: "Senegal",        flag: "🇸🇳", group: "I", odds: "30.0"  },
-  { id: 35, name: "IC Playoff 1",   flag: "🏳️",  group: "I", odds: "N/A",   isPlaceholder: true },
+  { id: 35, name: "Iraq",           flag: "🇮🇶", group: "I", odds: "100.0" },
   { id: 36, name: "Norway",         flag: "🇳🇴", group: "I", odds: "35.0"  },
   // Group J (ids 37-40)
   { id: 37, name: "Argentina",      flag: "🇦🇷", group: "J", odds: "4.5"   },
@@ -110,7 +110,7 @@ export const WORLD_CUP_TEAMS = [
   { id: 40, name: "Jordan",         flag: "🇯🇴", group: "J", odds: "100.0" },
   // Group K (ids 41-44)
   { id: 41, name: "Portugal",       flag: "🇵🇹", group: "K", odds: "9.0"   },
-  { id: 42, name: "IC Playoff 2",   flag: "🏳️",  group: "K", odds: "N/A",   isPlaceholder: true },
+  { id: 42, name: "Congo DR",       flag: "🇨🇩", group: "K", odds: "100.0" },
   { id: 43, name: "Uzbekistan",     flag: "🇺🇿", group: "K", odds: "150.0" },
   { id: 44, name: "Colombia",       flag: "🇨🇴", group: "K", odds: "12.0"  },
   // Group L (ids 45-48)

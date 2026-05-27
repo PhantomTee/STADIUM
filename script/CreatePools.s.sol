@@ -22,7 +22,6 @@ interface ITeamFactory {
 ///
 /// Team source of truth: config/teams.json and frontend/src/utils/contracts.js.
 /// teamId values 1-48 here MUST match the id field in contracts.js WORLD_CUP_TEAMS.
-/// isPlaceholder entries (ids 35 and 42) must be updated once confirmed.
 ///
 /// Usage:
 ///   forge script script/CreatePools.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
@@ -74,7 +73,7 @@ contract CreatePools is Script {
 
     // ── Team list (ids 1-48, Groups A-L) ─────────────────────────────────────
     // Keep in sync with config/teams.json and frontend/src/utils/contracts.js.
-    // Non-ASCII names are ASCII-approximated here; JSON/JS files use proper Unicode.
+    // Non-ASCII names (Turkiye, Curacao) are ASCII-approximated here only.
 
     function _teams() internal pure returns (
         uint16[] memory ids,
@@ -136,7 +135,7 @@ contract CreatePools is Script {
         // Group I
         ids[32]=33; names[32]="France";      syms[32]="FRA";
         ids[33]=34; names[33]="Senegal";     syms[33]="SEN";
-        ids[34]=35; names[34]="IC Playoff 1";syms[34]="IP1"; // isPlaceholder
+        ids[34]=35; names[34]="Iraq";         syms[34]="IRQ";
         ids[35]=36; names[35]="Norway";      syms[35]="NOR";
 
         // Group J
@@ -147,7 +146,7 @@ contract CreatePools is Script {
 
         // Group K
         ids[40]=41; names[40]="Portugal";    syms[40]="POR";
-        ids[41]=42; names[41]="IC Playoff 2";syms[41]="IP2"; // isPlaceholder
+        ids[41]=42; names[41]="Congo DR";     syms[41]="COD";
         ids[42]=43; names[42]="Uzbekistan";  syms[42]="UZB";
         ids[43]=44; names[43]="Colombia";    syms[43]="COL";
 
