@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 
+const ADMIN_ADDRESS = '0xF869c7b8A19146A4bbD5466e83c3B785AE7EE148'
+
 const NAV_ITEMS = [
   { path: '/',            label: 'Home'        },
   { path: '/scores',      label: 'Scores'      },
@@ -14,7 +16,7 @@ const NAV_ITEMS = [
   { path: '/activity',    label: 'Activity'    },
   { path: '/about',       label: 'About'       },
   { path: '/nfts',        label: 'NFTs'        },
-  { path: '/admin',       label: 'Admin'       },
+  { path: '/admin',       label: 'Admin', adminOnly: true },
 ]
 
 function useTheme() {
@@ -92,9 +94,11 @@ function CloseIcon() {
 
 export default function Layout({ children }) {
   const location = useLocation()
-  const { isConnected } = useAccount()
+  const { isConnected, address } = useAccount()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [light, setLight] = useTheme()
+  const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()
+  const visibleNav = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin)
 
   // Lock body scroll when overlay is open
   useEffect(() => {
@@ -113,17 +117,16 @@ export default function Layout({ children }) {
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
+          <Link to="/" className="flex items-center gap-2 group flex-shrink-0">
             <BallIcon />
             <span className="group-hover:text-stadium-green transition-colors" style={{ fontFamily: "'Anton', sans-serif", fontSize: 24, letterSpacing: '-0.02em', color: '#ffffff' }}>
               11°
             </span>
-            <span className="hidden sm:inline text-stadium-muted text-xs ml-1 font-mono">/ World Cup DeFi</span>
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6">
-            {NAV_ITEMS.map(({ path, label }) => {
+          <nav className="hidden md:flex items-center gap-6 min-w-0 overflow-hidden">
+            {visibleNav.map(({ path, label }) => {
               const active = location.pathname === path
               return (
                 <Link
@@ -141,7 +144,7 @@ export default function Layout({ children }) {
           </nav>
 
           {/* Right */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               onClick={() => setLight(l => !l)}
               className="p-2 text-stadium-muted hover:text-stadium-green transition-colors"
@@ -192,7 +195,7 @@ export default function Layout({ children }) {
             </div>
 
             <nav className="space-y-1">
-              {NAV_ITEMS.map(({ path, label }, i) => {
+              {visibleNav.map(({ path, label }, i) => {
                 const active = location.pathname === path
                 return (
                   <Link

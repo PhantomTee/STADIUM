@@ -32,17 +32,17 @@ export default function StadiumHero() {
 
   return (
     <section
-      className="-mx-4 -mt-8 overflow-hidden md:pt-20"
+      className="-mx-4 -mt-8 overflow-hidden"
       style={{
-        height: '100svh',
-        minHeight: 600,
+        height: 'calc(100svh - 4rem)',
+        minHeight: 560,
         background: bg,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
         paddingLeft: 'clamp(20px, 4vw, 64px)',
         paddingRight: 'clamp(20px, 4vw, 64px)',
-        paddingBottom: 'clamp(64px, 12vh, 96px)',
+        paddingBottom: 'clamp(48px, 10vh, 88px)',
         position: 'relative',
         transition: 'background 0.2s ease',
       }}
