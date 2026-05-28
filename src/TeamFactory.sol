@@ -70,6 +70,15 @@ contract TeamFactory is Ownable {
         emit HookUpdated(_hook);
     }
 
+    /// @notice Transfer team tokens held by this factory to any address.
+    ///         Used by the owner to seed liquidity or distribute tokens.
+    function distributeToken(uint16 teamId, address to, uint256 amount) external onlyOwner {
+        address token = teamToken[teamId];
+        if (token == address(0)) revert TeamNotRegistered(teamId);
+        require(to != address(0), "TeamFactory: zero to");
+        TeamToken(token).transfer(to, amount);
+    }
+
     // ─────────────────────────────── Owner: team & pool management ───────────────────────────────
 
     /// @notice Deploy a new TeamToken and register the team.

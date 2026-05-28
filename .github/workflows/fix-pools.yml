@@ -1,0 +1,156 @@
+name: Fix Pools (Redeploy + Seed Liquidity)
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Target network"
+        required: true
+        default: "xlayer_testnet"
+        type: choice
+        options:
+          - xlayer_testnet
+          - xlayer_mainnet
+      step:
+        description: "Which step to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all               # RedeployTeams + SeedLiquidity (full fix)
+          - register_only     # RegisterPools only (quick fix for PoolNotRegistered, existing pools)
+          - redeploy_only     # RedeployTeams only (new factory + correct price + hook registration)
+          - seed_only         # SeedLiquidity only (add liquidity to already-redeployed pools)
+
+jobs:
+  fix-pools:
+    name: Fix pools → ${{ github.event.inputs.network }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: claude/jolly-einstein-SEDia
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install forge dependencies
+        run: |
+          forge install foundry-rs/forge-std@v1.9.7 --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+          forge install Uniswap/v4-core@v4.0.0 --no-commit
+
+      - name: Set RPC URL
+        run: |
+          if [ "${{ github.event.inputs.network }}" = "xlayer_mainnet" ]; then
+            echo "RPC_URL=${{ secrets.XLAYER_MAINNET_RPC_URL }}" >> $GITHUB_ENV
+          else
+            echo "RPC_URL=https://testrpc.xlayer.tech/terigon" >> $GITHUB_ENV
+          fi
+
+      - name: Load addresses from xlayer.json
+        run: |
+          CFG=frontend/src/config/deployments/xlayer.json
+          echo "POOL_MANAGER_ADDRESS=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['poolManager'])")"          >> $GITHUB_ENV
+          echo "MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['mockUSDC'])")"               >> $GITHUB_ENV
+          echo "STADIUM_HOOK_ADDRESS=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['stadiumHook'])")"         >> $GITHUB_ENV
+          echo "TEAM_FACTORY_ADDRESS=$(python3 -c "import json; d=json.load(open('$CFG')); print(d['teamFactory'])")"         >> $GITHUB_ENV
+
+      # ── STEP: Register existing pools in hook (quick fix) ─────────────────
+      - name: Register pools in StadiumHook
+        if: ${{ github.event.inputs.step == 'register_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          forge script script/RegisterPools.s.sol \
+            --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY
+
+      # ── STEP: Redeploy TeamFactory + pools at correct price ───────────────
+      - name: Redeploy teams with correct sqrtPrice
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'redeploy_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          forge script script/RedeployTeams.s.sol \
+            --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY \
+            2>&1 | tee redeploy-teams.log
+
+          NEW_FACTORY=$(grep -oP 'TeamFactory deployed at: \K0x[0-9a-fA-F]{40}' redeploy-teams.log | tail -1)
+          if [ -z "$NEW_FACTORY" ]; then
+            NEW_FACTORY=$(python3 -c "
+          import json, glob
+          files = glob.glob('broadcast/RedeployTeams.s.sol/*/run-latest.json')
+          d = json.load(open(files[0]))
+          for tx in d['transactions']:
+            if tx.get('transactionType') == 'CREATE' and 'TeamFactory' in tx.get('contractName',''):
+              print(tx['contractAddress']); break
+          " 2>/dev/null)
+          fi
+          echo "NEW_TEAM_FACTORY=$NEW_FACTORY" >> $GITHUB_ENV
+          echo "New TeamFactory: $NEW_FACTORY"
+
+      # ── STEP: Seed liquidity ───────────────────────────────────────────────
+      - name: Seed initial liquidity
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          # Use new factory if just redeployed
+          if [ -n "$NEW_TEAM_FACTORY" ]; then
+            export TEAM_FACTORY_ADDRESS=$NEW_TEAM_FACTORY
+          fi
+          forge script script/SeedLiquidity.s.sol \
+            --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY \
+            2>&1 | tee seed-liquidity.log
+
+          LIQ_ROUTER=$(grep -oP 'StadiumLiquidityRouter deployed at: \K0x[0-9a-fA-F]{40}' seed-liquidity.log | tail -1)
+          echo "LIQ_ROUTER=$LIQ_ROUTER" >> $GITHUB_ENV
+          echo "LiquidityRouter: $LIQ_ROUTER"
+
+      # ── Update xlayer.json + commit ────────────────────────────────────────
+      - name: Update deployment config
+        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'redeploy_only' || github.event.inputs.step == 'seed_only') }}
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          path = 'frontend/src/config/deployments/xlayer.json'
+          with open(path) as f:
+              d = json.load(f)
+          factory = os.environ.get('NEW_TEAM_FACTORY', '').strip()
+          router  = os.environ.get('LIQ_ROUTER', '').strip()
+          if factory:
+              d['teamFactory'] = factory
+              print(f"Updated teamFactory: {factory}")
+          if router:
+              d['stadiumLiquidityRouter'] = router
+              print(f"Updated stadiumLiquidityRouter: {router}")
+          with open(path, 'w') as f:
+              json.dump(d, f, indent=2)
+          EOF
+
+      - name: Commit updated config
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/config/deployments/xlayer.json
+          git diff --staged --quiet && echo "Nothing to commit" || \
+            git commit -m "chore: update pool addresses after fix-pools run"
+          git push
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Fix Pools Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | ${{ github.event.inputs.step }} |" >> $GITHUB_STEP_SUMMARY
+          [ -n "$NEW_TEAM_FACTORY" ] && echo "| New TeamFactory | \`$NEW_TEAM_FACTORY\` |" >> $GITHUB_STEP_SUMMARY
+          [ -n "$LIQ_ROUTER" ] && echo "| LiquidityRouter | \`$LIQ_ROUTER\` |" >> $GITHUB_STEP_SUMMARY
