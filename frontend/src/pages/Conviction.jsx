@@ -509,7 +509,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
           </div>
           <div className="flex justify-center">
             <ShareButton
-              text={`I just backed ${team.flag} ${team.name} to win the 2026 World Cup on 11° — World Cup DeFi on X Layer! 🔒 #WorldCup2026 #DeFi`}
+              text={`I just locked $${amount} USDC on ${team.flag} ${team.name} to win the 2026 World Cup 🏆\n\nConviction backing on 11° — if my team lifts the cup I keep my principal + earn survivor yield from every eliminated nation 🔒\n\nBuilt on @Uniswap V4 · X Layer\n\n#WorldCup2026 #DeFi #UniswapV4`}
             />
           </div>
         </div>

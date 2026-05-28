@@ -191,7 +191,7 @@ function ConvictionPositionCard({ team, deposit, eliminated, champion, principal
       {isAlive && (
         <div className="mt-3 pt-3 border-t border-stadium-border/40">
           <ShareButton
-            text={`I'm backing ${team.flag} ${team.name} to win the 2026 World Cup on 11° — $${formatUSDC(deposit)} locked in! 🔒 #WorldCup2026 #DeFi`}
+            text={`I have $${formatUSDC(deposit)} USDC riding on ${team.flag} ${team.name} to win the 2026 World Cup 🏆\n\nConviction is locked on 11° — earning survivor yield every time a rival nation gets knocked out 🔒\n\nBuilt on @Uniswap V4 · X Layer\n\n#WorldCup2026 #DeFi #UniswapV4`}
           />
         </div>
       )}
