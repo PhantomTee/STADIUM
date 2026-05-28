@@ -16,7 +16,8 @@ export const ADDRESSES = {
   stadiumHook:     import.meta.env.VITE_STADIUM_HOOK_ADDRESS      || d.stadiumHook     || ZERO,
   teamFactory:     import.meta.env.VITE_TEAM_FACTORY_ADDRESS      || d.teamFactory     || ZERO,
   treasury:        import.meta.env.VITE_TREASURY_ADDRESS          || d.treasury        || ZERO,
-  stadiumRouter:   import.meta.env.VITE_STADIUM_ROUTER_ADDRESS    || d.stadiumRouter   || ZERO,
+  stadiumRouter:         import.meta.env.VITE_STADIUM_ROUTER_ADDRESS          || d.stadiumRouter         || ZERO,
+  stadiumLiquidityRouter: import.meta.env.VITE_STADIUM_LIQUIDITY_ROUTER_ADDRESS || d.stadiumLiquidityRouter || ZERO,
 }
 
 // Chain config — sourced from .env so it can be switched without rebuilding
