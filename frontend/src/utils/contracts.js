@@ -1,19 +1,22 @@
-// Contract addresses — update after deployment
-// Run Deploy.s.sol → copy values from deployments.json → set in frontend/.env
+// Contract addresses — env vars take priority; xlayer.json is the fallback.
+// This means the app works out-of-the-box against the testnet deployment
+// without needing a .env file. Set env vars to point at a different network.
+import deployments from '../config/deployments/xlayer.json'
 
 const ZERO = "0x0000000000000000000000000000000000000000"
+const d = deployments  // shorthand
 
 export const ADDRESSES = {
-  mockUSDC:        import.meta.env.VITE_MOCK_USDC_ADDRESS         || ZERO,
-  convictionVault: import.meta.env.VITE_CONVICTION_VAULT_ADDRESS  || ZERO,
-  varMarket:       import.meta.env.VITE_VAR_MARKET_ADDRESS        || ZERO,
-  matchOracle:     import.meta.env.VITE_MATCH_ORACLE_ADDRESS      || ZERO,
-  championPool:    import.meta.env.VITE_CHAMPION_POOL_ADDRESS     || ZERO,
-  stadiumNFT:      import.meta.env.VITE_STADIUM_NFT_ADDRESS       || ZERO,
-  stadiumHook:     import.meta.env.VITE_STADIUM_HOOK_ADDRESS      || ZERO,
-  teamFactory:     import.meta.env.VITE_TEAM_FACTORY_ADDRESS      || ZERO,
-  treasury:        import.meta.env.VITE_TREASURY_ADDRESS          || ZERO,
-  stadiumRouter:   import.meta.env.VITE_STADIUM_ROUTER_ADDRESS    || ZERO,
+  mockUSDC:        import.meta.env.VITE_MOCK_USDC_ADDRESS         || d.mockUSDC        || ZERO,
+  convictionVault: import.meta.env.VITE_CONVICTION_VAULT_ADDRESS  || d.convictionVault || ZERO,
+  varMarket:       import.meta.env.VITE_VAR_MARKET_ADDRESS        || d.varMarket       || ZERO,
+  matchOracle:     import.meta.env.VITE_MATCH_ORACLE_ADDRESS      || d.matchOracle     || ZERO,
+  championPool:    import.meta.env.VITE_CHAMPION_POOL_ADDRESS     || d.championPool    || ZERO,
+  stadiumNFT:      import.meta.env.VITE_STADIUM_NFT_ADDRESS       || d.stadiumNFT      || ZERO,
+  stadiumHook:     import.meta.env.VITE_STADIUM_HOOK_ADDRESS      || d.stadiumHook     || ZERO,
+  teamFactory:     import.meta.env.VITE_TEAM_FACTORY_ADDRESS      || d.teamFactory     || ZERO,
+  treasury:        import.meta.env.VITE_TREASURY_ADDRESS          || d.treasury        || ZERO,
+  stadiumRouter:   import.meta.env.VITE_STADIUM_ROUTER_ADDRESS    || d.stadiumRouter   || ZERO,
 }
 
 // Chain config — sourced from .env so it can be switched without rebuilding
