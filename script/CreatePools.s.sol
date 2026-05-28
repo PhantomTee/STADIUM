@@ -82,7 +82,7 @@ contract CreatePools is Script {
         }
     }
 
-    // ── Team list (ids 1-48, Groups A-L) ─────────────────────────────────────
+    // -- Team list (ids 1-48, Groups A-L) -----------------------------------------
     // Keep in sync with config/teams.json and frontend/src/utils/contracts.js.
     // Non-ASCII names (Turkiye, Curacao) are ASCII-approximated here only.
 
@@ -168,7 +168,7 @@ contract CreatePools is Script {
         ids[47]=48; names[47]="Panama";      syms[47]="PAN";
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // -- Helpers -------------------------------------------------------------------
 
     function _registerTeam(ITeamFactory factory, uint16 teamId, string memory name, string memory symbol) internal {
         try factory.registerTeam(teamId, name, symbol) {
@@ -196,7 +196,7 @@ contract CreatePools is Script {
         // Register the pool in StadiumHook so beforeSwap doesn't revert PoolNotRegistered.
         address token = factory.teamToken(teamId);
         if (token == address(0)) {
-            console.log(string.concat("No token for team — skipping registerPool: ", name));
+            console.log(string.concat("No token for team - skipping registerPool: ", name));
             return;
         }
 

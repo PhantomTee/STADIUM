@@ -38,7 +38,7 @@ contract VerifyConfig is Script {
         address factory     = _envAddrOr("TEAM_FACTORY_ADDRESS");
         address treasury    = _envAddrOr("TREASURY_ADDRESS");
 
-        // ── Code existence checks ─────────────────────────────────────────────
+        // -- Code existence checks --------------------------------------------------
 
         _check("ConvictionVault deployed", vault.code.length > 0,   vault);
         _check("MatchOracle deployed",     oracle.code.length > 0,  oracle);
@@ -65,7 +65,7 @@ contract VerifyConfig is Script {
             console.log("  [SKIP] TREASURY_ADDRESS not set");
         }
 
-        // ── Wiring checks via staticcall ──────────────────────────────────────
+        // -- Wiring checks via staticcall -------------------------------------------
 
         // ConvictionVault.oracle == oracle
         _checkSlot("Vault.oracle == MatchOracle", vault,     0x5, oracle);
@@ -100,7 +100,7 @@ contract VerifyConfig is Script {
             console.log(string.concat("  [PASS] ", label));
         } else {
             console.log(string.concat("  [WARN] ", label, ": got ", vm.toString(got), " expected ", vm.toString(expected)));
-            console.log("         (Slot-based checks may be inaccurate due to struct packing — verify manually if needed)");
+            console.log("         (Slot-based checks may be inaccurate due to struct packing - verify manually if needed)");
         }
     }
 

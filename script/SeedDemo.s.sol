@@ -29,7 +29,7 @@ contract SeedDemo is Script {
 
         vm.startBroadcast(deployerKey);
 
-        // ── Register 8 demo teams (World Cup 2026 groups A & J) ──────────────
+        // -- Register 8 demo teams (World Cup 2026 groups A & J) --------------------
         // Group A
         oracle.registerTeam(1,  "Mexico");
         oracle.registerTeam(2,  "South Africa");
@@ -43,7 +43,7 @@ contract SeedDemo is Script {
 
         console.log("Registered 8 demo teams");
 
-        // ── Create 2 demo matches ────────────────────────────────────────────
+        // -- Create 2 demo matches --------------------------------------------------
         uint256 kickoff1 = block.timestamp + 1 hours;
         uint256 kickoff2 = block.timestamp + 2 hours;
 
@@ -52,15 +52,15 @@ contract SeedDemo is Script {
 
         console.log("Created 2 demo matches");
 
-        // ── Open VAR window for match 1 ──────────────────────────────────────
+        // -- Open VAR window for match 1 --------------------------------------------
         oracle.openVARWindow(1);
         console.log("VAR window opened for match 1 (Mexico vs Argentina)");
 
         vm.stopBroadcast();
 
         console.log("\n=== DEMO SEED COMPLETE ===");
-        console.log("Match 1: Mexico (teamId=1) vs Argentina (teamId=37) — VAR OPEN");
-        console.log("Match 2: South Korea (teamId=3) vs Austria (teamId=39) — upcoming");
+        console.log("Match 1: Mexico (teamId=1) vs Argentina (teamId=37) - VAR OPEN");
+        console.log("Match 2: South Korea (teamId=3) vs Austria (teamId=39) - upcoming");
         console.log("\nDemo flow:");
         console.log("1. Faucet USDC:     mockUSDC.faucet()");
         console.log("2. Approve vault:   usdc.approve(convictionVault, amount)");

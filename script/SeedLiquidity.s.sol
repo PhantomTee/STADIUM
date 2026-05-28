@@ -26,15 +26,15 @@ interface IMockUSDC {
 /// @notice Seeds initial full-range liquidity for every registered team pool.
 ///
 /// Required env vars:
-///   PRIVATE_KEY            — deployer key (factory owner)
+///   PRIVATE_KEY            - deployer key (factory owner)
 ///   POOL_MANAGER_ADDRESS
-///   TEAM_FACTORY_ADDRESS   — the NEW factory from RedeployTeams.s.sol
+///   TEAM_FACTORY_ADDRESS   - the NEW factory from RedeployTeams.s.sol
 ///   MOCK_USDC_ADDRESS
 ///   STADIUM_HOOK_ADDRESS
 ///
 /// Optional:
-///   USDC_PER_POOL          — USDC display amount per pool (default 1000)
-///   TOKENS_PER_POOL        — Team tokens display amount per pool (default 1000)
+///   USDC_PER_POOL          - USDC display amount per pool (default 1000)
+///   TOKENS_PER_POOL        - Team tokens display amount per pool (default 1000)
 ///
 /// Usage:
 ///   forge script script/SeedLiquidity.s.sol \
@@ -44,7 +44,7 @@ contract SeedLiquidity is Script {
     int24 constant TICK_LOWER   = -887220;  // floor(MAX_TICK / tickSpacing) * tickSpacing
     int24 constant TICK_UPPER   =  887220;
 
-    // liquidityDelta for initial position — generous amount so small swaps work cleanly
+    // liquidityDelta for initial position - generous amount so small swaps work cleanly
     int256 constant LIQUIDITY_DELTA = 1e24;
 
     function run() external {
@@ -59,11 +59,11 @@ contract SeedLiquidity is Script {
 
         vm.startBroadcast(deployerKey);
 
-        // ── Deploy liquidity router ───────────────────────────────────
+        // -- Deploy liquidity router --------------------------------------------------
         StadiumLiquidityRouter liqRouter = new StadiumLiquidityRouter(poolMgr);
         console.log("StadiumLiquidityRouter deployed at:", address(liqRouter));
 
-        // ── Mint USDC to deployer (testnet mint) ────────────────────────
+        // -- Mint USDC to deployer (testnet mint) ------------------------------------
         // Mint enough for all pools; MockUSDC has mint(address,uint256).
         uint16[] memory ids = factory.getAllTeams();
         uint256 usdcNeeded  = 2_000_000e6; // 2M USDC total buffer
@@ -71,7 +71,7 @@ contract SeedLiquidity is Script {
         IERC20(usdcAddr).approve(address(liqRouter), type(uint256).max);
         console.log("Minted USDC and approved router");
 
-        // ── Seed each team pool ───────────────────────────────────
+        // -- Seed each team pool ------------------------------------------------------
         uint256 seeded = 0;
         for (uint256 i = 0; i < ids.length; i++) {
             uint16  teamId = ids[i];
@@ -79,7 +79,7 @@ contract SeedLiquidity is Script {
             if (token == address(0) || factory.teamPoolId(teamId) == bytes32(0)) continue;
 
             // Try to get team tokens from factory. distributeToken may not exist in older
-            // deployments — catch the revert silently and continue with whatever balance
+            // deployments - catch the revert silently and continue with whatever balance
             // the deployer already holds.
             uint256 factoryBal = IERC20(token).balanceOf(address(factory));
             if (factoryBal > 0) {
@@ -88,7 +88,7 @@ contract SeedLiquidity is Script {
                     abi.encodeWithSignature("distributeToken(uint16,address,uint256)", teamId, deployer, toDistribute)
                 );
                 if (!ok) {
-                    console.log("distributeToken unavailable for team", teamId, "(older factory) — skipping");
+                    console.log("distributeToken unavailable for team", teamId, "(older factory) - skipping");
                 }
             }
             IERC20(token).approve(address(liqRouter), type(uint256).max);

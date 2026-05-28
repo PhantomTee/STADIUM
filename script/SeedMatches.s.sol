@@ -8,8 +8,8 @@ import {MatchOracle} from "../src/MatchOracle.sol";
 ///         Run after SeedTeams.s.sol.
 ///
 /// Required env vars:
-///   PRIVATE_KEY            — deployer private key
-///   MATCH_ORACLE_ADDRESS   — deployed MatchOracle address
+///   PRIVATE_KEY            - deployer private key
+///   MATCH_ORACLE_ADDRESS   - deployed MatchOracle address
 ///
 /// Usage:
 ///   forge script script/SeedMatches.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
@@ -67,8 +67,8 @@ contract SeedMatches is Script {
 
         console.log("\n=== MATCH SEED COMPLETE ===");
         console.log("Match 1: Mexico(1) vs Argentina(37) - VAR OPEN");
-        console.log("Match 2: S.Korea(3) vs Austria(39)  — upcoming");
-        console.log("Match 3: France(33) vs Brazil(9)    — upcoming (Round of 16)");
+        console.log("Match 2: S.Korea(3) vs Austria(39)  - upcoming");
+        console.log("Match 3: France(33) vs Brazil(9)    - upcoming (Round of 16)");
         console.log("\nDemo flow:");
         console.log("1. Faucet USDC:     mockUSDC.faucet()");
         console.log("2. Approve vault:   usdc.approve(vaultAddr, amount)");
