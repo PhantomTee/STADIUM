@@ -7,38 +7,28 @@ const STEPS = [
     tag: 'Welcome',
     title: 'Welcome to 11°',
     body: 'The conviction-based DeFi protocol built on the 2026 World Cup. Lock USDC behind a team, earn yield while they stay alive, and share the Champion Pool if they lift the trophy.',
-    accent: 'gold',
   },
   {
     tag: 'Step 1',
     title: 'Claim your USDC',
-    body: 'Head to the Conviction page and hit the Faucet button. You\'ll receive 1,000 mock USDC instantly — once every 24 hours. No wallet balance? Start here.',
-    accent: 'green',
+    body: "Head to the Conviction page and hit the Faucet button. You'll receive 1,000 mock USDC instantly — once every 24 hours. No wallet balance? Start here.",
   },
   {
     tag: 'Step 2',
     title: 'Lock conviction behind a team',
     body: 'Pick any of the 48 WC 2026 teams and deposit USDC. Your locked amount earns yield proportional to your share of the total pool — the more the crowd backs your team, the more you earn.',
-    accent: 'green',
   },
   {
     tag: 'Step 3',
     title: 'Bet on VAR moments',
-    body: 'During live matches, open VAR markets let you stake on in-game events — red cards, corners, goals. Wrong bettors\' stakes are redistributed to the correct side. High conviction, high reward.',
-    accent: 'green',
+    body: "During live matches, open VAR markets let you stake on in-game events — red cards, corners, goals. Wrong bettors' stakes are redistributed to the correct side. High conviction, high reward.",
   },
   {
     tag: 'Step 4',
     title: 'The Champion Pool',
     body: '25% of every eliminated team\'s forfeit flows into the Champion Pool. When the final whistle blows, holders who backed the world champion split the entire pool proportionally. One team. One shot.',
-    accent: 'gold',
   },
 ]
-
-const ACCENT = {
-  gold:  { border: 'border-stadium-gold/40',  tag: 'text-stadium-gold',  dot: 'bg-stadium-gold',  btn: 'bg-stadium-gold text-stadium-dark hover:bg-stadium-gold/90' },
-  green: { border: 'border-stadium-green/40', tag: 'text-stadium-green', dot: 'bg-stadium-green', btn: 'bg-stadium-green text-stadium-dark hover:bg-stadium-green/90' },
-}
 
 export default function OnboardingModal() {
   const [visible, setVisible] = useState(false)
@@ -65,27 +55,36 @@ export default function OnboardingModal() {
   if (!visible) return null
 
   const current = STEPS[step]
-  const ac      = ACCENT[current.accent]
   const isLast  = step === STEPS.length - 1
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(4,8,4,0.85)', backdropFilter: 'blur(6px)' }}>
-      <div className={`relative w-full max-w-md bg-stadium-card border ${ac.border} flex flex-col`} style={{ borderRadius: 2 }}>
-
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(4,8,4,0.88)', backdropFilter: 'blur(6px)' }}
+    >
+      <div
+        className="relative w-full max-w-md bg-stadium-card border border-stadium-green/40 flex flex-col"
+        style={{ borderRadius: 2 }}
+      >
         {/* Top bar */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <span className={`text-[10px] font-bold uppercase tracking-widest font-mono ${ac.tag}`}>{current.tag}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest font-mono text-stadium-green">
+            {current.tag}
+          </span>
           <button
             onClick={dismiss}
-            className="text-stadium-muted hover:text-stadium-text transition-colors text-xs font-mono uppercase tracking-widest"
+            className="text-stadium-muted hover:text-white transition-colors text-xs font-mono uppercase tracking-widest"
           >
             Skip
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-5 pb-6 flex-1">
-          <h2 className="text-xl font-black uppercase tracking-tight text-stadium-text mb-3" style={{ fontFamily: "'Anton', sans-serif" }}>
+        <div className="px-5 pb-7 flex-1">
+          <h2
+            className="text-2xl font-black uppercase tracking-tight text-white mb-3"
+            style={{ fontFamily: "'Anton', sans-serif" }}
+          >
             {current.title}
           </h2>
           <p className="text-sm text-stadium-muted font-mono leading-relaxed">
@@ -100,7 +99,9 @@ export default function OnboardingModal() {
             {STEPS.map((_, i) => (
               <div
                 key={i}
-                className={`h-1.5 rounded-full transition-all ${i === step ? `${ac.dot} w-4` : 'bg-stadium-border w-1.5'}`}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === step ? 'bg-stadium-green w-4' : 'bg-stadium-border w-1.5'
+                }`}
               />
             ))}
           </div>
@@ -110,7 +111,7 @@ export default function OnboardingModal() {
             {step > 0 && (
               <button
                 onClick={back}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-widest font-mono text-stadium-muted hover:text-stadium-text border border-stadium-border transition-colors"
+                className="px-4 py-2 text-xs font-bold uppercase tracking-widest font-mono text-stadium-muted hover:text-white border border-stadium-border transition-colors"
                 style={{ borderRadius: 2 }}
               >
                 Back
@@ -118,10 +119,10 @@ export default function OnboardingModal() {
             )}
             <button
               onClick={next}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-widest font-mono transition-colors ${ac.btn}`}
+              className="px-5 py-2 text-xs font-bold uppercase tracking-widest font-mono bg-stadium-green text-stadium-dark hover:bg-stadium-green/90 transition-colors"
               style={{ borderRadius: 2 }}
             >
-              {isLast ? 'Let\'s go' : 'Next'}
+              {isLast ? "Let's go" : 'Next'}
             </button>
           </div>
         </div>

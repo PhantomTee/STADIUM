@@ -3,7 +3,7 @@ import { useReadContracts } from 'wagmi'
 import { WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC, ADDRESSES } from '../utils/contracts'
 import { ConvictionVault_ABI } from '../abis'
 import {
-  useTeamEliminated,
+  useTeamEliminated, useTeamTotalDeposit, useBackerCount,
   useTotalAliveDeposits, useChampionPoolData,
 } from '../hooks/useContracts'
 
