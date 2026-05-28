@@ -23,18 +23,18 @@ interface IMockUSDC {
     function mint(address to, uint256 amount) external;
 }
 
+interface IStadiumHook {
+    function registerPool(PoolKey calldata key, uint16 teamId) external;
+}
+
 /// @notice Seeds initial full-range liquidity for every registered team pool.
 ///
 /// Required env vars:
-///   PRIVATE_KEY            - deployer key (factory owner)
+///   PRIVATE_KEY            - deployer key (factory owner and hook owner)
 ///   POOL_MANAGER_ADDRESS
-///   TEAM_FACTORY_ADDRESS   - the NEW factory from RedeployTeams.s.sol
+///   TEAM_FACTORY_ADDRESS
 ///   MOCK_USDC_ADDRESS
 ///   STADIUM_HOOK_ADDRESS
-///
-/// Optional:
-///   USDC_PER_POOL          - USDC display amount per pool (default 1000)
-///   TOKENS_PER_POOL        - Team tokens display amount per pool (default 1000)
 ///
 /// Usage:
 ///   forge script script/SeedLiquidity.s.sol \
@@ -64,7 +64,6 @@ contract SeedLiquidity is Script {
         console.log("StadiumLiquidityRouter deployed at:", address(liqRouter));
 
         // -- Mint USDC to deployer (testnet mint) ------------------------------------
-        // Mint enough for all pools; MockUSDC has mint(address,uint256).
         uint16[] memory ids = factory.getAllTeams();
         uint256 usdcNeeded  = 2_000_000e6; // 2M USDC total buffer
         IMockUSDC(usdcAddr).mint(deployer, usdcNeeded);
@@ -72,7 +71,8 @@ contract SeedLiquidity is Script {
         console.log("Minted USDC and approved router");
 
         // -- Seed each team pool ------------------------------------------------------
-        uint256 seeded = 0;
+        uint256 seeded     = 0;
+        uint256 registered = 0;
         for (uint256 i = 0; i < ids.length; i++) {
             uint16  teamId = ids[i];
             address token  = factory.teamToken(teamId);
@@ -105,6 +105,22 @@ contract SeedLiquidity is Script {
                 hooks:       IHooks(hookAddr)
             });
 
+            // Register pool in hook so beforeAddLiquidity/beforeSwap don't revert
+            // PoolNotRegistered. Silently skip if already registered or access denied.
+            try IStadiumHook(hookAddr).registerPool(key, teamId) {
+                registered++;
+                console.log("Registered pool in hook for team", teamId);
+            } catch {
+                // Already registered or not owner - continue
+            }
+
+            // Skip addLiquidity when deployer has no team tokens to provide.
+            // This happens with older factory deployments that lack distributeToken.
+            if (IERC20(token).balanceOf(deployer) == 0) {
+                console.log("No team tokens for team", teamId, "- skipping addLiquidity");
+                continue;
+            }
+
             try liqRouter.addLiquidity(
                 key,
                 TICK_LOWER,
@@ -114,15 +130,19 @@ contract SeedLiquidity is Script {
             ) {
                 seeded++;
                 console.log("Seeded liquidity for team", teamId);
-            } catch (bytes memory err) {
-                console.log("Failed for team", teamId);
-                console.logBytes(err);
+            } catch {
+                console.log("addLiquidity failed for team", teamId);
             }
         }
 
         vm.stopBroadcast();
 
+        console.log("Pools registered in hook:", registered, "/", ids.length);
         console.log("Pools seeded:", seeded, "/", ids.length);
+        if (seeded == 0) {
+            console.log("NOTE: 0 pools seeded. Re-run with force_redeploy=true after");
+            console.log("      redeploying TeamFactory so distributeToken is available.");
+        }
 
         // Write address to JSON for CI merge step
         string memory json = string.concat(
