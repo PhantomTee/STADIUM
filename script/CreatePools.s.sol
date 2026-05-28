@@ -2,6 +2,10 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
+import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
+import {Currency} from "@uniswap/v4-core/types/Currency.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/libraries/LPFeeLibrary.sol";
+import {IHooks} from "@uniswap/v4-core/interfaces/IHooks.sol";
 
 interface ITeamFactory {
     function registerTeam(uint16 teamId, string calldata name, string calldata symbol) external;
@@ -9,6 +13,12 @@ interface ITeamFactory {
     function setHook(address hook) external;
     function teamToken(uint16 teamId) external view returns (address);
     function teamPoolId(uint16 teamId) external view returns (bytes32);
+    function usdc() external view returns (address);
+    function hook() external view returns (address);
+}
+
+interface IStadiumHook {
+    function registerPool(PoolKey calldata key, uint16 teamId) external;
 }
 
 /// @notice Registers all 48 World Cup 2026 teams in TeamFactory and creates their Uniswap V4 pools.
@@ -51,8 +61,9 @@ contract CreatePools is Script {
         }
 
         if (hookAddr != address(0)) {
+            address usdcAddr = factory.usdc();
             for (uint256 i = 0; i < ids.length; i++) {
-                _createPool(factory, ids[i], names[i]);
+                _createPool(factory, ids[i], names[i], usdcAddr, hookAddr);
             }
             console.log("Created V4 pools for all 48 teams");
         } else {
@@ -168,12 +179,43 @@ contract CreatePools is Script {
         }
     }
 
-    function _createPool(ITeamFactory factory, uint16 teamId, string memory name) internal {
+    function _createPool(
+        ITeamFactory factory,
+        uint16 teamId,
+        string memory name,
+        address usdcAddr,
+        address hookAddr
+    ) internal {
         try factory.createTeamPool(teamId, TICK_SPACING, SQRT_PRICE_1_1) {
             bytes32 pid = factory.teamPoolId(teamId);
             console.log(string.concat("Pool created: ", name), vm.toString(pid));
         } catch {
-            console.log(string.concat("Pool creation failed: ", name));
+            console.log(string.concat("Pool creation failed (may already exist): ", name));
+        }
+
+        // Register the pool in StadiumHook so beforeSwap doesn't revert PoolNotRegistered.
+        address token = factory.teamToken(teamId);
+        if (token == address(0)) {
+            console.log(string.concat("No token for team — skipping registerPool: ", name));
+            return;
+        }
+
+        (Currency c0, Currency c1) = usdcAddr < token
+            ? (Currency.wrap(usdcAddr), Currency.wrap(token))
+            : (Currency.wrap(token),    Currency.wrap(usdcAddr));
+
+        PoolKey memory key = PoolKey({
+            currency0:   c0,
+            currency1:   c1,
+            fee:         LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: TICK_SPACING,
+            hooks:       IHooks(hookAddr)
+        });
+
+        try IStadiumHook(hookAddr).registerPool(key, teamId) {
+            console.log(string.concat("Hook pool registered: ", name));
+        } catch {
+            console.log(string.concat("registerPool failed (may already be registered): ", name));
         }
     }
 

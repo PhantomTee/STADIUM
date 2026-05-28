@@ -53,6 +53,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     error NotOwner();
     error ZeroAddress();
     error PoolAlreadyRegistered();
+    error InvalidUSDCPool();
 
     // ─────────────────────────────── Structs ───────────────────────────────
 
@@ -178,9 +179,13 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     }
 
     /// @notice Register a V4 pool to a team. Pool must already be initialized via PoolManager.
+    ///         When usdc is configured the pool must contain USDC as currency0 or currency1.
     function registerPool(PoolKey calldata key, uint16 teamId) external onlyOwner {
         bytes32 pid = PoolId.unwrap(key.toId());
         if (poolState[pid].registered) revert PoolAlreadyRegistered();
+        if (usdc != address(0) &&
+            Currency.unwrap(key.currency0) != usdc &&
+            Currency.unwrap(key.currency1) != usdc) revert InvalidUSDCPool();
 
         poolState[pid] = PoolState({
             teamId:               teamId,
@@ -254,10 +259,20 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
             return (BaseHook.afterSwap.selector, 0);
         }
 
-        // Compute USDC volume: use whichever currency is USDC; fallback to currency0 if unset.
+        // Compute USDC volume from the correct side of the pool.
+        // When usdc is not configured, fall back to amount0 (demo mode only).
         int256 amt0 = delta.amount0();
         int256 amt1 = delta.amount1();
-        int256 usdcAmt = (usdc != address(0) && Currency.unwrap(key.currency1) == usdc) ? amt1 : amt0;
+        int256 usdcAmt;
+        if (usdc == address(0)) {
+            usdcAmt = amt0; // demo fallback
+        } else if (Currency.unwrap(key.currency0) == usdc) {
+            usdcAmt = amt0;
+        } else if (Currency.unwrap(key.currency1) == usdc) {
+            usdcAmt = amt1;
+        } else {
+            revert InvalidUSDCPool();
+        }
         uint256 absVol = usdcAmt < 0 ? uint256(-usdcAmt) : uint256(usdcAmt);
 
         // Update momentum and volume

@@ -80,7 +80,7 @@ User deposits USDC
 | Hook | Purpose |
 |---|---|
 | `beforeSwap` | Validates pool is active; rejects swaps on eliminated teams; returns dynamic fee |
-| `afterSwap` | Routes protocol fee → ChampionPool; increments `teamMomentum` |
+| `afterSwap` | Tracks notional fee accrual, updates `teamMomentum`, emits `ChampionFeeRouted`; no real USDC transfer from hook (ChampionPool funded via ConvictionVault/VARMarket settlement) |
 | `beforeAddLiquidity` | Blocks new liquidity on eliminated team pools |
 | `afterAddLiquidity` | Records liquidity stats per team |
 
@@ -138,7 +138,7 @@ MatchOracle  ←  trusted sports-data relayer (GitHub Actions)
 
 StadiumHook  (Uniswap V4 BaseHook)
     ├── beforeSwap:        validate + dynamic fee + block eliminated
-    ├── afterSwap:         momentum tracking + fee routing
+    ├── afterSwap:         momentum tracking + notional fee accrual (ChampionPool funded via ConvictionVault/VARMarket)
     └── beforeAddLiquidity: block eliminated pools
 
 TeamFactory
@@ -313,7 +313,7 @@ Required GitHub secrets: `FOOTBALL_DATA_API_KEY`, `ORACLE_PRIVATE_KEY`, `XLAYER_
 
 - [x] `StadiumHook.sol` inherits `BaseHook` (official Uniswap V4 interface)
 - [x] `beforeSwap` — validates pool, returns dynamic fee, reverts on eliminated teams
-- [x] `afterSwap` — routes fee to ChampionPool, updates `teamMomentum`
+- [x] `afterSwap` — tracks notional fee accrual, updates `teamMomentum`, emits `ChampionFeeRouted` (no real USDC transfer from hook)
 - [x] `beforeAddLiquidity` — blocks liquidity on eliminated pools
 - [x] `afterAddLiquidity` — records per-team liquidity stats
 - [x] `PoolKey` uses `hooks: IHooks(address(stadiumHook))` + `DYNAMIC_FEE_FLAG`

@@ -402,6 +402,27 @@ contract StadiumHookTest is Test {
         assertEq(hook.teamMomentum(TEAM_FRA), 500e6, "Momentum should use USDC side");
     }
 
+    // ── Test 11c: registerPool with no-USDC pool reverts InvalidUSDCPool ────
+
+    function test_RegisterPool_NonUSDCPool_Reverts() public {
+        // Build a key that contains neither usdc nor a team token — just two random tokens
+        address randA = makeAddr("randA");
+        address randB = makeAddr("randB");
+        (address t0, address t1) = randA < randB ? (randA, randB) : (randB, randA);
+
+        PoolKey memory badKey = PoolKey({
+            currency0:   Currency.wrap(t0),
+            currency1:   Currency.wrap(t1),
+            fee:         LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: 60,
+            hooks:       IHooks(address(hook))
+        });
+
+        vm.prank(owner);
+        vm.expectRevert(StadiumHook.InvalidUSDCPool.selector);
+        hook.registerPool(badKey, TEAM_ARG);
+    }
+
     // ── Test 12: Registered pool returns correct pool state ───────────────
 
     function test_RegisterPool_AlreadyRegistered_Reverts() public {
