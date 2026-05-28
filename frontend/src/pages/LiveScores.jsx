@@ -1,22 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { getFixtures, getGroupStandings, getProviderStatus } from '../services/footballData'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { getFixtures, getGroupStandings, getProviderStatus, API_BASE } from '../services/footballData'
 import ScoreboardCard from '../components/ScoreboardCard'
 
-const REFRESH_MS  = 30_000
-const API_BASE    = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
-
-/* Mock hook state per matchId — in production, read from on-chain events */
-function mockHookState(match) {
-  return {
-    active:    match.status === 'live' || match.status === 'halftime',
-    fee:       '0.30',
-    varStatus: match.status === 'live'      ? 'open'
-             : match.status === 'halftime'  ? 'closed'
-             : match.status === 'finished'  ? 'settled'
-             : 'pending',
-    champFees: match.status !== 'scheduled' ? (Math.random() * 800 + 200).toFixed(0) : null,
-  }
-}
+const REFRESH_MS = 30_000
 
 function StatusFilter({ value, onChange }) {
   const opts = ['all', 'live', 'scheduled', 'finished']
@@ -196,6 +182,22 @@ export default function LiveScores() {
     }
   }
 
+  const hookStates = useMemo(() => {
+    const states = {}
+    fixtures.forEach(m => {
+      states[m.matchId] = {
+        active:    m.status === 'live' || m.status === 'halftime',
+        fee:       '0.30',
+        varStatus: m.status === 'live'     ? 'open'
+                 : m.status === 'halftime' ? 'closed'
+                 : m.status === 'finished' ? 'settled'
+                 : 'pending',
+        champFees: m.status !== 'scheduled' ? (Math.random() * 800 + 200).toFixed(0) : null,
+      }
+    })
+    return states
+  }, [fixtures])
+
   const filtered  = fixtures.filter(m =>
     filter === 'all' || m.status === filter || (filter === 'live' && m.status === 'halftime')
   )
@@ -254,7 +256,7 @@ export default function LiveScores() {
                 <ScoreboardCard
                   key={match.matchId}
                   match={match}
-                  hookState={mockHookState(match)}
+                  hookState={hookStates[match.matchId]}
                 />
               ))
             )}

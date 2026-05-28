@@ -48,7 +48,9 @@ export const USDC_MULTIPLIER = BigInt(10 ** USDC_DECIMALS)
 
 export function formatUSDC(raw) {
   if (!raw) return "0.00"
-  const n = Number(raw) / 1e6
+  const whole = raw / 1_000_000n
+  const frac  = raw % 1_000_000n
+  const n = Number(whole) + Number(frac) / 1e6
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 

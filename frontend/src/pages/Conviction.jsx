@@ -46,7 +46,11 @@ export default function Conviction() {
   const { writeContract: writeFaucet, data: faucetHash } = useWriteContract()
   const { isLoading: faucetPending, isSuccess: faucetSuccess } = useWaitForTransactionReceipt({ hash: faucetHash })
 
-  const nowSec = BigInt(Math.floor(Date.now() / 1000))
+  const [nowSec, setNowSec] = useState(() => BigInt(Math.floor(Date.now() / 1000)))
+  useEffect(() => {
+    const id = setInterval(() => setNowSec(BigInt(Math.floor(Date.now() / 1000))), 1000)
+    return () => clearInterval(id)
+  }, [])
   const convictionOpen = !closeTime || closeTime === 0n || nowSec < closeTime
   const countdown = useCountdown(closeTime && closeTime > 0n ? closeTime : null)
 

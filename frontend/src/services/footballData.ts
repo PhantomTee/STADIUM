@@ -8,7 +8,7 @@
  * Set VITE_API_BASE_URL to point at the backend (defaults to localhost:3001 in dev).
  */
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
 
 // ── Public types (consumed by components) ────────────────────────────────────
 

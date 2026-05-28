@@ -1,13 +1,10 @@
 import React from 'react'
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContracts } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
 import {
-  useConvictionDeposit, usePendingYield,
-  useTeamEliminated, useTeamChampion, usePrincipalClaimed,
-  useAllMatchIds, useMatch, useUSDCBalance,
-  useTotalAliveDeposits, useConvictionMultiplier,
-  useChampionPoolData, useChampClaimed,
+  usePendingYield, useAllMatchIds, useMatch, useUSDCBalance,
+  useTotalAliveDeposits, useChampionPoolData, useChampClaimed,
 } from '../hooks/useContracts'
 import { ConvictionVault_ABI, ChampionPool_ABI } from '../abis'
 
@@ -89,49 +86,59 @@ function PortfolioSummary({ address }) {
 }
 
 function ConvictionPositions({ address }) {
+  const { data } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.flatMap(t => [
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'deposits',                args: [address, t.id] },
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'teamEliminated',          args: [t.id] },
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'teamChampion',            args: [t.id] },
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'principalClaimed',        args: [address, t.id] },
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'getConvictionMultiplier', args: [address, t.id] },
+    ]),
+    query: { enabled: !!address, refetchInterval: 15_000 },
+  })
+
+  const positions = WORLD_CUP_TEAMS.map((team, i) => {
+    const o = i * 5
+    return {
+      team,
+      deposit:          data?.[o]?.result     ?? 0n,
+      eliminated:       data?.[o + 1]?.result ?? false,
+      champion:         data?.[o + 2]?.result ?? false,
+      principalClaimed: data?.[o + 3]?.result ?? false,
+      multiplier:       data?.[o + 4]?.result ?? 100n,
+    }
+  }).filter(p => p.deposit > 0n)
+
   return (
     <div>
       <h2 className="font-semibold text-stadium-text mb-4">CONVICTION Positions</h2>
-      <div className="grid md:grid-cols-2 gap-4">
-        {WORLD_CUP_TEAMS.map(team => (
-          <ConvictionPositionCard key={team.id} team={team} address={address} />
-        ))}
-      </div>
+      {positions.length === 0 ? (
+        <div className="card text-center text-stadium-muted py-8 text-sm">No conviction positions yet</div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {positions.map(p => (
+            <ConvictionPositionCard key={p.team.id} {...p} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function ConvictionPositionCard({ team, address }) {
-  const { data: deposit }          = useConvictionDeposit(address, team.id)
-  const { data: eliminated }       = useTeamEliminated(team.id)
-  const { data: champion }         = useTeamChampion(team.id)
-  const { data: principalClaimed } = usePrincipalClaimed(address, team.id)
-  const { data: multiplier }       = useConvictionMultiplier(address, team.id)
-
+function ConvictionPositionCard({ team, deposit, eliminated, champion, principalClaimed, multiplier }) {
   const { writeContract, data: txHash } = useWriteContract()
   const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
-
-  if (!deposit || deposit === 0n) return null
 
   const isAlive  = !eliminated && !champion
   const hasBonus = multiplier === 150n
 
   function handleClaim() {
-    if (champion) {
-      writeContract({
-        address: ADDRESSES.convictionVault,
-        abi: ConvictionVault_ABI,
-        functionName: 'claimChampionPrincipal',
-        args: [team.id],
-      })
-    } else {
-      writeContract({
-        address: ADDRESSES.convictionVault,
-        abi: ConvictionVault_ABI,
-        functionName: 'claimEliminatedPosition',
-        args: [team.id],
-      })
-    }
+    writeContract({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: champion ? 'claimChampionPosition' : 'claimEliminatedPosition',
+      args: [team.id],
+    })
   }
 
   return (
@@ -145,7 +152,7 @@ function ConvictionPositionCard({ team, address }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          {isAlive   && <span className="badge-green">Active</span>}
+          {isAlive    && <span className="badge-green">Active</span>}
           {eliminated && <span className="badge-red">Eliminated</span>}
           {champion   && <span className="badge-gold">Champion</span>}
           {hasBonus && isAlive && <span className="badge-gold">1.5× VAR</span>}

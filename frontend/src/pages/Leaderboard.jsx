@@ -3,8 +3,7 @@ import { useReadContracts } from 'wagmi'
 import { WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC, ADDRESSES } from '../utils/contracts'
 import { ConvictionVault_ABI } from '../abis'
 import {
-  useTeamEliminated, useTeamTotalDeposit, useBackerCount,
-  useTotalAliveDeposits, useChampionPoolData,
+  useTeamEliminated, useTotalAliveDeposits, useChampionPoolData,
 } from '../hooks/useContracts'
 
 const TABS = ['Teams', 'Champion Pool']
@@ -227,23 +226,45 @@ function ChampionPoolView() {
         </div>
       </div>
 
-      <div>
-        <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">Tournament Favorites</div>
-        <div className="space-y-px bg-stadium-border">
-          {WORLD_CUP_TEAMS.slice(0, 8).map(team => (
-            <FavoriteRow key={team.id} team={team} />
-          ))}
-        </div>
+      <FavoritesList />
+    </div>
+  )
+}
+
+const TOP_TEAMS = WORLD_CUP_TEAMS.slice(0, 8)
+
+function FavoritesList() {
+  const { data: favoriteData } = useReadContracts({
+    contracts: TOP_TEAMS.flatMap(t => [
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'teamTotalDeposit', args: [t.id] },
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'backerCount',      args: [t.id] },
+      { address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI, functionName: 'teamEliminated',   args: [t.id] },
+    ]),
+    query: { refetchInterval: 15_000 },
+  })
+
+  return (
+    <div>
+      <div className="text-xs font-bold text-stadium-text uppercase tracking-widest mb-3">Tournament Favorites</div>
+      <div className="space-y-px bg-stadium-border">
+        {TOP_TEAMS.map((team, i) => {
+          const o = i * 3
+          return (
+            <FavoriteRow
+              key={team.id}
+              team={team}
+              locked={favoriteData?.[o]?.result}
+              backers={favoriteData?.[o + 1]?.result}
+              eliminated={favoriteData?.[o + 2]?.result}
+            />
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function FavoriteRow({ team }) {
-  const { data: locked }    = useTeamTotalDeposit(team.id)
-  const { data: backers }   = useBackerCount(team.id)
-  const { data: eliminated } = useTeamEliminated(team.id)
-
+function FavoriteRow({ team, locked, backers, eliminated }) {
   return (
     <div className={`flex items-center gap-3 p-4 bg-stadium-card border-l-2 border-l-transparent hover:border-l-stadium-gold/50 transition-colors ${eliminated ? 'opacity-30' : ''}`}>
       <span className="text-xl">{team.flag}</span>

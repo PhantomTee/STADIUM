@@ -114,7 +114,7 @@ export default function Activity() {
 
     try {
       const currentBlock = await publicClient.getBlockNumber()
-      const fromBlock    = currentBlock > 50000n ? currentBlock - 50000n : 0n
+      const fromBlock    = currentBlock > 9000n ? currentBlock - 9000n : 0n
 
       const [convictionLogs, betLogs] = await Promise.all([
         publicClient.getContractEvents({

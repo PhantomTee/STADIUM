@@ -14,7 +14,6 @@ export const ConvictionVault_ABI = [
   { inputs: [{ name: "teamId", type: "uint16" }, { name: "amount", type: "uint256" }], name: "depositConviction", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [], name: "claimYield", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [{ name: "teamId", type: "uint16" }], name: "claimEliminatedPosition", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [{ name: "teamId", type: "uint16" }], name: "claimChampionPrincipal", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [{ name: "teamId", type: "uint16" }], name: "claimChampionPosition", outputs: [], stateMutability: "nonpayable", type: "function" },
   // ── View functions ──
   { inputs: [{ name: "user", type: "address" }], name: "pendingYield", outputs: [{ name: "total", type: "uint256" }], stateMutability: "view", type: "function" },
