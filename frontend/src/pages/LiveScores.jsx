@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { getFixtures, getGroupStandings, getProviderStatus, API_BASE } from '../services/footballData'
 import ScoreboardCard from '../components/ScoreboardCard'
+import { useChampionPoolBalance } from '../hooks/useContracts'
+import { formatUSDC } from '../utils/contracts'
 
 const REFRESH_MS = 30_000
 
@@ -142,6 +144,8 @@ export default function LiveScores() {
   const [loading,     setLoading]     = useState(true)
   const [lastUpdate,  setLastUpdate]  = useState(null)
   const [error,       setError]       = useState(null)
+
+  const { data: champPoolTotal } = useChampionPoolBalance()
   const [status,      setStatus]      = useState(null)
   const [syncing,     setSyncing]     = useState(false)
 
@@ -192,7 +196,7 @@ export default function LiveScores() {
                  : m.status === 'halftime' ? 'closed'
                  : m.status === 'finished' ? 'settled'
                  : 'pending',
-        champFees: m.status !== 'scheduled' ? (Math.random() * 800 + 200).toFixed(0) : null,
+        champFees: m.status !== 'scheduled' ? (champPoolTotal != null ? formatUSDC(champPoolTotal) : null) : null,
       }
     })
     return states

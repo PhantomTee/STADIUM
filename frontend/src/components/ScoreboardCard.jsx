@@ -175,7 +175,7 @@ export default function ScoreboardCard({ match, hookState }) {
           {hookState?.champFees != null && (
             <div className="flex items-center gap-2 px-4 py-2">
               <span className="text-stadium-muted uppercase tracking-widest">Champion Pool</span>
-              <span className="text-stadium-gold font-bold">{hookState.champFees} USDC</span>
+              <span className="text-stadium-gold font-bold">${hookState.champFees}</span>
             </div>
           )}
         </div>
