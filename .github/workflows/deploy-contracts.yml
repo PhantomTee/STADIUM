@@ -80,6 +80,12 @@ jobs:
             echo "SKIP_HOOK_DEPLOY=true" >> $GITHUB_ENV
             echo "StadiumHook already deployed ($sh) — skipping unless force_redeploy=true"
           fi
+          pools=$(python3 -c "import json; print(len(json.load(open('v4-pools.json')).get('pools',[])))" 2>/dev/null || echo "0")
+          if [ "$pools" -gt "0" ] 2>/dev/null; then
+            echo "SKIP_SEED_TEAMS=true" >> $GITHUB_ENV
+            echo "SKIP_CREATE_POOLS=true" >> $GITHUB_ENV
+            echo "Teams already seeded and $pools pools already created — skipping SeedTeams + CreatePools unless force_redeploy=true"
+          fi
 
       # ── Step: Deploy core contracts ────────────────────────────────────────
       - name: Deploy core contracts (Deploy.s.sol)
@@ -116,7 +122,7 @@ jobs:
       # depositConviction(). Running this before CreatePools ensures correct ordering
       # in a full "all" deployment.
       - name: Seed teams (SeedTeams.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_teams' }}
+        if: ${{ (github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_teams') && (env.SKIP_SEED_TEAMS != 'true' || github.event.inputs.force_redeploy == 'true') }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
@@ -129,7 +135,7 @@ jobs:
 
       # ── Step: Register teams + create V4 pools ─────────────────────────────
       - name: Create V4 pools (CreatePools.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'pools_only' }}
+        if: ${{ (github.event.inputs.step == 'all' || github.event.inputs.step == 'pools_only') && (env.SKIP_CREATE_POOLS != 'true' || github.event.inputs.force_redeploy == 'true') }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
