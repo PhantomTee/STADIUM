@@ -1,4 +1,5 @@
 import React from 'react'
+import ShareButton from '../components/ShareButton'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContracts } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
@@ -185,6 +186,14 @@ function ConvictionPositionCard({ team, deposit, eliminated, champion, principal
       )}
       {principalClaimed && (
         <div className="text-xs text-stadium-muted font-mono mt-2">Principal claimed</div>
+      )}
+
+      {isAlive && (
+        <div className="mt-3 pt-3 border-t border-stadium-border/40">
+          <ShareButton
+            text={`I'm backing ${team.flag} ${team.name} to win the 2026 World Cup on 11° — $${formatUSDC(deposit)} locked in! 🔒 #WorldCup2026 #DeFi`}
+          />
+        </div>
       )}
     </div>
   )

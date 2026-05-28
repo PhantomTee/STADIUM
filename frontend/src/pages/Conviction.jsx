@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import ShareButton from '../components/ShareButton'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS, formatUSDC, parseUSDC } from '../utils/contracts'
@@ -373,7 +374,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
     writeClaim({
       address: ADDRESSES.convictionVault,
       abi: ConvictionVault_ABI,
-      functionName: 'claimChampionPrincipal',
+      functionName: 'claimChampionPosition',
       args: [team.id],
     })
   }
@@ -492,8 +493,15 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
       )}
 
       {depositSuccess && (
-        <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
-          Conviction deposited successfully
+        <div className="space-y-3">
+          <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
+            Conviction deposited successfully
+          </div>
+          <div className="flex justify-center">
+            <ShareButton
+              text={`I just backed ${team.flag} ${team.name} to win the 2026 World Cup on 11° — World Cup DeFi on X Layer! 🔒 #WorldCup2026 #DeFi`}
+            />
+          </div>
         </div>
       )}
 

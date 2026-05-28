@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import ShareButton from '../components/ShareButton'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS, TEAM_BY_ID, formatUSDC, parseUSDC } from '../utils/contracts'
@@ -362,8 +363,15 @@ function VARBettingPanel({
       )}
 
       {txSuccess && (
-        <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
-          Prediction placed successfully
+        <div className="space-y-3">
+          <div className="text-center text-stadium-green text-sm font-bold font-mono uppercase tracking-widest">
+            Prediction placed successfully
+          </div>
+          <div className="flex justify-center">
+            <ShareButton
+              text={`I just predicted ${outcomeLabel(selectedOutcome, teamAName, teamBName)} in ${teamAName} vs ${teamBName} on 11° VAR — World Cup DeFi on X Layer! 🎯 #WorldCup2026 #DeFi`}
+            />
+          </div>
         </div>
       )}
     </div>
