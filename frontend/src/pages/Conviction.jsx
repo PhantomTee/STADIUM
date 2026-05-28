@@ -13,6 +13,25 @@ import {
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
+function useCountdown(targetSec) {
+  const [remaining, setRemaining] = useState(() =>
+    targetSec ? Math.max(0, Number(targetSec) - Math.floor(Date.now() / 1000)) : null
+  )
+  useEffect(() => {
+    if (!targetSec) return
+    const tick = () => setRemaining(Math.max(0, Number(targetSec) - Math.floor(Date.now() / 1000)))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [targetSec])
+  if (remaining === null) return null
+  const d = Math.floor(remaining / 86400)
+  const h = Math.floor((remaining % 86400) / 3600)
+  const m = Math.floor((remaining % 3600) / 60)
+  const s = remaining % 60
+  return { d, h, m, s, remaining }
+}
+
 export default function Conviction() {
   const { address, isConnected } = useAccount()
   const [selectedTeam, setSelectedTeam] = useState(null)
@@ -29,6 +48,7 @@ export default function Conviction() {
 
   const nowSec = BigInt(Math.floor(Date.now() / 1000))
   const convictionOpen = !closeTime || closeTime === 0n || nowSec < closeTime
+  const countdown = useCountdown(closeTime && closeTime > 0n ? closeTime : null)
 
   const FAUCET_COOLDOWN = 24n * 60n * 60n
   const faucetReady = !lastFaucetTime || nowSec >= lastFaucetTime + FAUCET_COOLDOWN
@@ -85,13 +105,31 @@ export default function Conviction() {
       {/* Status Banner */}
       {closeTime && closeTime > 0n && (
         convictionOpen ? (
-          <div className="bg-stadium-gold/10 border border-stadium-gold/30 p-4 text-center space-y-1">
+          <div className="bg-stadium-gold/10 border border-stadium-gold/30 p-4 text-center space-y-2">
             <div className="text-xs font-bold text-stadium-gold uppercase tracking-widest font-mono">
-              CONVICTION closes at tournament kickoff
+              Back your team before the first whistle
             </div>
-            <div className="text-xs text-stadium-muted font-mono">
-              Back your team before the first whistle — {new Date(Number(closeTime) * 1000).toLocaleString()}
-            </div>
+            {countdown ? (
+              <div className="flex items-center justify-center gap-3 font-mono">
+                {[
+                  { v: countdown.d, label: 'D' },
+                  { v: countdown.h, label: 'H' },
+                  { v: countdown.m, label: 'M' },
+                  { v: countdown.s, label: 'S' },
+                ].map(({ v, label }) => (
+                  <div key={label} className="flex flex-col items-center">
+                    <span className="text-2xl font-black text-stadium-gold tabular-nums leading-none">
+                      {String(v).padStart(2, '0')}
+                    </span>
+                    <span className="text-[10px] text-stadium-muted uppercase tracking-widest mt-0.5">{label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-stadium-muted font-mono">
+                CONVICTION closes at tournament kickoff · 11 June 2026
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-red-500/10 border border-red-500/20 p-4 text-center space-y-1">
