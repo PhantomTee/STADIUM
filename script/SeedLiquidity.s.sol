@@ -116,6 +116,13 @@ contract SeedLiquidity is Script {
         vm.stopBroadcast();
 
         console.log("Pools seeded:", seeded, "/", ids.length);
+
+        // Write address to JSON for CI merge step
+        string memory json = string.concat(
+            '{\n  "stadiumLiquidityRouter": "', vm.toString(address(liqRouter)), '"\n}'
+        );
+        vm.writeFile("./liquidity-deployment.json", json);
+        console.log("Liquidity router address written to liquidity-deployment.json");
         console.log("\nUpdate frontend/.env:");
         console.log("VITE_STADIUM_LIQUIDITY_ROUTER_ADDRESS=%s", address(liqRouter));
     }

@@ -111,6 +111,7 @@ contract TeamFactory is Ownable {
         int24   tickSpacing,
         uint160 sqrtPriceX96
     ) external onlyOwner {
+        if (hook == address(0)) revert ZeroAddress(); // must set hook before creating pools
         address token = teamToken[teamId];
         if (token == address(0)) revert TeamNotRegistered(teamId);
         if (teamPoolId[teamId] != bytes32(0)) revert PoolAlreadyCreated(teamId);

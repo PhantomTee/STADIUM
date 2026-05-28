@@ -17,11 +17,12 @@ on:
         default: "all"
         type: choice
         options:
-          - all               # Deploy.s.sol + DeployHook.s.sol + CreatePools.s.sol
+          - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity
           - core_only         # Deploy.s.sol only
           - hook_only         # DeployHook.s.sol only (needs POOL_MANAGER_ADDRESS secret)
           - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
           - seed_teams        # SeedTeams.s.sol + SeedMatches.s.sol
+          - seed_liquidity    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
 
 jobs:
   deploy:
@@ -97,8 +98,10 @@ jobs:
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed teams + matches via oracle ──────────────────────────────
+      # Runs in "all" AND "seed_teams" so ConvictionVault/MatchOracle teams are
+      # always registered before pools are created and deposits are attempted.
       - name: Seed teams and matches
-        if: ${{ github.event.inputs.step == 'seed_teams' }}
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_teams' }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
@@ -106,11 +109,28 @@ jobs:
           forge script script/SeedTeams.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
-            --private-key $PRIVATE_KEY || true
+            --private-key $PRIVATE_KEY
           forge script script/SeedMatches.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
-            --private-key $PRIVATE_KEY || true
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Seed initial liquidity into V4 pools ───────────────────────────
+      # Runs in "all" AND "seed_liquidity". Deploys StadiumLiquidityRouter and
+      # seeds each team pool so swaps are possible from day one.
+      - name: Seed liquidity (SeedLiquidity.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_liquidity' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export POOL_MANAGER_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('poolManager',''))")
+          export TEAM_FACTORY_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
+          export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['mockUSDC'])")
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('stadiumHook',''))")
+          forge script script/SeedLiquidity.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY
 
       # ── Merge hook address into deployments.json ───────────────────────────
       - name: Merge hook-deployment.json into deployments.json
@@ -131,6 +151,24 @@ jobs:
           EOF
           fi
 
+      # ── Merge liquidity router address into deployments.json ───────────────
+      - name: Merge liquidity-deployment.json into deployments.json
+        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_liquidity') }}
+        run: |
+          if [ -f liquidity-deployment.json ] && [ -f deployments.json ]; then
+            python3 - <<'EOF'
+          import json
+          with open('deployments.json') as f:
+              d = json.load(f)
+          with open('liquidity-deployment.json') as f:
+              l = json.load(f)
+          d['stadiumLiquidityRouter'] = l.get('stadiumLiquidityRouter', '')
+          with open('deployments.json', 'w') as f:
+              json.dump(d, f, indent=2)
+          print("Merged stadiumLiquidityRouter into deployments.json")
+          EOF
+          fi
+
       # ── Commit deployment artifacts back to branch ─────────────────────────
       - name: Commit deployment artifacts
         if: always()
@@ -143,7 +181,7 @@ jobs:
             cp deployments.json frontend/src/config/deployments/xlayer.json
           fi
 
-          git add deployments.json hook-deployment.json v4-pools.json \
+          git add deployments.json hook-deployment.json liquidity-deployment.json v4-pools.json \
                   frontend/src/config/deployments/xlayer.json 2>/dev/null || true
           git diff --staged --quiet || git commit -m "chore: update deployment artifacts [${{ github.event.inputs.network }}]"
           git push
@@ -156,5 +194,7 @@ jobs:
           cat deployments.json 2>/dev/null || echo "deployments.json not found"
           echo ""
           cat hook-deployment.json 2>/dev/null || echo "hook-deployment.json not found"
+          echo ""
+          cat liquidity-deployment.json 2>/dev/null || echo "liquidity-deployment.json not found"
           echo ""
           cat v4-pools.json 2>/dev/null || echo "v4-pools.json not found"
