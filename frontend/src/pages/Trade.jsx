@@ -1,16 +1,51 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
 import {
   useTeamMomentum, useTeamEliminated, useTeamTotalDeposit,
-  useHookPaused, useHookFeeConfig, useFactoryTeamPoolId,
+  useHookPaused, useHookFeeConfig, useFactoryTeamPoolId, useFactoryTeamToken,
 } from '../hooks/useContracts'
+import {
+  StadiumRouter_ABI, MockUSDC_ABI, TeamToken_ABI, TeamFactory_ABI,
+} from '../abis/index.js'
+import { useToast } from '../components/Toast'
+import ShareButton from '../components/ShareButton'
 
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
-const STAGE_LABELS = ['Group Stage', 'Round of 32', 'Round of 16', 'Quarter Final', 'Semi Final', 'Final']
-const FEE_NAMES   = ['Group Stage', 'Knockout', 'Final']
+// V4 price limits (TickMath.MIN_SQRT_PRICE + 1 / MAX_SQRT_PRICE - 1)
+const MIN_SQRT_LIMIT = 4295128740n
+const MAX_SQRT_LIMIT = 1461446703485210103287273052203988822378723970341n
+
+// LPFeeLibrary.DYNAMIC_FEE_FLAG = 0x800000
+const DYNAMIC_FEE_FLAG = 0x800000
+const TICK_SPACING = 60
+
+const TOKEN_UNIT = 10n ** 18n  // team tokens: 18 decimals
+
+function formatToken(raw) {
+  if (!raw) return '0.00'
+  const whole = raw / TOKEN_UNIT
+  const frac  = raw % TOKEN_UNIT
+  const n = Number(whole) + Number(frac) / 1e18
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+
+function parseTokenAmount(str) {
+  if (!str) return 0n
+  const [whole, frac = ''] = str.split('.')
+  const fracPadded = frac.slice(0, 18).padEnd(18, '0')
+  return BigInt(whole || '0') * TOKEN_UNIT + BigInt(fracPadded)
+}
+
+function parseUSDCAmount(str) {
+  if (!str) return 0n
+  const [whole, frac = ''] = str.split('.')
+  const fracPadded = frac.slice(0, 6).padEnd(6, '0')
+  return BigInt(whole || '0') * 1_000_000n + BigInt(fracPadded)
+}
 
 export default function Trade() {
   const { isConnected } = useAccount()
@@ -124,10 +159,10 @@ function TeamPoolGrid({ onSelect, selectedId }) {
 }
 
 function TeamPoolRow({ team, selected, onClick }) {
-  const { data: momentum }  = useTeamMomentum(team.id)
+  const { data: momentum }   = useTeamMomentum(team.id)
   const { data: eliminated } = useTeamEliminated(team.id)
-  const { data: locked }    = useTeamTotalDeposit(team.id)
-  const { data: poolId }    = useFactoryTeamPoolId(team.id)
+  const { data: locked }     = useTeamTotalDeposit(team.id)
+  const { data: poolId }     = useFactoryTeamPoolId(team.id)
 
   const hasPool = poolId && poolId !== '0x0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -180,12 +215,8 @@ function SwapPanel({ teamId, isConnected }) {
   if (!team) {
     return (
       <div className="card text-center py-12">
-        <div className="text-stadium-muted text-sm font-mono">
-          Select a team to trade
-        </div>
-        <div className="text-stadium-border text-xs font-mono mt-2">
-          ← click any row
-        </div>
+        <div className="text-stadium-muted text-sm font-mono">Select a team to trade</div>
+        <div className="text-stadium-border text-xs font-mono mt-2">← click any row</div>
       </div>
     )
   }
@@ -217,15 +248,138 @@ function SwapPanel({ teamId, isConnected }) {
       )}
 
       {hasPool && !eliminated && (
-        <SwapForm team={team} isConnected={isConnected} poolId={poolId} />
+        <SwapForm team={team} isConnected={isConnected} />
       )}
     </div>
   )
 }
 
-function SwapForm({ team, isConnected, poolId }) {
-  const [amountIn, setAmountIn] = useState('')
-  const [direction, setDirection] = useState('buy')
+function SwapForm({ team, isConnected }) {
+  const { address } = useAccount()
+  const toast = useToast()
+
+  const [amountIn, setAmountIn]       = useState('')
+  const [direction, setDirection]     = useState('buy')  // 'buy' = USDC→token
+  const [swapDone, setSwapDone]       = useState(false)
+
+  const routerAddr    = ADDRESSES.stadiumRouter
+  const routerReady   = routerAddr !== ZERO_ADDR
+  const usdcAddr      = ADDRESSES.mockUSDC
+  const hookAddr      = ADDRESSES.stadiumHook
+
+  // Team token address from factory
+  const { data: teamTokenAddr } = useFactoryTeamToken(team.id)
+
+  // Determine sorted currency order (V4 requires currency0 < currency1 by address)
+  const usdcIsC0 = teamTokenAddr
+    ? usdcAddr.toLowerCase() < teamTokenAddr.toLowerCase()
+    : true
+  const currency0 = usdcIsC0 ? usdcAddr      : (teamTokenAddr ?? ZERO_ADDR)
+  const currency1 = usdcIsC0 ? (teamTokenAddr ?? ZERO_ADDR) : usdcAddr
+
+  // zeroForOne: are we sending currency0 to receive currency1?
+  const zeroForOne = direction === 'buy' ? usdcIsC0 : !usdcIsC0
+
+  // Which token the user is spending
+  const inputAddr     = direction === 'buy' ? usdcAddr : (teamTokenAddr ?? ZERO_ADDR)
+  const inputIsUSDC   = direction === 'buy'
+  const parsedAmount  = inputIsUSDC ? parseUSDCAmount(amountIn) : parseTokenAmount(amountIn)
+
+  // Balances
+  const { data: usdcBal,  refetch: refetchUSDC  } = useReadContract({
+    address: usdcAddr,
+    abi: MockUSDC_ABI,
+    functionName: 'balanceOf',
+    args: [address],
+    query: { enabled: !!address },
+  })
+  const { data: tokenBal, refetch: refetchToken } = useReadContract({
+    address: teamTokenAddr,
+    abi: TeamToken_ABI,
+    functionName: 'balanceOf',
+    args: [address],
+    query: { enabled: !!address && !!teamTokenAddr },
+  })
+
+  // Allowance of input token to router
+  const inputABI = inputIsUSDC ? MockUSDC_ABI : TeamToken_ABI
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: inputAddr,
+    abi: inputABI,
+    functionName: 'allowance',
+    args: [address, routerAddr],
+    query: { enabled: !!address && !!inputAddr && routerReady },
+  })
+
+  const needsApproval = routerReady && !!parsedAmount && parsedAmount > 0n && (allowance ?? 0n) < parsedAmount
+
+  // Approve
+  const { writeContract: writeApprove, data: approveTxHash, isPending: approvePending, error: approveError } = useWriteContract()
+  const { isLoading: approveConfirming, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash })
+
+  // Swap
+  const { writeContract: writeSwap, data: swapTxHash, isPending: swapPending, error: swapError } = useWriteContract()
+  const { isLoading: swapConfirming, isSuccess: swapSuccess } = useWaitForTransactionReceipt({ hash: swapTxHash })
+
+  useEffect(() => {
+    if (approveSuccess) {
+      refetchAllowance()
+      toast('Approval confirmed — ready to swap', 'success')
+    }
+  }, [approveSuccess])
+
+  useEffect(() => {
+    if (swapSuccess) {
+      refetchUSDC()
+      refetchToken()
+      setSwapDone(true)
+      toast(`Swap complete — ${team.flag} ${team.name}`, 'success')
+    }
+  }, [swapSuccess])
+
+  // Clear swapDone on direction / amount change
+  useEffect(() => { setSwapDone(false) }, [direction, amountIn])
+
+  const handleApprove = () => {
+    writeApprove({
+      address: inputAddr,
+      abi: inputABI,
+      functionName: 'approve',
+      args: [routerAddr, parsedAmount],
+    })
+  }
+
+  const handleSwap = () => {
+    if (!teamTokenAddr || !parsedAmount || parsedAmount === 0n) return
+
+    const poolKey = {
+      currency0,
+      currency1,
+      fee:         DYNAMIC_FEE_FLAG,
+      tickSpacing: TICK_SPACING,
+      hooks:       hookAddr,
+    }
+
+    const params = {
+      zeroForOne,
+      amountSpecified:   -parsedAmount,  // negative = exact-input
+      sqrtPriceLimitX96: zeroForOne ? MIN_SQRT_LIMIT : MAX_SQRT_LIMIT,
+    }
+
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200)  // 20 min
+
+    writeSwap({
+      address: routerAddr,
+      abi: StadiumRouter_ABI,
+      functionName: 'swap',
+      args: [poolKey, params, deadline],
+    })
+  }
+
+  const setMax = () => {
+    if (direction === 'buy' && usdcBal)  setAmountIn(formatUSDC(usdcBal))
+    if (direction === 'sell' && tokenBal) setAmountIn(formatToken(tokenBal))
+  }
 
   if (!isConnected) {
     return (
@@ -236,30 +390,135 @@ function SwapForm({ team, isConnected, poolId }) {
     )
   }
 
-  const shortPoolId = poolId ? `${poolId.slice(0, 6)}…${poolId.slice(-4)}` : '—'
+  if (!routerReady) {
+    return (
+      <div className="space-y-3">
+        <div className="bg-stadium-gold/10 border border-stadium-gold/30 p-4 text-xs font-mono text-stadium-gold space-y-2">
+          <div className="font-bold uppercase tracking-widest">Router Not Deployed</div>
+          <p className="text-stadium-muted leading-relaxed">
+            Deploy the StadiumRouter to enable on-chain V4 swaps:
+          </p>
+          <pre className="text-stadium-green text-[10px] leading-relaxed overflow-x-auto">
+{`POOL_MANAGER_ADDRESS=0x16d7342D...
+forge script script/DeployRouter.s.sol \\
+  --rpc-url $XLAYER_RPC_URL --broadcast
+
+# then add to frontend/.env:
+VITE_STADIUM_ROUTER_ADDRESS=0x...`}
+          </pre>
+        </div>
+        <SwapFormUI
+          team={team} direction={direction} setDirection={setDirection}
+          amountIn={amountIn} setAmountIn={setAmountIn}
+          inputIsUSDC={inputIsUSDC} usdcBal={usdcBal} tokenBal={tokenBal}
+          setMax={setMax} disabled={true}
+          currency0={currency0} currency1={currency1}
+        />
+      </div>
+    )
+  }
+
+  const busy = approvePending || approveConfirming || swapPending || swapConfirming
+  const canAct = !!parsedAmount && parsedAmount > 0n && !busy && !!teamTokenAddr
 
   return (
     <div className="space-y-3">
+      <SwapFormUI
+        team={team} direction={direction} setDirection={setDirection}
+        amountIn={amountIn} setAmountIn={setAmountIn}
+        inputIsUSDC={inputIsUSDC} usdcBal={usdcBal} tokenBal={tokenBal}
+        setMax={setMax} disabled={false}
+        currency0={currency0} currency1={currency1}
+      />
+
+      {/* Action button */}
+      {needsApproval ? (
+        <button
+          onClick={handleApprove}
+          disabled={!canAct}
+          className="btn-primary w-full py-3 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {approvePending ? '⏳ Confirm in wallet…' : approveConfirming ? '⏳ Approving…' : `Approve ${inputIsUSDC ? 'USDC' : team.name.split(' ')[0]}`}
+        </button>
+      ) : (
+        <button
+          onClick={handleSwap}
+          disabled={!canAct}
+          className="btn-primary w-full py-3 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {swapPending ? '⏳ Confirm in wallet…'
+            : swapConfirming ? '⏳ Swapping…'
+            : direction === 'buy'
+              ? `Buy ${team.name.split(' ')[0]} Token`
+              : `Sell ${team.name.split(' ')[0]} Token`}
+        </button>
+      )}
+
+      {/* Error feedback */}
+      {(approveError || swapError) && (
+        <div className="text-xs text-red-400 font-mono bg-red-500/10 border border-red-500/20 p-2">
+          {(approveError || swapError)?.shortMessage || 'Transaction failed'}
+        </div>
+      )}
+
+      {/* Success share */}
+      {swapDone && (
+        <div className="space-y-2">
+          <div className="text-xs text-stadium-green font-mono text-center uppercase tracking-widest">
+            Swap executed ✓
+          </div>
+          <div className="flex justify-center">
+            <ShareButton text={`Just swapped ${direction === 'buy' ? 'into' : 'out of'} ${team.flag} ${team.name} on 11° — the World Cup DeFi protocol powered by Uniswap V4!`} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Pure presentational sub-component for the form UI (shared between router-deployed and not)
+function SwapFormUI({ team, direction, setDirection, amountIn, setAmountIn,
+                      inputIsUSDC, usdcBal, tokenBal, setMax, disabled, currency0, currency1 }) {
+
+  const shortAddr = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—'
+  const balLabel  = inputIsUSDC ? 'USDC' : team.name.split(' ')[0]
+  const balance   = inputIsUSDC
+    ? (usdcBal !== undefined ? formatUSDC(usdcBal) : '—')
+    : (tokenBal !== undefined ? formatToken(tokenBal) : '—')
+
+  return (
+    <div className="space-y-3">
+      {/* Direction toggle */}
       <div className="flex gap-px bg-stadium-border">
         {['buy', 'sell'].map(d => (
           <button
             key={d}
-            onClick={() => setDirection(d)}
+            onClick={() => !disabled && setDirection(d)}
             className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
               direction === d
                 ? d === 'buy' ? 'bg-stadium-green text-stadium-dark' : 'bg-red-500 text-white'
                 : 'bg-stadium-card text-stadium-muted hover:text-stadium-text'
-            }`}
+            } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {d === 'buy' ? `Buy ${team.name.split(' ')[0]}` : `Sell ${team.name.split(' ')[0]}`}
           </button>
         ))}
       </div>
 
+      {/* Amount input */}
       <div>
-        <label className="text-xs text-stadium-muted font-mono uppercase tracking-widest block mb-1">
-          {direction === 'buy' ? 'USDC In' : 'Token In'}
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-stadium-muted font-mono uppercase tracking-widest">
+            {inputIsUSDC ? 'USDC Amount' : `${team.name.split(' ')[0]} Amount`}
+          </label>
+          <button
+            onClick={setMax}
+            disabled={disabled}
+            className="text-xs text-stadium-green font-mono hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Max: {balance} {balLabel}
+          </button>
+        </div>
         <input
           type="number"
           min="0"
@@ -267,37 +526,34 @@ function SwapForm({ team, isConnected, poolId }) {
           placeholder="0.00"
           value={amountIn}
           onChange={e => setAmountIn(e.target.value)}
-          className="w-full bg-stadium-dark border border-stadium-border text-stadium-text font-mono text-sm px-3 py-2 focus:outline-none focus:border-stadium-green"
+          disabled={disabled}
+          className="w-full bg-stadium-dark border border-stadium-border text-stadium-text font-mono text-sm px-3 py-2 focus:outline-none focus:border-stadium-green disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
 
+      {/* Pool info */}
       <div className="bg-stadium-dark border border-stadium-border p-3 text-xs font-mono space-y-1">
         <div className="flex justify-between text-stadium-muted">
-          <span>Pool</span>
-          <span className="text-stadium-text">{shortPoolId}</span>
+          <span>Currency 0</span>
+          <span className="text-stadium-text">{shortAddr(currency0)}</span>
+        </div>
+        <div className="flex justify-between text-stadium-muted">
+          <span>Currency 1</span>
+          <span className="text-stadium-text">{shortAddr(currency1)}</span>
         </div>
         <div className="flex justify-between text-stadium-muted">
           <span>Hook</span>
           <span className="text-stadium-green">StadiumHook</span>
         </div>
         <div className="flex justify-between text-stadium-muted">
-          <span>Fee (dynamic)</span>
-          <span className="text-stadium-text">varies by stage</span>
+          <span>Fee</span>
+          <span className="text-stadium-text">Dynamic (V4 hook)</span>
+        </div>
+        <div className="flex justify-between text-stadium-muted">
+          <span>Tick Spacing</span>
+          <span className="text-stadium-text">{TICK_SPACING}</span>
         </div>
       </div>
-
-      <button
-        disabled
-        className="btn-primary w-full py-3 text-sm opacity-60 cursor-not-allowed"
-        title="Direct V4 swap requires Uniswap Router integration"
-      >
-        Swap via Uniswap V4 ↗
-      </button>
-
-      <p className="text-xs text-stadium-muted font-mono text-center">
-        Swaps execute through the official Uniswap V4 router using the StadiumHook pool.
-        Full swap UI coming with mainnet deployment.
-      </p>
     </div>
   )
 }
