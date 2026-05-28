@@ -59,11 +59,11 @@ contract SeedLiquidity is Script {
 
         vm.startBroadcast(deployerKey);
 
-        // ── Deploy liquidity router ─────────────────────────────────────────
+        // ── Deploy liquidity router ───────────────────────────────────
         StadiumLiquidityRouter liqRouter = new StadiumLiquidityRouter(poolMgr);
         console.log("StadiumLiquidityRouter deployed at:", address(liqRouter));
 
-        // ── Mint USDC to deployer (testnet mint) ────────────────────────────
+        // ── Mint USDC to deployer (testnet mint) ────────────────────────
         // Mint enough for all pools; MockUSDC has mint(address,uint256).
         uint16[] memory ids = factory.getAllTeams();
         uint256 usdcNeeded  = 2_000_000e6; // 2M USDC total buffer
@@ -71,18 +71,25 @@ contract SeedLiquidity is Script {
         IERC20(usdcAddr).approve(address(liqRouter), type(uint256).max);
         console.log("Minted USDC and approved router");
 
-        // ── Seed each team pool ─────────────────────────────────────────────
+        // ── Seed each team pool ───────────────────────────────────
         uint256 seeded = 0;
         for (uint256 i = 0; i < ids.length; i++) {
             uint16  teamId = ids[i];
             address token  = factory.teamToken(teamId);
             if (token == address(0) || factory.teamPoolId(teamId) == bytes32(0)) continue;
 
-            // Transfer team tokens from factory to deployer (idempotent — skip if factory is empty)
+            // Try to get team tokens from factory. distributeToken may not exist in older
+            // deployments — catch the revert silently and continue with whatever balance
+            // the deployer already holds.
             uint256 factoryBal = IERC20(token).balanceOf(address(factory));
             if (factoryBal > 0) {
                 uint256 toDistribute = factoryBal < 1_000_000e18 ? factoryBal : 1_000_000e18;
-                factory.distributeToken(teamId, deployer, toDistribute);
+                (bool ok,) = address(factory).call(
+                    abi.encodeWithSignature("distributeToken(uint16,address,uint256)", teamId, deployer, toDistribute)
+                );
+                if (!ok) {
+                    console.log("distributeToken unavailable for team", teamId, "(older factory) — skipping");
+                }
             }
             IERC20(token).approve(address(liqRouter), type(uint256).max);
 
