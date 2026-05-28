@@ -46,11 +46,7 @@ jobs:
 
       - name: Read PoolManager address from deployments config
         run: |
-          POOL_MGR=$(python3 -c "
-          import json
-          d = json.load(open('frontend/src/config/deployments/xlayer.json'))
-          print(d['poolManager'])
-          ")
+          POOL_MGR=$(python3 -c "import json; print(json.load(open('frontend/src/config/deployments/xlayer.json'))['poolManager'])")
           echo "POOL_MANAGER_ADDRESS=$POOL_MGR" >> $GITHUB_ENV
           echo "PoolManager: $POOL_MGR"
 
@@ -65,18 +61,7 @@ jobs:
             2>&1 | tee deploy-router.log
 
           # Extract address from broadcast JSON (most reliable) or fall back to log grep
-          ROUTER=$(python3 -c "
-import json, glob, sys
-files = glob.glob('broadcast/DeployRouter.s.sol/*/run-latest.json')
-if not files:
-    sys.exit(1)
-d = json.load(open(files[0]))
-for tx in d.get('transactions', []):
-    if tx.get('transactionType') == 'CREATE':
-        print(tx['contractAddress'])
-        sys.exit(0)
-sys.exit(1)
-" 2>/dev/null) || \
+          ROUTER=$(python3 -c "import json,glob,sys; f=glob.glob('broadcast/DeployRouter.s.sol/*/run-latest.json'); d=json.load(open(f[0])) if f else sys.exit(1); addr=next((t['contractAddress'] for t in d.get('transactions',[]) if t.get('transactionType')=='CREATE'),None); print(addr) if addr else sys.exit(1)" 2>/dev/null) || \
           ROUTER=$(grep -oP 'StadiumRouter deployed at: \K0x[0-9a-fA-F]{40}' deploy-router.log | tail -1)
 
           if [ -z "$ROUTER" ]; then
