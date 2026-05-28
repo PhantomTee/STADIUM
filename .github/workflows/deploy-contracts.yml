@@ -24,6 +24,16 @@ on:
           - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
           - liquidity_only    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
           - seed_matches      # SeedMatches.s.sol only
+      force_redeploy:
+        description: "Force re-deploy even if deployments.json already has valid addresses"
+        required: false
+        default: "false"
+        type: boolean
+
+# Only one deploy job per network at a time — prevents wallet nonce collisions.
+concurrency:
+  group: deploy-contracts-${{ github.event.inputs.network }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -57,9 +67,23 @@ jobs:
             echo "RPC_URL=${{ secrets.XLAYER_TESTNET_RPC_URL }}" >> $GITHUB_ENV
           fi
 
+      # ── Check for existing deployment (skip redeploy unless forced) ───────────
+      - name: Check existing deployment
+        run: |
+          tf=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('teamFactory',''))" 2>/dev/null || echo "")
+          if [ -n "$tf" ] && [ "$tf" != "0x0000000000000000000000000000000000000000" ]; then
+            echo "SKIP_CORE_DEPLOY=true" >> $GITHUB_ENV
+            echo "Core contracts already deployed (teamFactory=$tf) — skipping unless force_redeploy=true"
+          fi
+          sh=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('stadiumHook',''))" 2>/dev/null || echo "")
+          if [ -n "$sh" ] && [ "$sh" != "0x0000000000000000000000000000000000000000" ]; then
+            echo "SKIP_HOOK_DEPLOY=true" >> $GITHUB_ENV
+            echo "StadiumHook already deployed ($sh) — skipping unless force_redeploy=true"
+          fi
+
       # ── Step: Deploy core contracts ────────────────────────────────────────
       - name: Deploy core contracts (Deploy.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'core_only' }}
+        if: ${{ (github.event.inputs.step == 'all' || github.event.inputs.step == 'core_only') && (env.SKIP_CORE_DEPLOY != 'true' || github.event.inputs.force_redeploy == 'true') }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
           TREASURY_ADDRESS: ${{ secrets.TREASURY_ADDRESS }}
@@ -72,7 +96,7 @@ jobs:
 
       # ── Step: Deploy StadiumHook (CREATE2 salt mining) ─────────────────────
       - name: Deploy StadiumHook (DeployHook.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only' }}
+        if: ${{ (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') && (env.SKIP_HOOK_DEPLOY != 'true' || github.event.inputs.force_redeploy == 'true') }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
           POOL_MANAGER_ADDRESS: ${{ secrets.POOL_MANAGER_ADDRESS }}
