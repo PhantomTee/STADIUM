@@ -9,6 +9,7 @@ import Portfolio from './pages/Portfolio'
 import Leaderboard from './pages/Leaderboard'
 import NFTs from './pages/NFTs'
 import LiveScores from './pages/LiveScores'
+import Activity from './pages/Activity'
 const Trade = lazy(() => import('./pages/Trade'))
 const Admin = lazy(() => import('./pages/Admin'))
 
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/nfts" element={<NFTs />} />
+        <Route path="/activity" element={<Activity />} />
         <Route path="/admin" element={<Lazy><Admin /></Lazy>} />
       </Routes>
     </Layout>

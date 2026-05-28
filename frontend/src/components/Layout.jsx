@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { path: '/trade',       label: 'Trade'       },
   { path: '/portfolio',   label: 'Portfolio'   },
   { path: '/leaderboard', label: 'Leaderboard' },
+  { path: '/activity',    label: 'Activity'    },
   { path: '/nfts',        label: 'NFTs'        },
   { path: '/admin',       label: 'Admin'       },
 ]

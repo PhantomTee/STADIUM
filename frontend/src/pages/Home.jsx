@@ -1,9 +1,64 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
+import { useReadContracts } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import StadiumHero from '../components/StadiumHero'
 import V4HookEngine from '../components/V4HookEngine'
+import { WORLD_CUP_TEAMS, ADDRESSES, formatUSDC } from '../utils/contracts'
+import { ConvictionVault_ABI, ChampionPool_ABI } from '../abis'
+import { useTotalAliveDeposits, useChampionPoolBalance } from '../hooks/useContracts'
+
+function LiveStats() {
+  const { data: totalAlive }   = useTotalAliveDeposits()
+  const { data: champPool }    = useChampionPoolBalance()
+
+  const { data: backerResults } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.map(t => ({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'backerCount',
+      args: [t.id],
+    })),
+    query: { refetchInterval: 30_000 },
+  })
+
+  const totalBackers = backerResults
+    ? backerResults.reduce((sum, r) => sum + Number(r?.result ?? 0n), 0)
+    : null
+
+  const { data: teamDepResults } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.map(t => ({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'teamTotalDeposit',
+      args: [t.id],
+    })),
+    query: { refetchInterval: 30_000 },
+  })
+
+  const totalCommitted = teamDepResults
+    ? teamDepResults.reduce((sum, r) => sum + (r?.result ?? 0n), 0n)
+    : null
+
+  const stats = [
+    { label: 'Total Locked',    value: totalAlive    != null ? `$${formatUSDC(totalAlive)}`    : '—', color: 'text-stadium-green' },
+    { label: 'All-Time Staked', value: totalCommitted != null ? `$${formatUSDC(totalCommitted)}` : '—', color: 'text-stadium-text' },
+    { label: 'Champion Pool',   value: champPool     != null ? `$${formatUSDC(champPool)}`     : '—', color: 'text-stadium-gold'  },
+    { label: 'Total Backers',   value: totalBackers  != null ? totalBackers.toString()          : '—', color: 'text-stadium-text' },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-stadium-border border border-stadium-border">
+      {stats.map(({ label, value, color }) => (
+        <div key={label} className="bg-stadium-dark px-6 py-5 text-center">
+          <div className={`text-2xl font-black font-mono tabular-nums ${color}`}>{value}</div>
+          <div className="text-[10px] text-stadium-muted uppercase tracking-widest font-mono mt-1">{label}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function Home() {
@@ -14,6 +69,11 @@ export default function Home() {
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <StadiumHero />
+
+      {/* ── Live Stats Strip ──────────────────────────────────────────────── */}
+      <div className="mt-8">
+        <LiveStats />
+      </div>
 
       <div className="space-y-24 mt-20">
 
