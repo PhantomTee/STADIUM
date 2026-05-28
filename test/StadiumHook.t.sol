@@ -364,6 +364,24 @@ contract StadiumHookTest is Test {
         hook.beforeAddLiquidity(address(this), baseKey, params, "");
     }
 
+    // ── Test 11a: beforeAddLiquidity succeeds on registered, active pool ────
+    //    Proves a pool can be seeded with liquidity through the hook.
+
+    function test_BeforeAddLiquidity_Succeeds() public {
+        _registerPool(TEAM_ARG);
+
+        IPoolManager.ModifyLiquidityParams memory params = IPoolManager.ModifyLiquidityParams({
+            tickLower:      -887220,
+            tickUpper:       887220,
+            liquidityDelta:  1e24,
+            salt:            bytes32(0)
+        });
+
+        vm.prank(poolManager);
+        bytes4 selector = hook.beforeAddLiquidity(address(this), baseKey, params, "");
+        assertEq(selector, StadiumHook.beforeAddLiquidity.selector, "beforeAddLiquidity must return correct selector");
+    }
+
     // ── Test 11b: afterSwap uses USDC side correctly when USDC is currency1 ──
 
     function test_AfterSwap_UsesUsdcCurrency1ForVolume() public {

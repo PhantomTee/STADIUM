@@ -84,23 +84,11 @@ jobs:
             --broadcast \
             --private-key $PRIVATE_KEY
 
-      # ── Step: Register teams + create V4 pools ─────────────────────────────
-      - name: Create V4 pools (CreatePools.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'pools_only' }}
-        env:
-          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
-        run: |
-          export TEAM_FACTORY_ADDRESS=$(python3 -c "import sys,json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
-          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json; d=json.load(open('hook-deployment.json')); print(d['stadiumHook'])")
-          forge script script/CreatePools.s.sol \
-            --rpc-url $RPC_URL \
-            --broadcast \
-            --private-key $PRIVATE_KEY
-
-      # ── Step: Seed teams + matches via oracle ──────────────────────────────
-      # Runs in "all" AND "seed_teams" so ConvictionVault/MatchOracle teams are
-      # always registered before pools are created and deposits are attempted.
-      - name: Seed teams and matches
+      # ── Step: Seed MatchOracle + ConvictionVault teams (must run before CreatePools) ──
+      # Teams must be registered in MatchOracle/ConvictionVault before users can
+      # depositConviction(). Running this before CreatePools ensures correct ordering
+      # in a full "all" deployment.
+      - name: Seed teams (SeedTeams.s.sol)
         if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_teams' }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
@@ -110,14 +98,29 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --private-key $PRIVATE_KEY
-          forge script script/SeedMatches.s.sol \
+
+      # ── Step: Register teams + create V4 pools ─────────────────────────────
+      - name: Create V4 pools (CreatePools.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'pools_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export TEAM_FACTORY_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "
+import json, os
+if os.path.exists('hook-deployment.json'):
+    addr = json.load(open('hook-deployment.json')).get('stadiumHook', '')
+else:
+    addr = json.load(open('deployments.json')).get('stadiumHook', '')
+print(addr)
+")
+          forge script script/CreatePools.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed initial liquidity into V4 pools ───────────────────────────
-      # Runs in "all" AND "seed_liquidity". Deploys StadiumLiquidityRouter and
-      # seeds each team pool so swaps are possible from day one.
+      # Deploys StadiumLiquidityRouter and seeds each team pool so swaps work.
       - name: Seed liquidity (SeedLiquidity.s.sol)
         if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_liquidity' }}
         env:
@@ -128,6 +131,18 @@ jobs:
           export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['mockUSDC'])")
           export STADIUM_HOOK_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('stadiumHook',''))")
           forge script script/SeedLiquidity.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Seed match fixtures ─────────────────────────────────────────
+      - name: Seed matches (SeedMatches.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_teams' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export MATCH_ORACLE_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['matchOracle'])")
+          forge script script/SeedMatches.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
             --private-key $PRIVATE_KEY
