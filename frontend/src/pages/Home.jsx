@@ -4,7 +4,6 @@ import { useAccount } from 'wagmi'
 import { useReadContracts } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import StadiumHero from '../components/StadiumHero'
-import V4HookEngine from '../components/V4HookEngine'
 import { WORLD_CUP_TEAMS, ADDRESSES, formatUSDC } from '../utils/contracts'
 import { ConvictionVault_ABI, ChampionPool_ABI } from '../abis'
 import { useTotalAliveDeposits, useChampionPoolBalance } from '../hooks/useContracts'
@@ -179,9 +178,6 @@ export default function Home() {
             ))}
           </div>
         </section>
-
-        {/* ── V4 Hook Engine ────────────────────────────────────────────── */}
-        <V4HookEngine />
 
         {/* ── Survivor Yield Formula ────────────────────────────────────── */}
         <section className="grid md:grid-cols-2 gap-12 items-start">

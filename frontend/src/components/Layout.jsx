@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { path: '/portfolio',   label: 'Portfolio'   },
   { path: '/leaderboard', label: 'Leaderboard' },
   { path: '/activity',    label: 'Activity'    },
+  { path: '/about',       label: 'About'       },
   { path: '/nfts',        label: 'NFTs'        },
   { path: '/admin',       label: 'Admin'       },
 ]

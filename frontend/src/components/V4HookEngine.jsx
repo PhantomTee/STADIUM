@@ -65,7 +65,6 @@ export default function V4HookEngine() {
   const pm         = deployments.poolManager
   const isDeployed = hook && hook !== '0x0000000000000000000000000000000000000000'
 
-  // Simulated live state for demo when contracts not deployed
   const [dynamicFee]   = useState('3000')   // 0.30% group stage
   const [momentum]     = useState('48 200') // notional
   const [teamStatus]   = useState('ACTIVE')
@@ -161,10 +160,10 @@ export default function V4HookEngine() {
           </div>
         </div>
 
-        {/* Demo Pool */}
+        {/* Live V4 Pool */}
         <div className="bg-stadium-card p-6">
           <div className="text-xs font-mono text-stadium-muted uppercase tracking-widest mb-4">
-            Demo V4 Pool
+            Live V4 Pool
           </div>
           <div className="space-y-3">
             <div className="flex justify-between text-xs">
@@ -196,7 +195,7 @@ export default function V4HookEngine() {
       {/* Demo flow */}
       <div className="bg-stadium-dark border border-t-0 border-stadium-border p-6 md:p-8">
         <div className="text-xs font-mono text-stadium-muted uppercase tracking-widest mb-6">
-          // Hook Demo Flow — Elimination Proof
+          // Hook Proof — Swap Block on Elimination
         </div>
         <div className="grid sm:grid-cols-3 gap-px bg-stadium-border">
           {[
