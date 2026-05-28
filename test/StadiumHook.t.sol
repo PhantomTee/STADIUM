@@ -182,7 +182,7 @@ contract StadiumHookTest is Test {
 
     // ─────────────────────────────── Tests ───────────────────────────────
 
-    // ── Test 1: Owner can register a pool ─────────────────────────────────
+    // ── Test 1: Owner can register a pool ───────────────────────────────
 
     function test_RegisterPool() public {
         _registerPool(TEAM_ARG);
@@ -203,7 +203,7 @@ contract StadiumHookTest is Test {
         assertEq(hook.teamPoolId(TEAM_ARG), basePoolId);
     }
 
-    // ── Test 2: Non-owner cannot register a pool ──────────────────────────
+    // ── Test 2: Non-owner cannot register a pool ─────────────────────────
 
     function test_RegisterPool_NonOwner_Reverts() public {
         vm.prank(makeAddr("random"));
@@ -222,7 +222,7 @@ contract StadiumHookTest is Test {
         hook.beforeSwap(address(this), baseKey, params, "");
     }
 
-    // ── Test 4: Eliminated team swap reverts ──────────────────────────────
+    // ── Test 4: Eliminated team swap reverts ────────────────────────────
 
     function test_EliminatedTeam_SwapReverts() public {
         _registerPool(TEAM_ARG);
@@ -235,7 +235,7 @@ contract StadiumHookTest is Test {
         hook.beforeSwap(address(this), baseKey, params, "");
     }
 
-    // ── Test 5: Paused hook rejects all swaps ─────────────────────────────
+    // ── Test 5: Paused hook rejects all swaps ───────────────────────────
 
     function test_PauseBlocksSwaps() public {
         _registerPool(TEAM_ARG);
@@ -250,7 +250,7 @@ contract StadiumHookTest is Test {
         hook.beforeSwap(address(this), baseKey, params, "");
     }
 
-    // ── Test 6: Unpause allows swaps again ────────────────────────────────
+    // ── Test 6: Unpause allows swaps again ────────────────────────────
 
     function test_UnpauseAllowsSwaps() public {
         _registerPool(TEAM_ARG);
@@ -267,7 +267,7 @@ contract StadiumHookTest is Test {
         assertEq(selector, StadiumHook.beforeSwap.selector);
     }
 
-    // ── Test 7: Successful beforeSwap returns correct selector ────────────
+    // ── Test 7: Successful beforeSwap returns correct selector ─────────────
 
     function test_BeforeSwap_ReturnsSelector() public {
         _registerPool(TEAM_ARG);
@@ -301,7 +301,7 @@ contract StadiumHookTest is Test {
         assertEq(fee, 2500, "Conviction holder should get discounted fee");
     }
 
-    // ── Test 9: Momentum updates on swap ──────────────────────────────────
+    // ── Test 9: Momentum updates on swap ───────────────────────────────
 
     function test_MomentumUpdatesOnSwap() public {
         _registerPool(TEAM_ARG);
@@ -346,7 +346,7 @@ contract StadiumHookTest is Test {
         assertGt(feeRouted, 0, "Notional fee accumulator should increase after swap");
     }
 
-    // ── Test 11: beforeAddLiquidity reverts for eliminated team ───────────
+    // ── Test 11: beforeAddLiquidity reverts for eliminated team ─────────────
 
     function test_BeforeAddLiquidity_EliminatedTeam_Reverts() public {
         _registerPool(TEAM_ARG);
@@ -441,7 +441,7 @@ contract StadiumHookTest is Test {
         hook.registerPool(badKey, TEAM_ARG);
     }
 
-    // ── Test 12: Registered pool returns correct pool state ───────────────
+    // ── Test 12: Registered pool returns correct pool state ─────────────────
 
     function test_RegisterPool_AlreadyRegistered_Reverts() public {
         _registerPool(TEAM_ARG);
@@ -451,7 +451,7 @@ contract StadiumHookTest is Test {
         hook.registerPool(baseKey, TEAM_FRA);
     }
 
-    // ── Test 13: protocolFeeBps enforcement ───────────────────────────────
+    // ── Test 13: protocolFeeBps enforcement ─────────────────────────────
 
     function test_ProtocolFeeBps_TooHigh_Reverts() public {
         vm.prank(owner);
@@ -459,7 +459,7 @@ contract StadiumHookTest is Test {
         hook.setProtocolFeeBps(1001); // > 1000 = > 10%
     }
 
-    // ── Test 14: FeeConfig can be updated ─────────────────────────────────
+    // ── Test 14: FeeConfig can be updated ──────────────────────────────
 
     function test_SetFeeConfig() public {
         StadiumHook.FeeConfig memory cfg = StadiumHook.FeeConfig({

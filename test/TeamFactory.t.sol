@@ -62,7 +62,7 @@ contract TeamFactoryTest is Test {
         assertTrue(factory.teamPoolId(TEAM_BRA) != bytes32(0), "Pool ID must be set");
     }
 
-    // ── Test 3: setHook can be called by owner only ──────────────────────
+    // ── Test 3: setHook can be called by owner only ─────────────────────
 
     function test_SetHook_NonOwner_Reverts() public {
         vm.prank(makeAddr("random"));
