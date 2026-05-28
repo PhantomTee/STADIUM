@@ -107,14 +107,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
           export TEAM_FACTORY_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
-          export STADIUM_HOOK_ADDRESS=$(python3 -c "
-import json, os
-if os.path.exists('hook-deployment.json'):
-    addr = json.load(open('hook-deployment.json')).get('stadiumHook', '')
-else:
-    addr = json.load(open('deployments.json')).get('stadiumHook', '')
-print(addr)
-")
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json,os; f='hook-deployment.json'; print(json.load(open(f)).get('stadiumHook','') if os.path.exists(f) else json.load(open('deployments.json')).get('stadiumHook',''))")
           forge script script/CreatePools.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
@@ -132,14 +125,7 @@ print(addr)
           export POOL_MANAGER_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('poolManager',''))")
           export TEAM_FACTORY_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
           export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['mockUSDC'])")
-          export STADIUM_HOOK_ADDRESS=$(python3 -c "
-import json, os
-if os.path.exists('hook-deployment.json'):
-    addr = json.load(open('hook-deployment.json')).get('stadiumHook', '')
-else:
-    addr = json.load(open('deployments.json')).get('stadiumHook', '')
-print(addr)
-")
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json,os; f='hook-deployment.json'; print(json.load(open(f)).get('stadiumHook','') if os.path.exists(f) else json.load(open('deployments.json')).get('stadiumHook',''))")
           forge script script/SeedLiquidity.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
