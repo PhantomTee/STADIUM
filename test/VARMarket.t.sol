@@ -235,6 +235,38 @@ contract VARMarketTest is Test {
     }
 }
 
+    // ── Test 9: No-winner settlement routes toWinnersPool to championPool ────
+
+    function test_NoWinner_FundsRoutedToChampPool() public {
+        // Only bob bets; outcome B loses — nobody bets on outcome A (the winner)
+        vm.prank(bob);
+        varMarket.placeBet(MATCH_ID, MARKET_WIN, OUTCOME_B, 200e6);
+
+        vm.prank(oracle); varMarket.closeMarkets(MATCH_ID);
+
+        uint256 champBefore = usdc.balanceOf(championPool);
+        vm.prank(oracle);
+        varMarket.settleMarket(MATCH_ID, MARKET_WIN, OUTCOME_A);
+
+        // losingPool = 200e6 (all on OUTCOME_B, which lost)
+        // loserRefund = 20e6, remaining = 180e6
+        // toWinnersPool = 90e6, toChamp = 45e6, toTreasury = 45e6
+        // Nobody bet on OUTCOME_A → toWinnersPool redirected to championPool
+        uint256 champGain = usdc.balanceOf(championPool) - champBefore;
+        // champGain = normal toChampPool (45e6) + redirected toWinnersPool (90e6) = 135e6
+        assertEq(champGain, 135e6, "No-winner toWinnersPool must flow to championPool");
+
+        // The stored toWinnersPool must be 0 (no claimable winners pool)
+        VARMarket.MarketState memory m = varMarket.getMarket(MATCH_ID, MARKET_WIN);
+        assertEq(m.toWinnersPool, 0, "toWinnersPool must be 0 after no-winner redirect");
+
+        // Bob (loser) still gets 10% refund
+        uint256 bobBefore = usdc.balanceOf(bob);
+        vm.prank(bob); varMarket.claimPayout(MATCH_ID, MARKET_WIN);
+        assertApproxEqAbs(usdc.balanceOf(bob) - bobBefore, 20e6, 1, "Bob still gets 10% refund");
+    }
+}
+
 /// @notice Minimal mock for IConvictionVault (two-team signature).
 contract MockConvictionVault {
     // mapping: user => teamA => teamB => multiplier

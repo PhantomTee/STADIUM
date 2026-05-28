@@ -285,6 +285,7 @@ contract ConvictionVault is ReentrancyGuard, Ownable {
         rewardDebt[msg.sender][teamId] = deposits[msg.sender][teamId] * accYieldPerShare / 1e18;
         if (deposits[msg.sender][teamId] == 0) {
             backerCount[teamId]--;
+            userHasTeam[msg.sender][teamId] = false;
         }
         usdc.safeTransfer(msg.sender, amount);
         emit ConvictionWithdrawn(msg.sender, teamId, amount);

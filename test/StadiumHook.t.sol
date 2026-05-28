@@ -144,6 +144,7 @@ contract StadiumHookTest is Test {
         hook.setChampionPool(address(champPool));
         hook.setConvictionVault(address(convVault));
         hook.setTreasury(address(usdc)); // just an address for treasury
+        hook.setUsdc(address(usdc));
         hook.setProtocolFeeBps(30);
         vm.stopPrank();
 
@@ -322,28 +323,27 @@ contract StadiumHookTest is Test {
         assertGt(momentumAfter, momentumBefore, "Momentum should increase after swap");
     }
 
-    // ── Test 10: afterSwap calls recordFor on champion pool ───────────────
+    // ── Test 10: afterSwap increments the notional feeRoutedToChampPool accumulator ──
+    //    No real USDC leaves the hook — ChampionPool is funded by ConvictionVault, not here.
 
-    function test_AfterSwap_RoutesFeeToChampPool() public {
+    function test_AfterSwap_UpdatesNotionalFeeAccumulator() public {
         _registerPool(TEAM_ARG);
 
-        // protocolFeeBps = 30 (0.3%)
-        // abs(amount0) = 1000e6 → fee = 1000e6 * 30 / 10000 = 3e6
-        // BalanceDelta layout: high 128 bits = amount0, low 128 bits = amount1
+        // BalanceDelta: amount0 = -1000e6, amount1 = +500e6
         int256 packed2 = (int256(int128(-1000e6)) << 128) | int256(int128(500e6));
         BalanceDelta delta = BalanceDelta.wrap(packed2);
 
         IPoolManager.SwapParams memory params = _makeSwapParams(true);
 
-        uint256 callsBefore = champPool.callCount();
-
         vm.prank(poolManager);
         hook.afterSwap(address(this), baseKey, params, delta, "");
 
-        // recordFor should have been called once
-        assertEq(champPool.callCount(), callsBefore + 1, "recordFor should be called once");
-        assertEq(champPool.lastSource(), "hook",         "Source should be 'hook'");
-        assertGt(champPool.lastAmount(), 0,              "Fee amount should be > 0");
+        // No call to championPool — fee is notional only
+        assertEq(champPool.callCount(), 0, "ChampionPool must NOT be called from hook afterSwap");
+
+        // feeRoutedToChampPool accumulator must increase
+        (,,,, uint256 feeRouted) = hook.poolState(basePoolId);
+        assertGt(feeRouted, 0, "Notional fee accumulator should increase after swap");
     }
 
     // ── Test 11: beforeAddLiquidity reverts for eliminated team ───────────
@@ -362,6 +362,44 @@ contract StadiumHookTest is Test {
         vm.prank(poolManager);
         vm.expectRevert(StadiumHook.TeamEliminated.selector);
         hook.beforeAddLiquidity(address(this), baseKey, params, "");
+    }
+
+    // ── Test 11b: afterSwap uses USDC side correctly when USDC is currency1 ──
+
+    function test_AfterSwap_UsesUsdcCurrency1ForVolume() public {
+        // Build a key where teamToken < usdc (i.e. usdc is currency1)
+        address teamToken = address(0x1); // tiny address → teamToken is currency0
+        // usdc address is larger, so currency0 = teamToken, currency1 = usdc
+        PoolKey memory key1 = PoolKey({
+            currency0:   Currency.wrap(teamToken),
+            currency1:   Currency.wrap(address(usdc)),
+            fee:         LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: 60,
+            hooks:       IHooks(address(hook))
+        });
+
+        vm.prank(owner);
+        hook.registerPool(key1, TEAM_FRA);
+
+        // amount0 = +999e6 (team tokens received by PM), amount1 = -500e6 (USDC paid by PM)
+        // USDC is currency1 → hook should use abs(amount1) = 500e6 for volume.
+        // Must mask amount1 to prevent sign-extension from corrupting the high 128 bits.
+        int256 packed = (int256(int128(999e6)) << 128) | int256(uint128(int128(-500e6)));
+        BalanceDelta delta = BalanceDelta.wrap(packed);
+
+        IPoolManager.SwapParams memory p = IPoolManager.SwapParams({
+            zeroForOne: false,
+            amountSpecified: -500e6,
+            sqrtPriceLimitX96: 1461446703485210103287273052203988822378723970341
+        });
+
+        vm.prank(poolManager);
+        hook.afterSwap(address(this), key1, p, delta, "");
+
+        bytes32 pid1 = PoolId.unwrap(key1.toId());
+        (,,, uint256 vol,) = hook.poolState(pid1);
+        assertEq(vol, 500e6, "Volume should reflect USDC (currency1) side");
+        assertEq(hook.teamMomentum(TEAM_FRA), 500e6, "Momentum should use USDC side");
     }
 
     // ── Test 12: Registered pool returns correct pool state ───────────────

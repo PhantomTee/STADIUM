@@ -78,8 +78,12 @@ contract SeedLiquidity is Script {
             address token  = factory.teamToken(teamId);
             if (token == address(0) || factory.teamPoolId(teamId) == bytes32(0)) continue;
 
-            // Transfer team tokens from factory to deployer
-            factory.distributeToken(teamId, deployer, 1_000_000e18);
+            // Transfer team tokens from factory to deployer (idempotent — skip if factory is empty)
+            uint256 factoryBal = IERC20(token).balanceOf(address(factory));
+            if (factoryBal > 0) {
+                uint256 toDistribute = factoryBal < 1_000_000e18 ? factoryBal : 1_000_000e18;
+                factory.distributeToken(teamId, deployer, toDistribute);
+            }
             IERC20(token).approve(address(liqRouter), type(uint256).max);
 
             (Currency c0, Currency c1) = usdcAddr < token

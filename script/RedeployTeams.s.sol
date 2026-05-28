@@ -91,11 +91,8 @@ contract RedeployTeams is Script {
                 hooks:       IHooks(hookAddr)
             });
 
-            try hook.registerPool(key, teamId) {
-                poolsCreated++;
-            } catch {
-                console.log("Hook registerPool failed for team", teamId);
-            }
+            hook.registerPool(key, teamId);
+            poolsCreated++;
         }
 
         vm.stopBroadcast();

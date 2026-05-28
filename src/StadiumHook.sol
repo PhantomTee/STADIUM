@@ -5,6 +5,7 @@ import {BaseHook} from "./vendor/BaseHook.sol";
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/types/PoolId.sol";
+import {Currency} from "@uniswap/v4-core/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/types/BeforeSwapDelta.sol";
 import {Hooks} from "@uniswap/v4-core/libraries/Hooks.sol";
@@ -80,6 +81,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     address public championPool;
     address public convictionVault;
     address public treasury;
+    address public usdc;
 
     uint24 public protocolFeeBps; // basis points of swap volume routed to champion pool (max 1000)
     FeeConfig public feeConfig;
@@ -151,6 +153,11 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert ZeroAddress();
         treasury = _treasury;
+    }
+
+    function setUsdc(address _usdc) external onlyOwner {
+        if (_usdc == address(0)) revert ZeroAddress();
+        usdc = _usdc;
     }
 
     function setProtocolFeeBps(uint24 _feeBps) external onlyOwner {
@@ -247,17 +254,18 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
             return (BaseHook.afterSwap.selector, 0);
         }
 
-        // Compute absolute volume from delta (use amount0 as USDC proxy)
+        // Compute USDC volume: use whichever currency is USDC; fallback to currency0 if unset.
         int256 amt0 = delta.amount0();
         int256 amt1 = delta.amount1();
-        uint256 absVol = amt0 < 0 ? uint256(-amt0) : uint256(amt0);
+        int256 usdcAmt = (usdc != address(0) && Currency.unwrap(key.currency1) == usdc) ? amt1 : amt0;
+        uint256 absVol = usdcAmt < 0 ? uint256(-usdcAmt) : uint256(usdcAmt);
 
         // Update momentum and volume
         ps.totalVolumeUSDC += absVol;
         teamMomentum[ps.teamId] += absVol;
 
-        // Notional protocol fee — accumulates for display; actual ChampionPool funding
-        // comes from ConvictionVault.settleElimination() which transfers real USDC.
+        // Notional fee accumulator — display only; NO real USDC transfer from the hook.
+        // ChampionPool is funded by ConvictionVault.settleElimination(), not here.
         if (protocolFeeBps > 0) {
             uint256 fee = absVol * protocolFeeBps / 10000;
             if (fee > 0) {

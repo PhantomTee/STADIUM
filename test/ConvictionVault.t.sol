@@ -321,10 +321,10 @@ contract ConvictionVaultTest is Test {
         vm.prank(alice);
         vault.claimChampionPosition(TEAM_A);
 
-        // Second claim via original function should revert
+        // Second claim should revert
         vm.prank(alice);
         vm.expectRevert();
-        vault.claimChampionPrincipal(TEAM_A);
+        vault.claimChampionPosition(TEAM_A);
     }
 
     // ── Test 16: Deposit blocked after conviction close time ─────────────────
@@ -373,5 +373,28 @@ contract ConvictionVaultTest is Test {
         vault.withdrawConviction(TEAM_A, 100e6);
         assertEq(vault.backerCount(TEAM_A), 0);
         assertEq(vault.deposits(alice, TEAM_A), 0);
+    }
+
+    // ── Test 20: Withdraw-to-zero + re-deposit correctly re-increments backerCount ──
+
+    function test_ReDepositAfterFullWithdraw_IncrementsBackerCount() public {
+        vault.setConvictionCloseTime(block.timestamp + 2 hours);
+
+        // First deposit
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 100e6);
+        assertEq(vault.backerCount(TEAM_A), 1);
+
+        // Full withdraw — backerCount must drop to 0 and userHasTeam reset
+        vm.prank(alice);
+        vault.withdrawConviction(TEAM_A, 100e6);
+        assertEq(vault.backerCount(TEAM_A), 0);
+        assertFalse(vault.userHasTeam(alice, TEAM_A), "userHasTeam must be false after full withdraw");
+
+        // Re-deposit — backerCount must rise back to 1
+        usdc.mint(alice, 50e6);
+        vm.prank(alice);
+        vault.depositConviction(TEAM_A, 50e6);
+        assertEq(vault.backerCount(TEAM_A), 1, "Re-deposit must re-increment backerCount");
     }
 }

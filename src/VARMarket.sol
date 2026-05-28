@@ -105,6 +105,8 @@ contract VARMarket is ReentrancyGuard {
     event PayoutClaimed(address indexed user, uint256 indexed matchId, uint8 marketType, uint256 payout);
     // Backwards-compat alias
     event VARClaimed(address indexed user, uint256 indexed matchId, uint8 marketType, uint256 payout);
+    /// @notice Emitted when toWinnersPool is redirected because nobody bet on the winning outcome.
+    event NoWinnerFundsRouted(uint256 indexed matchId, uint8 marketType, uint256 amount);
 
     // ─────────────────────────────── Modifiers ───────────────────────────────
 
@@ -222,6 +224,14 @@ contract VARMarket is ReentrancyGuard {
 
         // totalWeightedWinning was pre-computed incrementally in placeBet — no loop needed
         uint256 totalWeighted = totalWeightedPerOutcome[matchId][marketType][correctOutcome];
+
+        // If nobody bet on the winning outcome toWinnersPool cannot be claimed; route to championPool.
+        if (totalWeighted == 0 && toWinnersPool > 0) {
+            usdc.safeTransfer(championPool, toWinnersPool);
+            IChampionPoolVAR(championPool).recordDeposit(toWinnersPool);
+            emit NoWinnerFundsRouted(matchId, marketType, toWinnersPool);
+            toWinnersPool = 0;
+        }
 
         // Store settled state for pull-based claims
         m.toWinnersPool        = toWinnersPool;
