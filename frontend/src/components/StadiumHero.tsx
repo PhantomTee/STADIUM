@@ -77,13 +77,13 @@ export default function StadiumHero() {
         <h1
           style={{
             fontFamily: "'Anton', sans-serif",
-            fontSize: 'clamp(52px, max(10vw, 7.5vh), 148px)',
+            fontSize: 'clamp(52px, min(10vw, 11.5vh), 120px)',
             lineHeight: 0.9,
             letterSpacing: '-0.025em',
             color: cText,
             textTransform: 'uppercase',
             margin: 0,
-            marginBottom: 'clamp(22px, 4vh, 44px)',
+            marginBottom: 'clamp(16px, 3vh, 40px)',
           }}
         >
           Back Your<br />
