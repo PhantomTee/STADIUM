@@ -17,7 +17,7 @@ The entire protocol is orchestrated through a **Uniswap V4 Hook** as its core on
 
 | | |
 |---|---|
-| **Frontend** | [11deg.vercel.app](https://11deg.vercel.app) *(or your deployed URL)* |
+| **Frontend** | [e11even-men.vercel.app](https://e11even-men.vercel.app) |
 | **Network** | X Layer Testnet — Chain ID `1952` |
 | **Explorer** | [web3.okx.com/explorer/xlayer-test](https://web3.okx.com/explorer/xlayer-test) |
 
