@@ -86,9 +86,11 @@ contract StadiumRouter {
         return abi.encode(delta);
     }
 
-    /// @dev Transfer ERC20 from payer to PoolManager, then record the deposit via settle().
+    /// @dev V4 settle pattern: sync → transfer → settle() (no-arg form in v4.0.0).
+    ///      sync() snapshots the current balance so settle() can compute the delta.
     function _settle(Currency currency, address from, uint128 amount) internal {
+        manager.sync(currency);
         IERC20(Currency.unwrap(currency)).safeTransferFrom(from, address(manager), amount);
-        manager.settle(currency);
+        manager.settle();
     }
 }
