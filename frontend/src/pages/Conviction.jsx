@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import ShareButton from '../components/ShareButton'
+import { useToast } from '../components/Toast'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS, formatUSDC, parseUSDC } from '../utils/contracts'
@@ -37,15 +38,24 @@ export default function Conviction() {
   const { address, isConnected } = useAccount()
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [filterGroup, setFilterGroup]   = useState('ALL')
+  const toast = useToast()
 
-  const { data: usdcBalance } = useUSDCBalance(address)
+  const { data: usdcBalance, refetch: refetchBalance } = useUSDCBalance(address)
   const { data: totalAlive }  = useTotalAliveDeposits()
   const { data: closeTime }      = useConvictionCloseTime()
-  const { data: lastFaucetTime } = useFaucetCooldown(address)
+  const { data: lastFaucetTime, refetch: refetchCooldown } = useFaucetCooldown(address)
 
   // Faucet has its own isolated write hook so it never bleeds into DepositForm
   const { writeContract: writeFaucet, data: faucetHash } = useWriteContract()
   const { isLoading: faucetPending, isSuccess: faucetSuccess } = useWaitForTransactionReceipt({ hash: faucetHash })
+
+  useEffect(() => {
+    if (faucetSuccess) {
+      refetchBalance()
+      refetchCooldown()
+      toast('1,000 USDC claimed successfully')
+    }
+  }, [faucetSuccess])
 
   const [nowSec, setNowSec] = useState(() => BigInt(Math.floor(Date.now() / 1000)))
   useEffect(() => {
@@ -97,10 +107,10 @@ export default function Conviction() {
             <button
               onClick={handleFaucet}
               disabled={faucetPending || !faucetReady}
-              className="btn-secondary text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-secondary text-xs py-1.5 px-4 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {faucetPending  ? 'Claiming…'
-               : !faucetReady ? `Cooldown ${faucetCooldownLabel}`
+              {faucetPending  ? '🚫 Claiming…'
+               : !faucetReady ? `⏳ Cooldown ${faucetCooldownLabel}`
                : 'Claim 1,000 USDC'}
             </button>
           </div>

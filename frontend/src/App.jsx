@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import OnboardingModal from './components/OnboardingModal'
+import { ToastProvider } from './components/Toast'
 import Home from './pages/Home'
 import Conviction from './pages/Conviction'
 import VAR from './pages/VAR'
@@ -22,21 +23,23 @@ const Lazy = ({ children }) => (
 
 export default function App() {
   return (
-    <Layout>
-      <OnboardingModal />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/scores" element={<LiveScores />} />
-        <Route path="/conviction" element={<Conviction />} />
-        <Route path="/var" element={<VAR />} />
-        <Route path="/trade" element={<Lazy><Trade /></Lazy>} />
-        <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/nfts" element={<NFTs />} />
-        <Route path="/activity" element={<Activity />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/admin" element={<Lazy><Admin /></Lazy>} />
-      </Routes>
-    </Layout>
+    <ToastProvider>
+      <Layout>
+        <OnboardingModal />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/scores" element={<LiveScores />} />
+          <Route path="/conviction" element={<Conviction />} />
+          <Route path="/var" element={<VAR />} />
+          <Route path="/trade" element={<Lazy><Trade /></Lazy>} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/nfts" element={<NFTs />} />
+          <Route path="/activity" element={<Activity />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/admin" element={<Lazy><Admin /></Lazy>} />
+        </Routes>
+      </Layout>
+    </ToastProvider>
   )
 }
