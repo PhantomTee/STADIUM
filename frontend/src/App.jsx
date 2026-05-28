@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import OnboardingModal from './components/OnboardingModal'
 import Home from './pages/Home'
 import Conviction from './pages/Conviction'
 import VAR from './pages/VAR'
@@ -20,6 +21,7 @@ const Lazy = ({ children }) => (
 export default function App() {
   return (
     <Layout>
+      <OnboardingModal />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/scores" element={<LiveScores />} />
