@@ -57,6 +57,7 @@ jobs:
           forge script script/DeployRouter.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY \
             2>&1 | tee deploy-router.log
 

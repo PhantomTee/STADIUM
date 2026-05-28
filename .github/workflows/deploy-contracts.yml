@@ -67,6 +67,7 @@ jobs:
           forge script script/Deploy.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Step: Deploy StadiumHook (CREATE2 salt mining) ─────────────────────
@@ -83,6 +84,7 @@ jobs:
           forge script script/DeployHook.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed MatchOracle + ConvictionVault teams (must run before CreatePools) ──
@@ -98,6 +100,7 @@ jobs:
           forge script script/SeedTeams.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Step: Register teams + create V4 pools ─────────────────────────────
@@ -111,6 +114,7 @@ jobs:
           forge script script/CreatePools.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed initial liquidity into V4 pools ───────────────────────────
@@ -129,6 +133,7 @@ jobs:
           forge script script/SeedLiquidity.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed match fixtures ─────────────────────────────────────────
@@ -141,6 +146,7 @@ jobs:
           forge script script/SeedMatches.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Merge hook address into deployments.json ───────────────────────────
