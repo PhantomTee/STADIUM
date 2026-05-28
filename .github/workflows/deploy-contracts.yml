@@ -17,12 +17,13 @@ on:
         default: "all"
         type: choice
         options:
-          - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity
+          - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity + SeedMatches
           - core_only         # Deploy.s.sol only
           - hook_only         # DeployHook.s.sol only (needs POOL_MANAGER_ADDRESS secret)
+          - seed_teams        # SeedTeams.s.sol only
           - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
-          - seed_teams        # SeedTeams.s.sol + SeedMatches.s.sol
-          - seed_liquidity    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
+          - liquidity_only    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
+          - seed_matches      # SeedMatches.s.sol only
 
 jobs:
   deploy:
@@ -121,15 +122,24 @@ print(addr)
 
       # ── Step: Seed initial liquidity into V4 pools ───────────────────────────
       # Deploys StadiumLiquidityRouter and seeds each team pool so swaps work.
+      # STADIUM_HOOK_ADDRESS: prefer hook-deployment.json (written by DeployHook in this
+      # same run) because the merge step hasn't run yet at this point.
       - name: Seed liquidity (SeedLiquidity.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_liquidity' }}
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'liquidity_only' }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
           export POOL_MANAGER_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('poolManager',''))")
           export TEAM_FACTORY_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['teamFactory'])")
           export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d['mockUSDC'])")
-          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('stadiumHook',''))")
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "
+import json, os
+if os.path.exists('hook-deployment.json'):
+    addr = json.load(open('hook-deployment.json')).get('stadiumHook', '')
+else:
+    addr = json.load(open('deployments.json')).get('stadiumHook', '')
+print(addr)
+")
           forge script script/SeedLiquidity.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
@@ -137,7 +147,7 @@ print(addr)
 
       # ── Step: Seed match fixtures ─────────────────────────────────────────
       - name: Seed matches (SeedMatches.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_teams' }}
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_matches' }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
@@ -168,7 +178,7 @@ print(addr)
 
       # ── Merge liquidity router address into deployments.json ───────────────
       - name: Merge liquidity-deployment.json into deployments.json
-        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_liquidity') }}
+        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'liquidity_only') }}
         run: |
           if [ -f liquidity-deployment.json ] && [ -f deployments.json ]; then
             python3 - <<'EOF'
