@@ -9,6 +9,7 @@ import {Currency} from "@uniswap/v4-core/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/types/BeforeSwapDelta.sol";
 import {Hooks} from "@uniswap/v4-core/libraries/Hooks.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/libraries/LPFeeLibrary.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -54,6 +55,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     error ZeroAddress();
     error PoolAlreadyRegistered();
     error InvalidUSDCPool();
+    error InvalidFee();
 
     // ─────────────────────────────── Structs ───────────────────────────────
 
@@ -167,6 +169,10 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     }
 
     function setFeeConfig(FeeConfig calldata _cfg) external onlyOwner {
+        _validateLpFee(_cfg.groupStageFee);
+        _validateLpFee(_cfg.knockoutFee);
+        _validateLpFee(_cfg.finalFee);
+        if (_cfg.convictionDiscount > _cfg.groupStageFee) revert InvalidFee();
         feeConfig = _cfg;
     }
 
@@ -235,8 +241,9 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
         }
 
         uint24 dynamicFee = _getDynamicFee(ps.teamId, sender);
+        uint24 overrideFee = dynamicFee | LPFeeLibrary.OVERRIDE_FEE_FLAG;
 
-        return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, dynamicFee);
+        return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, overrideFee);
     }
 
     /// @dev Called after every swap. Routes protocol fee to ChampionPool and updates team momentum.
@@ -346,6 +353,10 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
 
     // ─────────────────────────────── Internal helpers ───────────────────────────────
 
+    function _validateLpFee(uint24 fee) internal pure {
+        if (!LPFeeLibrary.isValid(fee)) revert InvalidFee();
+    }
+
     /// @dev Determine dynamic fee based on tournament stage and conviction status.
     ///      Stage 0 = GROUP, 1-2 = KNOCKOUT, 3+ = FINAL bracket.
     function _getDynamicFee(uint16 teamId, address swapper) internal view returns (uint24) {
@@ -372,6 +383,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
             } catch {}
         }
 
+        _validateLpFee(baseFee);
         return baseFee;
     }
 }

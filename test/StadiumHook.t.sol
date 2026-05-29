@@ -279,8 +279,8 @@ contract StadiumHookTest is Test {
 
         assertEq(selector, StadiumHook.beforeSwap.selector);
         assertEq(BeforeSwapDelta.unwrap(delta), BeforeSwapDelta.unwrap(BeforeSwapDeltaLibrary.ZERO_DELTA));
-        // Fee should be group stage default (3000) for non-conviction holder
-        assertEq(fee, 3000);
+        // Fee should be group stage default (3000) with the v4 override flag for non-conviction holder
+        assertEq(fee, LPFeeLibrary.OVERRIDE_FEE_FLAG | 3000);
     }
 
     // ── Test 8: Conviction holder gets lower fee ──────────────────────────
@@ -297,8 +297,8 @@ contract StadiumHookTest is Test {
         (, , uint24 fee) = hook.beforeSwap(swapper, baseKey, params, "");
 
         // Default group stage fee = 3000, conviction discount = 500
-        // Expected fee = 3000 - 500 = 2500
-        assertEq(fee, 2500, "Conviction holder should get discounted fee");
+        // Expected fee = (3000 - 500) with the v4 override flag
+        assertEq(fee, LPFeeLibrary.OVERRIDE_FEE_FLAG | 2500, "Conviction holder should get discounted fee");
     }
 
     // ── Test 9: Momentum updates on swap ───────────────────────────────
@@ -402,7 +402,7 @@ contract StadiumHookTest is Test {
         // amount0 = +999e6 (team tokens received by PM), amount1 = -500e6 (USDC paid by PM)
         // USDC is currency1 → hook should use abs(amount1) = 500e6 for volume.
         // Must mask amount1 to prevent sign-extension from corrupting the high 128 bits.
-        int256 packed = (int256(int128(999e6)) << 128) | int256(uint128(int128(-500e6)));
+        int256 packed = (int256(int128(999e6)) << 128) | int256(uint256(uint128(int128(-500e6))));
         BalanceDelta delta = BalanceDelta.wrap(packed);
 
         IPoolManager.SwapParams memory p = IPoolManager.SwapParams({

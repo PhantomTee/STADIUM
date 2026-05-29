@@ -138,6 +138,7 @@ contract IntegrationTest is Test {
         vm.prank(bob);   vault.depositConviction(ARG, 1_000e6);
 
         // Fund champPool directly to simulate accumulated USDC
+        champPool.addAuthorized(deployer);
         usdc.mint(address(champPool), 500e6);
         champPool.recordDeposit(500e6);
 
@@ -180,6 +181,7 @@ contract IntegrationTest is Test {
 
     function test_TreasuryContract_ReceiveFor() public {
         Treasury treasuryContract = new Treasury(deployer, address(usdc));
+        treasuryContract.setAuthorized(deployer, true);
 
         usdc.mint(address(treasuryContract), 500e6);
         treasuryContract.receiveFor("elimination", 300e6);

@@ -251,7 +251,11 @@ contract CreatePools is Script {
         header = string.concat(
             header,
             '  "tickSpacing": ', vm.toString(uint256(uint24(int24(TICK_SPACING)))),
-            ',\n  "sqrtPriceX96": "', vm.toString(uint256(SQRT_PRICE_1_1)),
+            ',\n  "sqrtPriceUsdcCurrency0": "', vm.toString(uint256(SQRT_PRICE_USDC_C0)), '"'
+        );
+        header = string.concat(
+            header,
+            ',\n  "sqrtPriceTeamCurrency0": "', vm.toString(uint256(SQRT_PRICE_TEAM_C0)),
             '",\n  "pools": [\n'
         );
 

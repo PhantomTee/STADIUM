@@ -14,6 +14,10 @@ on:
         required: false
         default: 'false'
 
+concurrency:
+  group: xlayer-oracle-relayer
+  cancel-in-progress: false
+
 jobs:
   relay:
     name: Sync fixtures and post results
@@ -33,6 +37,8 @@ jobs:
 
       - name: Install cast (Foundry)
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Fetch and process fixtures
         env:

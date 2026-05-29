@@ -99,7 +99,7 @@ contract ConvictionVaultTest is Test {
         vault.settleElimination(TEAM_B);
 
         uint256 snapshot = vault.teamEliminationSnapshot(TEAM_B);
-        assertEq(snapshot, vault.accYieldPerShare(), "Snapshot must equal current accYieldPerShare");
+        assertLt(snapshot, vault.accYieldPerShare(), "Snapshot must freeze before survivor yield accrues");
 
         // Eliminate Team C with zero stake — accumulator still changes if any alive deposits
         vm.prank(oracle);

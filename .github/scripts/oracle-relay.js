@@ -73,8 +73,94 @@ function cast(args) {
     const out = execSync(cmd, { stdio: 'pipe' }).toString().trim()
     console.log('  tx:', out.match(/transactionHash\s+(\S+)/)?.[1] || out.slice(0, 80))
   } catch (err) {
-    console.warn('  cast error:', err.stderr?.toString().slice(0, 200))
+    const stderr = err.stderr?.toString() || err.message
+    console.error('  cast error:', stderr.slice(0, 1000))
+    throw err
   }
+}
+
+const PROTOCOL_TEAM_BY_NAME = new Map([
+  ['mexico', 1],
+  ['south africa', 2],
+  ['south korea', 3],
+  ['korea republic', 3],
+  ['czechia', 4],
+  ['czech republic', 4],
+  ['canada', 5],
+  ['bosnia', 6],
+  ['bosnia and herz', 6],
+  ['bosnia and herzegovina', 6],
+  ['qatar', 7],
+  ['switzerland', 8],
+  ['brazil', 9],
+  ['morocco', 10],
+  ['haiti', 11],
+  ['scotland', 12],
+  ['usa', 13],
+  ['united states', 13],
+  ['united states of america', 13],
+  ['paraguay', 14],
+  ['australia', 15],
+  ['turkiye', 16],
+  ['türkiye', 16],
+  ['turkey', 16],
+  ['germany', 17],
+  ['curacao', 18],
+  ['curaçao', 18],
+  ['ivory coast', 19],
+  ["cote d'ivoire", 19],
+  ['côte d’ivoire', 19],
+  ["côte d'ivoire", 19],
+  ['ecuador', 20],
+  ['netherlands', 21],
+  ['japan', 22],
+  ['sweden', 23],
+  ['tunisia', 24],
+  ['belgium', 25],
+  ['egypt', 26],
+  ['iran', 27],
+  ['new zealand', 28],
+  ['spain', 29],
+  ['cape verde', 30],
+  ['saudi arabia', 31],
+  ['uruguay', 32],
+  ['france', 33],
+  ['senegal', 34],
+  ['iraq', 35],
+  ['norway', 36],
+  ['argentina', 37],
+  ['algeria', 38],
+  ['austria', 39],
+  ['jordan', 40],
+  ['portugal', 41],
+  ['congo dr', 42],
+  ['dr congo', 42],
+  ['democratic republic of the congo', 42],
+  ['uzbekistan', 43],
+  ['colombia', 44],
+  ['england', 45],
+  ['croatia', 46],
+  ['ghana', 47],
+  ['panama', 48],
+])
+
+function normalizeTeamName(name) {
+  return String(name || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’]/g, "'")
+    .replace(/&/g, 'and')
+    .replace(/[.]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+function protocolTeamId(apiTeam) {
+  const normalized = normalizeTeamName(apiTeam.name)
+  const id = PROTOCOL_TEAM_BY_NAME.get(normalized)
+  if (!id) throw new Error(`No protocol teamId mapping for API-Football team "${apiTeam.name}" (${apiTeam.id})`)
+  return id
 }
 
 function sig(fn, ...types) {
@@ -103,8 +189,8 @@ async function main() {
     if (FORCE_FID && String(fixtureId) !== String(FORCE_FID)) continue
 
     const matchId   = fixtureId                    // use API fixture ID as on-chain matchId
-    const teamAId   = teams.home.id                // NOTE: API team IDs ≠ protocol teamIds
-    const teamBId   = teams.away.id                //       Production: maintain ID mapping
+    const teamAId   = protocolTeamId(teams.home)
+    const teamBId   = protocolTeamId(teams.away)
     const kickoff   = Math.floor(new Date(fixture.date).getTime() / 1000)
     const status    = fixture.status.short         // TBD, NS, 1H, HT, 2H, FT, AET, PEN
     const round     = fixture.round || 'Group Stage'

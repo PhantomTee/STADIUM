@@ -26,7 +26,9 @@ contract VARMarketTest is Test {
     uint8   constant OUTCOME_DRAW = 3;
 
     function setUp() public {
-        usdc     = new MockUSDC();
+        usdc         = new MockUSDC();
+        vault        = address(new MockConvictionVault());
+        championPool = address(new MockChampionPool());
         varMarket = new VARMarket(
             address(usdc),
             oracle,
@@ -233,7 +235,6 @@ contract VARMarketTest is Test {
         // Bob: principal 100e6 + earnedShare 36e6 = 136e6
         assertApproxEqAbs(bobGain, 136e6, 1, "Bob non-multiplier gain mismatch");
     }
-}
 
     // ── Test 9: No-winner settlement routes toWinnersPool to championPool ────
 
@@ -280,5 +281,15 @@ contract MockConvictionVault {
     function getConvictionMultiplier(address user, uint16 teamA, uint16 teamB) external view returns (uint256) {
         uint256 m = mult[user][teamA][teamB];
         return m == 0 ? 100 : m;
+    }
+}
+
+
+/// @notice Minimal mock for ChampionPool recordDeposit callback.
+contract MockChampionPool {
+    uint256 public totalRecorded;
+
+    function recordDeposit(uint256 amount) external {
+        totalRecorded += amount;
     }
 }
