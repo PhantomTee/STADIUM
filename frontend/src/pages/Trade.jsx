@@ -25,6 +25,18 @@ const TICK_SPACING = 60
 
 const TOKEN_UNIT = 10n ** 18n  // team tokens: 18 decimals
 
+function _isV4SimError(err) {
+  if (!err) return false
+  const msg = (err?.message || err?.shortMessage || '').toLowerCase()
+  return (
+    msg.includes('third-party') ||
+    msg.includes('execution error') ||
+    msg.includes('simulation') ||
+    msg.includes('estimategas') ||
+    msg.includes('eth_estimategas')
+  )
+}
+
 function formatToken(raw) {
   if (!raw) return '0.00'
   const whole = raw / TOKEN_UNIT
@@ -373,6 +385,9 @@ function SwapForm({ team, isConnected }) {
       abi: StadiumRouter_ABI,
       functionName: 'swap',
       args: [poolKey, params, deadline],
+      // Manual gas limit bypasses eth_estimateGas simulation, which OKX wallet
+      // cannot handle for V4's re-entrant unlock → unlockCallback pattern.
+      gas: 500_000n,
     })
   }
 
@@ -456,8 +471,17 @@ VITE_STADIUM_ROUTER_ADDRESS=0x...`}
 
       {/* Error feedback */}
       {(approveError || swapError) && (
-        <div className="text-xs text-red-400 font-mono bg-red-500/10 border border-red-500/20 p-2">
-          {(approveError || swapError)?.shortMessage || 'Transaction failed'}
+        <div className="text-xs font-mono bg-red-500/10 border border-red-500/20 p-3 space-y-1.5">
+          <div className="text-red-400">
+            {(approveError || swapError)?.shortMessage || 'Transaction failed'}
+          </div>
+          {_isV4SimError(approveError || swapError) && (
+            <div className="text-stadium-muted leading-relaxed">
+              OKX wallet may not simulate Uniswap V4's callback pattern correctly.
+              Try switching to MetaMask — or confirm the transaction anyway if your
+              wallet shows a "Send anyway" option.
+            </div>
+          )}
         </div>
       )}
 
