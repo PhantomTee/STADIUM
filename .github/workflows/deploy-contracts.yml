@@ -17,7 +17,7 @@ on:
         default: "all"
         type: choice
         options:
-          - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity + SeedMatches
+          - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity (no SeedMatches — uses live API)
           - core_only         # Deploy.s.sol only
           - hook_only         # DeployHook.s.sol only (needs POOL_MANAGER_ADDRESS secret)
           - seed_teams        # SeedTeams.s.sol only
@@ -87,7 +87,7 @@ jobs:
             echo "Teams already seeded and $pools pools already created — skipping SeedTeams + CreatePools unless force_redeploy=true"
           fi
 
-      # ── Step: Deploy core contracts ────────────────────────────────────────
+      # ── Step: Deploy core contracts ───────────────────────────────────────
       - name: Deploy core contracts (Deploy.s.sol)
         if: ${{ (github.event.inputs.step == 'all' || github.event.inputs.step == 'core_only') && (env.SKIP_CORE_DEPLOY != 'true' || github.event.inputs.force_redeploy == 'true') }}
         env:
@@ -100,7 +100,7 @@ jobs:
             --non-interactive \
             --private-key $PRIVATE_KEY
 
-      # ── Step: Deploy StadiumHook (CREATE2 salt mining) ─────────────────────
+      # ── Step: Deploy StadiumHook (CREATE2 salt mining) ────────────────────
       - name: Deploy StadiumHook (DeployHook.s.sol)
         if: ${{ (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') && (env.SKIP_HOOK_DEPLOY != 'true' || github.event.inputs.force_redeploy == 'true') }}
         env:
@@ -147,7 +147,7 @@ jobs:
             --non-interactive \
             --private-key $PRIVATE_KEY
 
-      # ── Step: Seed initial liquidity into V4 pools ───────────────────────────
+      # ── Step: Seed initial liquidity into V4 pools ─────────────────────────
       # Deploys StadiumLiquidityRouter and seeds each team pool so swaps work.
       # STADIUM_HOOK_ADDRESS: prefer hook-deployment.json (written by DeployHook in this
       # same run) because the merge step hasn't run yet at this point.
@@ -166,9 +166,11 @@ jobs:
             --non-interactive \
             --private-key $PRIVATE_KEY
 
-      # ── Step: Seed match fixtures ─────────────────────────────────────────
+      # ── Step: Seed match fixtures (manual only — not part of 'all') ──────
+      # Real fixtures come from football-data.org via the backend keeper.
+      # Only run this step explicitly via step=seed_matches for emergency use.
       - name: Seed matches (SeedMatches.s.sol)
-        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'seed_matches' }}
+        if: ${{ github.event.inputs.step == 'seed_matches' }}
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
         run: |
@@ -179,7 +181,7 @@ jobs:
             --non-interactive \
             --private-key $PRIVATE_KEY
 
-      # ── Merge hook address into deployments.json ───────────────────────────
+      # ── Merge hook address into deployments.json ────────────────────────
       - name: Merge hook-deployment.json into deployments.json
         if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') }}
         run: |
@@ -216,7 +218,7 @@ jobs:
           EOF
           fi
 
-      # ── Commit deployment artifacts back to branch ─────────────────────────
+      # ── Commit deployment artifacts back to branch ───────────────────────
       - name: Commit deployment artifacts
         if: always()
         run: |
@@ -233,7 +235,7 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: update deployment artifacts [${{ github.event.inputs.network }}]"
           git push
 
-      # ── Print summary ──────────────────────────────────────────────────────
+      # ── Print summary ────────────────────────────────────────────────────────
       - name: Print deployment summary
         if: always()
         run: |
