@@ -33,7 +33,7 @@ on:
 
 # Only one deploy job per network at a time — prevents wallet nonce collisions.
 concurrency:
-  group: deploy-contracts-${{ github.event.inputs.network }}
+  group: xlayer-deployer-${{ github.event.inputs.network }}
   cancel-in-progress: false
 
 jobs:
@@ -47,18 +47,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: claude/jolly-einstein-SEDia
+          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
-
-      - name: Install forge dependencies
-        run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-commit
-          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
-          forge install Uniswap/v4-core@v4.0.0 --no-commit
+          version: stable
 
       - name: Set RPC URL
         run: |
@@ -98,6 +92,7 @@ jobs:
           forge script script/Deploy.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --skip-simulation \
             --private-key $PRIVATE_KEY
@@ -116,6 +111,7 @@ jobs:
           forge script script/DeployHook.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY
 
@@ -132,6 +128,7 @@ jobs:
           forge script script/SeedTeams.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY
 
@@ -146,6 +143,7 @@ jobs:
           forge script script/CreatePools.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY
 
@@ -165,6 +163,7 @@ jobs:
           forge script script/SeedLiquidity.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY
 
@@ -178,6 +177,7 @@ jobs:
           forge script script/DeployRouter.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY
 
@@ -193,12 +193,13 @@ jobs:
           forge script script/SeedMatches.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY
 
       # ── Merge router address into deployments.json ─────────────────────
       - name: Merge router-deployment.json into deployments.json
-        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'router_only') }}
+        if: ${{ success() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'router_only') }}
         run: |
           if [ -f router-deployment.json ] && [ -f deployments.json ]; then
             python3 - <<'EOF'
@@ -216,7 +217,7 @@ jobs:
 
       # ── Merge hook address into deployments.json ─────────────────────
       - name: Merge hook-deployment.json into deployments.json
-        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') }}
+        if: ${{ success() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') }}
         run: |
           if [ -f hook-deployment.json ] && [ -f deployments.json ]; then
             python3 - <<'EOF'
@@ -235,7 +236,7 @@ jobs:
 
       # ── Merge liquidity router address into deployments.json ───────────────
       - name: Merge liquidity-deployment.json into deployments.json
-        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'liquidity_only') }}
+        if: ${{ success() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'liquidity_only') }}
         run: |
           if [ -f liquidity-deployment.json ] && [ -f deployments.json ]; then
             python3 - <<'EOF'
@@ -253,7 +254,7 @@ jobs:
 
       # ── Commit deployment artifacts back to branch ───────────────────────
       - name: Commit deployment artifacts
-        if: always()
+        if: success()
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

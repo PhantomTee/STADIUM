@@ -12,6 +12,10 @@ on:
           - xlayer_testnet
           - xlayer_mainnet
 
+concurrency:
+  group: xlayer-deployer-${{ github.event.inputs.network }}
+  cancel-in-progress: false
+
 jobs:
   deploy-router:
     name: Deploy router → ${{ github.event.inputs.network }}
@@ -23,25 +27,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: claude/jolly-einstein-SEDia
+          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
-
-      - name: Install forge dependencies
-        run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-commit
-          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
-          forge install Uniswap/v4-core@v4.0.0 --no-commit
+          version: stable
 
       - name: Set RPC URL
         run: |
           if [ "${{ github.event.inputs.network }}" = "xlayer_mainnet" ]; then
             echo "RPC_URL=${{ secrets.XLAYER_MAINNET_RPC_URL }}" >> $GITHUB_ENV
           else
-            echo "RPC_URL=https://testrpc.xlayer.tech/terigon" >> $GITHUB_ENV
+            echo "RPC_URL=${{ secrets.XLAYER_TESTNET_RPC_URL }}" >> $GITHUB_ENV
           fi
 
       - name: Read PoolManager address from deployments config
@@ -57,6 +55,7 @@ jobs:
           forge script script/DeployRouter.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
+            --slow \
             --non-interactive \
             --private-key $PRIVATE_KEY \
             2>&1 | tee deploy-router.log
