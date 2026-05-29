@@ -23,6 +23,7 @@ on:
           - seed_teams        # SeedTeams.s.sol only
           - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
           - liquidity_only    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
+          - router_only       # DeployRouter.s.sol only (V4 swap router)
           - seed_matches      # SeedMatches.s.sol only
       force_redeploy:
         description: "Force re-deploy even if deployments.json already has valid addresses"
@@ -166,6 +167,19 @@ jobs:
             --non-interactive \
             --private-key $PRIVATE_KEY
 
+      # ── Step: Deploy StadiumRouter (V4 swap router) ─────────────────────
+      - name: Deploy StadiumRouter (DeployRouter.s.sol)
+        if: ${{ github.event.inputs.step == 'all' || github.event.inputs.step == 'router_only' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export POOL_MANAGER_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('poolManager',''))")
+          forge script script/DeployRouter.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --non-interactive \
+            --private-key $PRIVATE_KEY
+
       # ── Step: Seed match fixtures (manual only — not part of 'all') ──────
       # Real fixtures come from football-data.org via the backend keeper.
       # Only run this step explicitly via step=seed_matches for emergency use.
@@ -181,7 +195,25 @@ jobs:
             --non-interactive \
             --private-key $PRIVATE_KEY
 
-      # ── Merge hook address into deployments.json ────────────────────────
+      # ── Merge router address into deployments.json ─────────────────────
+      - name: Merge router-deployment.json into deployments.json
+        if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'router_only') }}
+        run: |
+          if [ -f router-deployment.json ] && [ -f deployments.json ]; then
+            python3 - <<'EOF'
+          import json
+          with open('deployments.json') as f:
+              d = json.load(f)
+          with open('router-deployment.json') as f:
+              r = json.load(f)
+          d['stadiumRouter'] = r.get('stadiumRouter', '')
+          with open('deployments.json', 'w') as f:
+              json.dump(d, f, indent=2)
+          print("Merged stadiumRouter into deployments.json")
+          EOF
+          fi
+
+      # ── Merge hook address into deployments.json ─────────────────────
       - name: Merge hook-deployment.json into deployments.json
         if: ${{ always() && (github.event.inputs.step == 'all' || github.event.inputs.step == 'hook_only') }}
         run: |
@@ -230,7 +262,7 @@ jobs:
             cp deployments.json frontend/src/config/deployments/xlayer.json
           fi
 
-          git add deployments.json hook-deployment.json liquidity-deployment.json v4-pools.json \
+          git add deployments.json hook-deployment.json liquidity-deployment.json router-deployment.json v4-pools.json \
                   frontend/src/config/deployments/xlayer.json 2>/dev/null || true
           git diff --staged --quiet || git commit -m "chore: update deployment artifacts [${{ github.event.inputs.network }}]"
           git push
@@ -245,5 +277,7 @@ jobs:
           cat hook-deployment.json 2>/dev/null || echo "hook-deployment.json not found"
           echo ""
           cat liquidity-deployment.json 2>/dev/null || echo "liquidity-deployment.json not found"
+          echo ""
+          cat router-deployment.json 2>/dev/null || echo "router-deployment.json not found"
           echo ""
           cat v4-pools.json 2>/dev/null || echo "v4-pools.json not found"
