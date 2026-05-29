@@ -14,9 +14,6 @@ import {StadiumRouter} from "../src/StadiumRouter.sol";
 ///   forge script script/DeployRouter.s.sol \
 ///     --rpc-url $XLAYER_RPC_URL \
 ///     --broadcast
-///
-/// Then copy the printed address into frontend/.env:
-///   VITE_STADIUM_ROUTER_ADDRESS=0x...
 contract DeployRouter is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
@@ -28,7 +25,11 @@ contract DeployRouter is Script {
         vm.stopBroadcast();
 
         console.log("StadiumRouter deployed at:", address(router));
-        console.log("\nAdd to frontend/.env:");
-        console.log("VITE_STADIUM_ROUTER_ADDRESS=%s", address(router));
+
+        string memory json = string.concat(
+            '{\n  "stadiumRouter": "', vm.toString(address(router)), '"\n}'
+        );
+        vm.writeFile("./router-deployment.json", json);
+        console.log("Router address written to router-deployment.json");
     }
 }
