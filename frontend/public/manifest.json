@@ -1,0 +1,19 @@
+{
+  "name": "11° — World Cup DeFi",
+  "short_name": "11°",
+  "description": "Back your team. Predict matches. Win the Champion Pool. The DeFi protocol for the 2026 World Cup, built on X Layer.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#00ff87",
+  "background_color": "#060c06",
+  "categories": ["finance", "sports", "games"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

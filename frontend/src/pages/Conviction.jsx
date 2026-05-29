@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ShareButton from '../components/ShareButton'
 import { useToast } from '../components/Toast'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
@@ -38,6 +38,7 @@ export default function Conviction() {
   const { address, isConnected } = useAccount()
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [filterGroup, setFilterGroup]   = useState('ALL')
+  const mobileFormRef = useRef(null)
   const toast = useToast()
 
   const { data: usdcBalance, refetch: refetchBalance } = useUSDCBalance(address)
@@ -86,8 +87,11 @@ export default function Conviction() {
   }
 
   function handleSelectTeam(team) {
-    // Toggle off if already selected, otherwise select
     setSelectedTeam(prev => prev?.id === team.id ? null : team)
+    // Scroll the inline form into view on mobile after React updates the DOM
+    if (mobileFormRef.current) {
+      setTimeout(() => mobileFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    }
   }
 
   const depositFormProps = { usdcBalance, userAddress: address, convictionOpen }
@@ -205,7 +209,7 @@ export default function Conviction() {
                 {/* Mobile inline dropdown — expands right below the tapped team.
                     Hidden on lg+ where the sidebar panel takes over. */}
                 {selectedTeam?.id === team.id && (
-                  <div className="col-span-full lg:hidden border-t-2 border-stadium-green bg-stadium-dark">
+                  <div ref={mobileFormRef} className="col-span-full lg:hidden border-t-2 border-stadium-green bg-stadium-dark">
                     {!isConnected ? (
                       <div className="p-6 text-center space-y-4">
                         <p className="text-stadium-muted text-sm font-mono">Connect to back a team</p>
