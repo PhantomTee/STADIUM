@@ -54,6 +54,18 @@ contract DeployHook is Script {
         StadiumHook hook = new StadiumHook{salt: salt}(IPoolManager(poolManager), owner);
         require(address(hook) == hookAddress, "DeployHook: address mismatch - re-run mining");
 
+        // Wire USDC immediately so momentum tracks USDC volume (not raw token amounts).
+        // Without this, hook.usdc == address(0) and afterSwap falls back to amt0,
+        // which is the 18-decimal team token for most pools — showing absurd momentum.
+        address usdcAddr = _envAddressOr("MOCK_USDC_ADDRESS", address(0));
+        if (usdcAddr != address(0)) {
+            hook.setUsdc(usdcAddr);
+            console.log("setUsdc:", usdcAddr);
+        } else {
+            console.log("WARNING: MOCK_USDC_ADDRESS not set — momentum will use demo fallback (amt0).");
+            console.log("         Run SetHookUsdc.s.sol to fix this before any swaps.");
+        }
+
         vm.stopBroadcast();
 
         console.log("\n=== HOOK DEPLOYMENT SUMMARY ===");
@@ -84,5 +96,13 @@ contract DeployHook is Script {
         vm.writeFile("./hook-deployment.json", hookJson);
         console.log("\nHook info written to hook-deployment.json");
         console.log("Merge stadiumHook address into deployments.json manually or via jq.");
+    }
+
+    function _envAddressOr(string memory key, address fallback_) internal view returns (address) {
+        try vm.envAddress(key) returns (address val) {
+            return val == address(0) ? fallback_ : val;
+        } catch {
+            return fallback_;
+        }
     }
 }

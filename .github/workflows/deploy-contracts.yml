@@ -20,6 +20,7 @@ on:
           - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity (no SeedMatches — uses live API)
           - core_only         # Deploy.s.sol only
           - hook_only         # DeployHook.s.sol only (needs POOL_MANAGER_ADDRESS secret)
+          - set_hook_usdc     # SetHookUsdc.s.sol only — fixes momentum tracking on existing hook
           - seed_teams        # SeedTeams.s.sol only
           - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
           - liquidity_only    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
@@ -123,7 +124,26 @@ jobs:
           if [ -z "$POOL_MANAGER_ADDRESS" ] && [ -f deployments.json ]; then
             export POOL_MANAGER_ADDRESS=$(python3 -c "import sys,json; d=json.load(open('deployments.json')); print(d['poolManager'])")
           fi
+          # Pass USDC address so the hook wires setUsdc() on deploy — fixes momentum tracking
+          export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('mockUSDC',''))" 2>/dev/null || echo "")
           forge script script/DeployHook.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --slow \
+            --non-interactive \
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Fix hook USDC address on existing deployment ────────────────
+      # Run this standalone if hook was already deployed without setUsdc().
+      # Fixes momentum tracking (was using raw token amt0 instead of USDC volume).
+      - name: Set hook USDC address (SetHookUsdc.s.sol)
+        if: ${{ github.event.inputs.step == 'set_hook_usdc' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json,os; f='hook-deployment.json'; print(json.load(open(f)).get('stadiumHook','') if os.path.exists(f) else json.load(open('deployments.json')).get('stadiumHook',''))")
+          export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('mockUSDC',''))")
+          forge script script/SetHookUsdc.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
