@@ -103,10 +103,13 @@ contract SeedTeams is Script {
     }
 
     function _register(MatchOracle oracle, uint16 teamId, string memory name) internal {
-        try oracle.registerTeam(teamId, name) {
-            console.log(string.concat("Registered: ", name, " (id=", vm.toString(uint256(teamId)), ")"));
-        } catch {
+        // Skip teams that are already registered to avoid reverting broadcast transactions.
+        // Forge's simulation fails if any broadcast transaction reverts, even inside try/catch.
+        if (oracle.getTeam(teamId).registered) {
             console.log(string.concat("Skipped (already registered): ", name));
+            return;
         }
+        oracle.registerTeam(teamId, name);
+        console.log(string.concat("Registered: ", name, " (id=", vm.toString(uint256(teamId)), ")"));
     }
 }
