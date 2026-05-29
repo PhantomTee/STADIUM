@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { getFixtures, getGroupStandings, getProviderStatus, API_BASE } from '../services/footballData'
+import { getFixtures, getGroupStandings, getProviderStatus } from '../services/footballData'
 import ScoreboardCard from '../components/ScoreboardCard'
 import { useChampionPoolBalance } from '../hooks/useContracts'
 import { formatUSDC } from '../utils/contracts'
@@ -103,7 +103,7 @@ function StandingsTable({ groups }) {
   )
 }
 
-function ProviderPanel({ status, onSync, syncing }) {
+function ProviderPanel({ status }) {
   const isLive = status?.provider === 'football-data.org'
   return (
     <div className="border border-stadium-border bg-stadium-dark p-4 font-mono text-xs">
@@ -125,14 +125,6 @@ function ProviderPanel({ status, onSync, syncing }) {
         </div>
       )}
       <div className="text-stadium-muted mt-3">Auto-refreshes every 30 s</div>
-      <button
-        onClick={onSync}
-        disabled={syncing}
-        className="mt-3 w-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest border border-stadium-border text-stadium-muted hover:text-stadium-text hover:border-stadium-green transition-colors disabled:opacity-40"
-        style={{ borderRadius: 2 }}
-      >
-        {syncing ? 'Syncing…' : 'Trigger Oracle Sync'}
-      </button>
     </div>
   )
 }
@@ -147,7 +139,6 @@ export default function LiveScores() {
 
   const { data: champPoolTotal } = useChampionPoolBalance()
   const [status,      setStatus]      = useState(null)
-  const [syncing,     setSyncing]     = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -173,18 +164,6 @@ export default function LiveScores() {
     const interval = setInterval(load, REFRESH_MS)
     return () => clearInterval(interval)
   }, [load])
-
-  async function triggerSync() {
-    setSyncing(true)
-    try {
-      await fetch(`${API_BASE}/api/admin/sync`, { method: 'POST' })
-      await load()
-    } catch {
-      /* ignore */
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   const hookStates = useMemo(() => {
     const states = {}
@@ -269,7 +248,7 @@ export default function LiveScores() {
           {/* Right: Standings + Provider */}
           <div className="space-y-6">
             <StandingsTable groups={groups} />
-            <ProviderPanel status={status} onSync={triggerSync} syncing={syncing} />
+            <ProviderPanel status={status} />
           </div>
         </div>
       )}

@@ -4,6 +4,9 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ADDRESSES, WORLD_CUP_TEAMS } from '../utils/contracts'
 import { MatchOracle_ABI } from '../abis'
 import { useAllMatchIds, useMatch, useTeamCount } from '../hooks/useContracts'
+import { API_BASE } from '../services/footballData'
+
+const ADMIN_ADDRESS = '0xF869c7b8A19146A4bbD5466e83c3B785AE7EE148'
 
 const TEAMS_BY_ID = Object.fromEntries(WORLD_CUP_TEAMS.map(t => [t.id, t]))
 
@@ -25,11 +28,21 @@ export default function Admin() {
     )
   }
 
+  if (address?.toLowerCase() !== ADMIN_ADDRESS.toLowerCase()) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <h1 className="text-2xl font-bold text-stadium-text">Admin — Oracle</h1>
+        <p className="text-stadium-muted font-mono text-sm">This page is restricted to the protocol admin.</p>
+      </div>
+    )
+  }
+
   const tabs = [
     { id: 'register', label: 'Register Teams' },
     { id: 'matches',  label: 'Manage Matches' },
     { id: 'results',  label: 'Post Results'   },
     { id: 'tourney',  label: 'Elim / Champion' },
+    { id: 'sync',     label: 'Oracle Sync'    },
   ]
 
   return (
@@ -46,7 +59,7 @@ export default function Admin() {
       </div>
 
       {/* Tab Bar */}
-      <div className="grid grid-cols-4 gap-px bg-stadium-border">
+      <div className="grid grid-cols-5 gap-px bg-stadium-border">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -67,6 +80,7 @@ export default function Admin() {
       {activeTab === 'matches'   && <ManageMatchesTab />}
       {activeTab === 'results'   && <PostResultsTab />}
       {activeTab === 'tourney'   && <TournamentTab />}
+      {activeTab === 'sync'      && <OracleSyncTab />}
     </div>
   )
 }
@@ -501,6 +515,47 @@ function TournamentTab() {
           <div className="text-stadium-green text-xs font-mono">Champion declared. Pool snapshot taken. Principal claims enabled.</div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── Oracle Sync ───────────────────────────────────────────────────────────────
+
+function OracleSyncTab() {
+  const [syncing, setSyncing] = useState(false)
+  const [result,  setResult]  = useState(null)
+
+  async function triggerSync() {
+    setSyncing(true)
+    setResult(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/sync`, { method: 'POST' })
+      setResult(res.ok ? 'Sync triggered successfully.' : `Error: ${res.status}`)
+    } catch (e) {
+      setResult(`Failed to reach backend: ${e.message}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <div className="card space-y-6">
+      <div className="text-xs font-bold text-stadium-text uppercase tracking-widest">Oracle Sync</div>
+      <p className="text-stadium-muted text-sm font-mono">
+        Manually trigger the sports-data relayer to fetch the latest fixtures and push results to MatchOracle.
+      </p>
+      <button
+        onClick={triggerSync}
+        disabled={syncing}
+        className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest border border-stadium-green text-stadium-green hover:bg-stadium-green/10 transition-colors disabled:opacity-40"
+      >
+        {syncing ? 'Syncing…' : 'Trigger Oracle Sync'}
+      </button>
+      {result && (
+        <div className={`text-xs font-mono ${result.startsWith('Error') || result.startsWith('Failed') ? 'text-red-400' : 'text-stadium-green'}`}>
+          {result}
+        </div>
+      )}
     </div>
   )
 }
