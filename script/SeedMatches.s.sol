@@ -59,9 +59,16 @@ contract SeedMatches is Script {
         );
         console.log("Match 3: France vs Brazil (Round of 16)");
 
-        // Open VAR window for match 1 immediately
-        oracle.openVARWindow(1);
-        console.log("VAR window opened for Match 1");
+        // Open VAR window for match 1 — guard against re-run revert ("already open")
+        if (oracle.matchExists(1)) {
+            MatchOracle.Match memory m1 = oracle.getMatch(1);
+            if (!m1.varOpen && !m1.varClosed && !m1.settled) {
+                oracle.openVARWindow(1);
+                console.log("VAR window opened for Match 1");
+            } else {
+                console.log("VAR window already open/closed for Match 1 - skipping");
+            }
+        }
 
         vm.stopBroadcast();
 

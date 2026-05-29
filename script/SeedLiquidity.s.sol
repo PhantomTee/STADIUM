@@ -51,8 +51,11 @@ contract SeedLiquidity is Script {
     int24 constant TICK_LOWER   = -887220;  // floor(MAX_TICK / tickSpacing) * tickSpacing
     int24 constant TICK_UPPER   =  887220;
 
-    // liquidityDelta for initial position - generous amount so small swaps work cleanly
-    int256 constant LIQUIDITY_DELTA = 1e24;
+    // liquidityDelta calibrated for SQRT_PRICE_1_1 pools (sqrtPriceX96 = 2^96).
+    // At price 1:1 (raw), a full-range position needs ~LIQUIDITY_DELTA raw units of each token.
+    //   Team tokens (18 dec): deployer gets 1_000_000e18 via distributeToken — trivially satisfied.
+    //   USDC (6 dec): 1e10 raw = 10,000 USDC/pool × 48 pools = 480k USDC << 2M minted.
+    int256 constant LIQUIDITY_DELTA = 1e10;
 
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
@@ -123,17 +126,13 @@ contract SeedLiquidity is Script {
                 console.log("Registered pool in hook for team", teamId);
             }
 
-            // At sqrtPrice 1:1 (raw units), a full-range position with LIQUIDITY_DELTA
-            // needs approximately LIQUIDITY_DELTA raw units of EACH token.
-            // The deployer gets 1_000_000e18 team tokens via distributeToken (= 1e24 raw)
-            // and mints 2_000_000e6 USDC (= 2e12 raw). Since 2e12 << LIQUIDITY_DELTA/2
-            // the USDC check will always gate addLiquidity until the USDC mint is increased
-            // or LIQUIDITY_DELTA is reduced. This prevents on-chain ERC20InsufficientBalance
-            // reverts that cause forge --broadcast to exit with code 1.
+            // Guard against on-chain ERC20InsufficientBalance: only call addLiquidity when
+            // both token balances exceed the expected per-pool requirement.
             uint256 teamBal = IERC20(token).balanceOf(deployer);
             uint256 usdcBal = IERC20(usdcAddr).balanceOf(deployer);
-            uint256 minBal  = uint256(LIQUIDITY_DELTA) / 2;
+            uint256 minBal  = uint256(LIQUIDITY_DELTA);
             if (teamBal < minBal || usdcBal < minBal) {
+                console.log("Insufficient balance for team", teamId, "- skipping addLiquidity");
                 continue;
             }
 
