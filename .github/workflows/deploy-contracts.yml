@@ -99,6 +99,7 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Deploy StadiumHook (CREATE2 salt mining) ────────────────────
