@@ -114,10 +114,17 @@ contract SeedLiquidity is Script {
                 // Already registered or not owner - continue
             }
 
-            // Skip addLiquidity when deployer has no team tokens to provide.
-            // This happens with older factory deployments that lack distributeToken.
-            if (IERC20(token).balanceOf(deployer) == 0) {
-                console.log("No team tokens for team", teamId, "- skipping addLiquidity");
+            // At sqrtPrice 1:1 (raw units), a full-range position with LIQUIDITY_DELTA
+            // needs approximately LIQUIDITY_DELTA raw units of EACH token.
+            // The deployer gets 1_000_000e18 team tokens via distributeToken (= 1e24 raw)
+            // and mints 2_000_000e6 USDC (= 2e12 raw). Since 2e12 << LIQUIDITY_DELTA/2
+            // the USDC check will always gate addLiquidity until the USDC mint is increased
+            // or LIQUIDITY_DELTA is reduced. This prevents on-chain ERC20InsufficientBalance
+            // reverts that cause forge --broadcast to exit with code 1.
+            uint256 teamBal = IERC20(token).balanceOf(deployer);
+            uint256 usdcBal = IERC20(usdcAddr).balanceOf(deployer);
+            uint256 minBal  = uint256(LIQUIDITY_DELTA) / 2;
+            if (teamBal < minBal || usdcBal < minBal) {
                 continue;
             }
 
