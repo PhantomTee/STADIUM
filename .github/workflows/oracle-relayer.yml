@@ -15,7 +15,7 @@ on:
         default: 'false'
 
 concurrency:
-  group: xlayer-oracle-relayer
+  group: xlayer-deployer-xlayer_testnet
   cancel-in-progress: false
 
 jobs:

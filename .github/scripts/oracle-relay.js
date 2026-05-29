@@ -69,14 +69,8 @@ function cast(args) {
     return
   }
   const cmd = `cast send --rpc-url "${RPC_URL}" --private-key "${PRIV_KEY}" ${args.join(' ')}`
-  try {
-    const out = execSync(cmd, { stdio: 'pipe' }).toString().trim()
-    console.log('  tx:', out.match(/transactionHash\s+(\S+)/)?.[1] || out.slice(0, 80))
-  } catch (err) {
-    const stderr = err.stderr?.toString() || err.message
-    console.error('  cast error:', stderr.slice(0, 1000))
-    throw err
-  }
+  const out = execSync(cmd, { stdio: 'pipe' }).toString().trim()
+  console.log('  tx:', out.match(/transactionHash\s+(\S+)/)?.[1] || out.slice(0, 80))
 }
 
 const PROTOCOL_TEAM_BY_NAME = new Map([
@@ -183,67 +177,76 @@ async function main() {
   const fixtures = res.response || []
   console.log(`Found ${fixtures.length} fixture(s) today.`)
 
+  let errors = 0
   for (const f of fixtures) {
     const { fixture, teams, goals, score } = f
     const fixtureId = fixture.id
     if (FORCE_FID && String(fixtureId) !== String(FORCE_FID)) continue
 
-    const matchId   = fixtureId                    // use API fixture ID as on-chain matchId
-    const teamAId   = protocolTeamId(teams.home)
-    const teamBId   = protocolTeamId(teams.away)
-    const kickoff   = Math.floor(new Date(fixture.date).getTime() / 1000)
-    const status    = fixture.status.short         // TBD, NS, 1H, HT, 2H, FT, AET, PEN
-    const round     = fixture.round || 'Group Stage'
-    const stage     = STAGE_MAP[round] ?? 0
+    try {
+      const matchId   = fixtureId                    // use API fixture ID as on-chain matchId
+      const teamAId   = protocolTeamId(teams.home)
+      const teamBId   = protocolTeamId(teams.away)
+      const kickoff   = Math.floor(new Date(fixture.date).getTime() / 1000)
+      const status    = fixture.status.short         // TBD, NS, 1H, HT, 2H, FT, AET, PEN
+      const round     = fixture.round || 'Group Stage'
+      const stage     = STAGE_MAP[round] ?? 0
 
-    console.log(`\n[${fixtureId}] ${teams.home.name} vs ${teams.away.name} — ${status}`)
+      console.log(`\n[${fixtureId}] ${teams.home.name} vs ${teams.away.name} — ${status}`)
 
-    // ── Create or update the match schedule ──
-    cast([
-      ORACLE,
-      sig('createOrUpdateMatch', 'uint256', 'uint256', 'uint16', 'uint16', 'uint256', 'uint8'),
-      fixtureId, matchId, teamAId, teamBId, kickoff, stage,
-    ])
-
-    // ── Open VAR window ~60 min before kickoff ──
-    const nowSec = Math.floor(Date.now() / 1000)
-    if (status === 'NS' && kickoff - nowSec < 3600) {
-      console.log('  → Opening VAR window')
-      cast([ORACLE, sig('openVARWindow', 'uint256'), matchId])
-    }
-
-    // ── Start match when live ──
-    if (['1H', 'HT', '2H'].includes(status)) {
-      console.log('  → Starting match (closing VAR)')
-      cast([ORACLE, sig('startMatch', 'uint256'), matchId])
-    }
-
-    // ── Post result for finished matches ──
-    if (['FT', 'AET', 'PEN'].includes(status) && goals.home !== null) {
-      const homeGoals = goals.home
-      const awayGoals = goals.away
-
-      let winner, firstGoal, redCard, extraTime
-
-      if (homeGoals > awayGoals)       winner = OUTCOME.TEAM_A
-      else if (awayGoals > homeGoals)  winner = OUTCOME.TEAM_B
-      else                             winner = OUTCOME.DRAW
-
-      // First goal: simplify — whoever scored more goals (approximate)
-      firstGoal = homeGoals > 0 ? OUTCOME.TEAM_A : awayGoals > 0 ? OUTCOME.TEAM_B : OUTCOME.NO_GOAL
-
-      // Red card: check events (simplified — assume no red card if not fetched)
-      redCard   = false // fetch `/fixtures/events?fixture=${fixtureId}` for real data
-      extraTime = ['AET', 'PEN'].includes(status)
-
-      console.log(`  → Posting result: winner=${winner} firstGoal=${firstGoal} redCard=${redCard} extraTime=${extraTime}`)
+      // ── Create or update the match schedule ──
       cast([
         ORACLE,
-        sig('postResult', 'uint256', 'uint8', 'uint8', 'bool', 'bool'),
-        matchId, winner, firstGoal, redCard ? 'true' : 'false', extraTime ? 'true' : 'false',
+        sig('createOrUpdateMatch', 'uint256', 'uint256', 'uint16', 'uint16', 'uint256', 'uint8'),
+        fixtureId, matchId, teamAId, teamBId, kickoff, stage,
       ])
+
+      // ── Open VAR window ~60 min before kickoff ──
+      const nowSec = Math.floor(Date.now() / 1000)
+      if (status === 'NS' && kickoff - nowSec < 3600) {
+        console.log('  → Opening VAR window')
+        cast([ORACLE, sig('openVARWindow', 'uint256'), matchId])
+      }
+
+      // ── Start match when live ──
+      if (['1H', 'HT', '2H'].includes(status)) {
+        console.log('  → Starting match (closing VAR)')
+        cast([ORACLE, sig('startMatch', 'uint256'), matchId])
+      }
+
+      // ── Post result for finished matches ──
+      if (['FT', 'AET', 'PEN'].includes(status) && goals.home !== null) {
+        const homeGoals = goals.home
+        const awayGoals = goals.away
+
+        let winner, firstGoal, redCard, extraTime
+
+        if (homeGoals > awayGoals)       winner = OUTCOME.TEAM_A
+        else if (awayGoals > homeGoals)  winner = OUTCOME.TEAM_B
+        else                             winner = OUTCOME.DRAW
+
+        // First goal: simplify — whoever scored more goals (approximate)
+        firstGoal = homeGoals > 0 ? OUTCOME.TEAM_A : awayGoals > 0 ? OUTCOME.TEAM_B : OUTCOME.NO_GOAL
+
+        // Red card: check events (simplified — assume no red card if not fetched)
+        redCard   = false // fetch `/fixtures/events?fixture=${fixtureId}` for real data
+        extraTime = ['AET', 'PEN'].includes(status)
+
+        console.log(`  → Posting result: winner=${winner} firstGoal=${firstGoal} redCard=${redCard} extraTime=${extraTime}`)
+        cast([
+          ORACLE,
+          sig('postResult', 'uint256', 'uint8', 'uint8', 'bool', 'bool'),
+          matchId, winner, firstGoal, redCard ? 'true' : 'false', extraTime ? 'true' : 'false',
+        ])
+      }
+    } catch (err) {
+      errors++
+      console.error(`  [ERROR] fixture ${fixtureId} (${teams?.home?.name} vs ${teams?.away?.name}): ${err.message}`)
+      if (err.stderr) console.error('  stderr:', err.stderr.toString().slice(0, 500))
     }
   }
+
+  if (errors > 0) console.warn(`\n${errors} fixture(s) failed — see errors above.`)
 
   console.log('\nDone.')
 }
