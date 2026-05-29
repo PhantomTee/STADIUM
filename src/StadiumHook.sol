@@ -169,6 +169,13 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
         protocolFeeBps = _feeBps;
     }
 
+    /// @notice Admin override for a team's cumulative momentum score.
+    ///         Use to correct bogus values accumulated before setUsdc() was called.
+    function setTeamMomentum(uint16 teamId, uint256 value) external onlyOwner {
+        teamMomentum[teamId] = value;
+        emit TeamMomentumUpdated(teamId, value);
+    }
+
     function setFeeConfig(FeeConfig calldata _cfg) external onlyOwner {
         _validateLpFee(_cfg.groupStageFee);
         _validateLpFee(_cfg.knockoutFee);

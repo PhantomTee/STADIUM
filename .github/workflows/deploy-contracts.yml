@@ -20,7 +20,8 @@ on:
           - all               # Deploy + Hook + SeedTeams + CreatePools + SeedLiquidity (no SeedMatches — uses live API)
           - core_only         # Deploy.s.sol only
           - hook_only         # DeployHook.s.sol only (needs POOL_MANAGER_ADDRESS secret)
-          - set_hook_usdc     # SetHookUsdc.s.sol only — fixes momentum tracking on existing hook
+          - set_hook_usdc          # SetHookUsdc.s.sol only — fixes momentum tracking on existing hook
+          - reset_team_momentum    # ResetTeamMomentum.s.sol — zero-out a team's bogus momentum
           - seed_teams        # SeedTeams.s.sol only
           - pools_only        # CreatePools.s.sol only (needs TEAM_FACTORY + HOOK secrets)
           - liquidity_only    # SeedLiquidity.s.sol only (needs TEAM_FACTORY + HOOK secrets)
@@ -144,6 +145,25 @@ jobs:
           export STADIUM_HOOK_ADDRESS=$(python3 -c "import json,os; f='hook-deployment.json'; print(json.load(open(f)).get('stadiumHook','') if os.path.exists(f) else json.load(open('deployments.json')).get('stadiumHook',''))")
           export MOCK_USDC_ADDRESS=$(python3 -c "import json; d=json.load(open('deployments.json')); print(d.get('mockUSDC',''))")
           forge script script/SetHookUsdc.s.sol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --slow \
+            --non-interactive \
+            --private-key $PRIVATE_KEY
+
+      # ── Step: Reset a team's momentum score on an existing hook ─────────
+      # Run with step=reset_team_momentum.
+      # Set TEAM_ID (default 2 = South Africa) and MOMENTUM_VALUE (default 0)
+      # as repository variables, or the defaults will be used.
+      - name: Reset team momentum (ResetTeamMomentum.s.sol)
+        if: ${{ github.event.inputs.step == 'reset_team_momentum' }}
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          export STADIUM_HOOK_ADDRESS=$(python3 -c "import json,os; f='hook-deployment.json'; print(json.load(open(f)).get('stadiumHook','') if os.path.exists(f) else json.load(open('deployments.json')).get('stadiumHook',''))")
+          export TEAM_ID="${{ vars.RESET_TEAM_ID || '2' }}"
+          export MOMENTUM_VALUE="${{ vars.RESET_MOMENTUM_VALUE || '0' }}"
+          forge script script/ResetTeamMomentum.s.sol \
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \

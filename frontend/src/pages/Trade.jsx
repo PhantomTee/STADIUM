@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
@@ -62,8 +62,17 @@ function parseUSDCAmount(str) {
 export default function Trade() {
   const { isConnected } = useAccount()
   const [selectedTeamId, setSelectedTeamId] = useState(null)
+  const swapPanelRef = useRef(null)
 
   const hookDeployed = ADDRESSES.stadiumHook !== ZERO_ADDR
+
+  function handleSelectTeam(id) {
+    setSelectedTeamId(prev => prev === id ? null : id)
+    // On mobile (< lg breakpoint) scroll to the swap panel
+    if (id !== selectedTeamId && window.innerWidth < 1024) {
+      setTimeout(() => swapPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -86,9 +95,9 @@ export default function Trade() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <TeamPoolGrid onSelect={setSelectedTeamId} selectedId={selectedTeamId} />
+          <TeamPoolGrid onSelect={handleSelectTeam} selectedId={selectedTeamId} />
         </div>
-        <div>
+        <div ref={swapPanelRef}>
           <SwapPanel teamId={selectedTeamId} isConnected={isConnected} />
         </div>
       </div>
@@ -358,6 +367,7 @@ function SwapForm({ team, isConnected }) {
       abi: inputABI,
       functionName: 'approve',
       args: [routerAddr, parsedAmount],
+      gas: 150_000n,
     })
   }
 
