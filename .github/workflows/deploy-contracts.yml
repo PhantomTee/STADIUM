@@ -54,6 +54,21 @@ jobs:
         with:
           version: stable
 
+      # ── X Layer: replace EIP-1153 transient storage with regular storage ──
+      # X Layer zkEVM does not clear transient storage between transactions,
+      # causing AlreadyUnlocked() (0x486aa307) after any failed swap.
+      # Patch files live in patches/xlayer/ and are copied over lib/v4-core/src/
+      # before each build. Only applied for xlayer networks.
+      - name: Apply X Layer transient-storage patches
+        if: ${{ contains(github.event.inputs.network, 'xlayer') }}
+        run: |
+          cp patches/xlayer/Exttload.sol             lib/v4-core/src/Exttload.sol
+          cp patches/xlayer/libraries/Lock.sol             lib/v4-core/src/libraries/Lock.sol
+          cp patches/xlayer/libraries/NonzeroDeltaCount.sol lib/v4-core/src/libraries/NonzeroDeltaCount.sol
+          cp patches/xlayer/libraries/CurrencyDelta.sol    lib/v4-core/src/libraries/CurrencyDelta.sol
+          cp patches/xlayer/libraries/CurrencyReserves.sol lib/v4-core/src/libraries/CurrencyReserves.sol
+          echo "X Layer patches applied (tstore/tload → sstore/sload)"
+
       - name: Set RPC URL
         run: |
           if [ "${{ github.event.inputs.network }}" = "xlayer_mainnet" ]; then
