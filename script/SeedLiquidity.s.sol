@@ -51,11 +51,17 @@ contract SeedLiquidity is Script {
     int24 constant TICK_LOWER   = -887220;  // floor(MAX_TICK / tickSpacing) * tickSpacing
     int24 constant TICK_UPPER   =  887220;
 
-    // liquidityDelta calibrated for SQRT_PRICE_1_1 pools (sqrtPriceX96 = 2^96).
-    // At price 1:1 (raw), a full-range position needs ~LIQUIDITY_DELTA raw units of each token.
-    //   Team tokens (18 dec): deployer gets 1_000_000e18 via distributeToken — trivially satisfied.
-    //   USDC (6 dec): 1e10 raw = 10,000 USDC/pool × 48 pools = 480k USDC << 2M minted.
-    int256 constant LIQUIDITY_DELTA = 1e10;
+    // liquidityDelta for pools initialised at 0.01 USDC per team token (CreatePools.s.sol).
+    // At that price, sqrtP = 1e-7 (team as C0) or 1e7 (USDC as C0).
+    // A full-range position with L=LIQUIDITY_DELTA needs approximately:
+    //   Team tokens: L × (2^96 / sqrtPriceX96) ≈ L × 1e7 raw = 1e22 raw = 10,000 tokens/pool
+    //   USDC:        L × (sqrtPriceX96 / 2^96) ≈ L × 1e-7 raw = 1e8 raw  = 100 USDC/pool
+    //   48 pools: ~480k tokens/team (< 1M distributable), ~4.8k USDC total (< 2M minted)
+    int256 constant LIQUIDITY_DELTA = 1e15;
+
+    // Minimum raw token balances required per-pool before calling addLiquidity.
+    uint256 constant TEAM_MIN_BAL = 1e22;  // 10,000 display team tokens
+    uint256 constant USDC_MIN_BAL = 1e8;   // 100 USDC
 
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
@@ -126,12 +132,11 @@ contract SeedLiquidity is Script {
                 console.log("Registered pool in hook for team", teamId);
             }
 
-            // Guard against on-chain ERC20InsufficientBalance: only call addLiquidity when
-            // both token balances exceed the expected per-pool requirement.
+            // Guard against on-chain ERC20InsufficientBalance: check actual per-token minimums.
+            // Amounts depend on pool price, not raw LIQUIDITY_DELTA — use precomputed constants.
             uint256 teamBal = IERC20(token).balanceOf(deployer);
             uint256 usdcBal = IERC20(usdcAddr).balanceOf(deployer);
-            uint256 minBal  = uint256(LIQUIDITY_DELTA);
-            if (teamBal < minBal || usdcBal < minBal) {
+            if (teamBal < TEAM_MIN_BAL || usdcBal < USDC_MIN_BAL) {
                 console.log("Insufficient balance for team", teamId, "- skipping addLiquidity");
                 continue;
             }

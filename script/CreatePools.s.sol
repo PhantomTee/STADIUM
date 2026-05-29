@@ -36,8 +36,21 @@ interface IStadiumHook {
 /// Usage:
 ///   forge script script/CreatePools.s.sol --rpc-url $XLAYER_RPC_URL --broadcast
 contract CreatePools is Script {
-    uint160 constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
-    int24   constant TICK_SPACING   = 60;
+    // Target display price: 0.01 USDC per team token (100 tokens per USDC).
+    // USDC (6 dec) and team tokens (18 dec) have a 12-order decimal gap, so the
+    // correct sqrtPriceX96 depends on which token sorts lower (becomes currency0).
+    //
+    // When USDC is currency0 (usdcAddr < tokenAddr):
+    //   P_raw(C1/C0) = (100 × 1e18 raw team) / 1e6 raw USDC = 1e14
+    //   sqrtPriceX96 = sqrt(1e14) × 2^96 = 1e7 × 2^96
+    uint160 constant SQRT_PRICE_USDC_C0 = 792281625142643375935439503360000000;
+
+    // When team token is currency0 (tokenAddr < usdcAddr):
+    //   P_raw(C1/C0) = 1e4 raw USDC / 1e18 raw team = 1e-14
+    //   sqrtPriceX96 = sqrt(1e-14) × 2^96 = 2^96 / 1e7
+    uint160 constant SQRT_PRICE_TEAM_C0 = 7922816251426433759354;
+
+    int24 constant TICK_SPACING = 60;
 
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
@@ -186,7 +199,17 @@ contract CreatePools is Script {
         address usdcAddr,
         address hookAddr
     ) internal {
-        try factory.createTeamPool(teamId, TICK_SPACING, SQRT_PRICE_1_1) {
+        // Get token address first so we can determine sort order and pick the correct sqrtPriceX96.
+        address token = factory.teamToken(teamId);
+        if (token == address(0)) {
+            console.log(string.concat("No token for team - skipping pool creation: ", name));
+            return;
+        }
+
+        bool usdcIsC0 = usdcAddr < token;
+        uint160 sqrtPriceX96 = usdcIsC0 ? SQRT_PRICE_USDC_C0 : SQRT_PRICE_TEAM_C0;
+
+        try factory.createTeamPool(teamId, TICK_SPACING, sqrtPriceX96) {
             bytes32 pid = factory.teamPoolId(teamId);
             console.log(string.concat("Pool created: ", name), vm.toString(pid));
         } catch {
@@ -194,13 +217,7 @@ contract CreatePools is Script {
         }
 
         // Register the pool in StadiumHook so beforeSwap doesn't revert PoolNotRegistered.
-        address token = factory.teamToken(teamId);
-        if (token == address(0)) {
-            console.log(string.concat("No token for team - skipping registerPool: ", name));
-            return;
-        }
-
-        (Currency c0, Currency c1) = usdcAddr < token
+        (Currency c0, Currency c1) = usdcIsC0
             ? (Currency.wrap(usdcAddr), Currency.wrap(token))
             : (Currency.wrap(token),    Currency.wrap(usdcAddr));
 
