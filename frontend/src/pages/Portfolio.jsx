@@ -42,8 +42,9 @@ function PortfolioSummary({ address }) {
   const { data: pendingYield } = usePendingYield(address)
   const { data: totalAlive }   = useTotalAliveDeposits()
 
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   const hasYield = pendingYield && pendingYield > 0n
 
@@ -127,8 +128,9 @@ function ConvictionPositions({ address }) {
 }
 
 function ConvictionPositionCard({ team, deposit, eliminated, champion, principalClaimed, multiplier }) {
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   const isAlive  = !eliminated && !champion
   const hasBonus = multiplier === 150n
@@ -203,8 +205,9 @@ function ChampionPoolSection({ address }) {
   const { totalAccumulated, snapshot, championSet, championTeamId } = useChampionPoolData()
   const { data: claimed } = useChampClaimed(address, championTeamId)
 
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   function handleClaim() {
     writeContract({

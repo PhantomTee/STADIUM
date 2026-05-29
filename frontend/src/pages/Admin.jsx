@@ -90,8 +90,9 @@ export default function Admin() {
 function RegisterTeamsTab() {
   const [batchIds, setBatchIds] = useState('')
 
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   const { data: registeredCount } = useTeamCount()
 
@@ -178,8 +179,9 @@ function ManageMatchesTab() {
   const [teamBId, setTeamBId]       = useState('')
   const [kickoffTime, setKickoffTime] = useState('')
 
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   const { data: matchIds } = useAllMatchIds()
 
@@ -318,8 +320,9 @@ function PostResultsTab() {
   const [redCard, setRedCard]       = useState(false)
   const [extraTime, setExtraTime]   = useState(false)
 
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   const { data: matchIds } = useAllMatchIds()
 
@@ -424,11 +427,13 @@ function TournamentTab() {
   const [elimTeamId, setElimTeamId]     = useState('')
   const [champTeamId, setChampTeamId]   = useState('')
 
-  const { writeContract, data: elimTxHash } = useWriteContract()
-  const { isLoading: elimLoading, isSuccess: elimSuccess } = useWaitForTransactionReceipt({ hash: elimTxHash })
+  const { writeContract, data: elimTxHash, isPending: elimSubmitting } = useWriteContract()
+  const { isLoading: elimConfirming, isSuccess: elimSuccess } = useWaitForTransactionReceipt({ hash: elimTxHash })
+  const elimLoading = elimSubmitting || elimConfirming
 
-  const { writeContract: writeChamp, data: champTxHash } = useWriteContract()
-  const { isLoading: champLoading, isSuccess: champSuccess } = useWaitForTransactionReceipt({ hash: champTxHash })
+  const { writeContract: writeChamp, data: champTxHash, isPending: champSubmitting } = useWriteContract()
+  const { isLoading: champConfirming, isSuccess: champSuccess } = useWaitForTransactionReceipt({ hash: champTxHash })
+  const champLoading = champSubmitting || champConfirming
 
   function handleElimination() {
     writeContract({

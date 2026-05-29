@@ -46,8 +46,9 @@ export default function Conviction() {
   const { data: lastFaucetTime, refetch: refetchCooldown } = useFaucetCooldown(address)
 
   // Faucet has its own isolated write hook so it never bleeds into DepositForm
-  const { writeContract: writeFaucet, data: faucetHash } = useWriteContract()
-  const { isLoading: faucetPending, isSuccess: faucetSuccess } = useWaitForTransactionReceipt({ hash: faucetHash })
+  const { writeContract: writeFaucet, data: faucetHash, isPending: faucetSubmitting } = useWriteContract()
+  const { isLoading: faucetConfirming, isSuccess: faucetSuccess } = useWaitForTransactionReceipt({ hash: faucetHash })
+  const faucetPending = faucetSubmitting || faucetConfirming
 
   useEffect(() => {
     if (faucetSuccess) {
@@ -326,22 +327,26 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
   const { data: champion }         = useTeamChampion(team.id)
   const { data: principalClaimed } = usePrincipalClaimed(userAddress, team.id)
 
-  const { writeContract: writeApprove,  data: approveTxHash  } = useWriteContract()
-  const { isLoading: approvePending, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash })
+  const { writeContract: writeApprove,  data: approveTxHash, isPending: approveSubmitting  } = useWriteContract()
+  const { isLoading: approveConfirming, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash })
+  const approvePending = approveSubmitting || approveConfirming
 
   // Immediately re-read allowance after approval so the button switches without delay
   useEffect(() => {
     if (approveSuccess) refetchAllowance()
   }, [approveSuccess])
 
-  const { writeContract: writeDeposit,  data: depositTxHash  } = useWriteContract()
-  const { isLoading: depositPending, isSuccess: depositSuccess } = useWaitForTransactionReceipt({ hash: depositTxHash })
+  const { writeContract: writeDeposit,  data: depositTxHash, isPending: depositSubmitting  } = useWriteContract()
+  const { isLoading: depositConfirming, isSuccess: depositSuccess } = useWaitForTransactionReceipt({ hash: depositTxHash })
+  const depositPending = depositSubmitting || depositConfirming
 
-  const { writeContract: writeClaim,    data: claimTxHash    } = useWriteContract()
-  const { isLoading: claimPending }                             = useWaitForTransactionReceipt({ hash: claimTxHash })
+  const { writeContract: writeClaim,    data: claimTxHash, isPending: claimSubmitting    } = useWriteContract()
+  const { isLoading: claimConfirming }                              = useWaitForTransactionReceipt({ hash: claimTxHash })
+  const claimPending = claimSubmitting || claimConfirming
 
-  const { writeContract: writeWithdraw, data: withdrawHash   } = useWriteContract()
-  const { isLoading: withdrawPending, isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash })
+  const { writeContract: writeWithdraw, data: withdrawHash, isPending: withdrawSubmitting   } = useWriteContract()
+  const { isLoading: withdrawConfirming, isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash })
+  const withdrawPending = withdrawSubmitting || withdrawConfirming
 
   const parsedAmount   = amount         ? parseUSDC(amount)         : 0n
   const parsedWithdraw = withdrawAmount ? parseUSDC(withdrawAmount) : 0n
@@ -610,8 +615,9 @@ function MechanicsCard() {
 
 function UserPositions({ address }) {
   const { data: pending } = usePendingYield(address)
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = txSubmitting || txConfirming
 
   function handleClaimYield() {
     writeContract({

@@ -76,8 +76,9 @@ export default function VAR() {
   const parsedAmount  = betAmount ? parseUSDC(betAmount) : 0n
   const needsApproval = allowance !== undefined && parsedAmount > 0n && allowance < parsedAmount
 
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading: txPending, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
+  const { isLoading: txConfirming, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const txPending = txSubmitting || txConfirming
 
   const teamAName = selectedMatch?.teamAName || ''
   const teamBName = selectedMatch?.teamBName || ''
@@ -400,8 +401,9 @@ function OutcomePoolCell({ matchId, marketType, outcome, label }) {
 
 function ClaimSection({ matchId, marketType, address }) {
   const { data: alreadyClaimed } = useVARClaimed(matchId, marketType, address)
-  const { writeContract, data: txHash } = useWriteContract()
-  const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const { writeContract, data: txHash, isPending: claimSubmitting } = useWriteContract()
+  const { isLoading: claimConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash })
+  const isLoading = claimSubmitting || claimConfirming
 
   function handleClaim() {
     writeContract({
