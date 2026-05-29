@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
+import {SwapParams} from "@uniswap/v4-core/types/PoolOperation.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {Currency} from "@uniswap/v4-core/types/Currency.sol";
@@ -30,7 +31,7 @@ contract StadiumRouter {
     struct CallbackData {
         address sender;
         PoolKey key;
-        IPoolManager.SwapParams params;
+        SwapParams params;
     }
 
     error NotManager();
@@ -55,7 +56,7 @@ contract StadiumRouter {
     /// @return delta   Packed BalanceDelta: amount0 in lower 128 bits, amount1 in upper 128 bits.
     function swap(
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        SwapParams calldata params,
         uint256 deadline
     ) external returns (BalanceDelta delta) {
         if (block.timestamp > deadline) revert Expired();

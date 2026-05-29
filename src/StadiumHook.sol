@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {BaseHook} from "./vendor/BaseHook.sol";
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
+import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/types/PoolOperation.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/types/Currency.sol";
@@ -212,7 +213,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     function beforeSwap(
         address sender,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata,
+        SwapParams calldata,
         bytes calldata
     )
         external
@@ -250,7 +251,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     function afterSwap(
         address sender,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata,
+        SwapParams calldata,
         BalanceDelta delta,
         bytes calldata
     )
@@ -306,7 +307,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     function beforeAddLiquidity(
         address sender,
         PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         bytes calldata
     )
         external
@@ -337,7 +338,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
     function afterAddLiquidity(
         address,
         PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         BalanceDelta,
         BalanceDelta,
         bytes calldata
