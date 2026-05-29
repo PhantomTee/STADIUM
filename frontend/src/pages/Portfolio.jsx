@@ -53,6 +53,7 @@ function PortfolioSummary({ address }) {
       address: ADDRESSES.convictionVault,
       abi: ConvictionVault_ABI,
       functionName: 'claimYield',
+      gas: 300_000n,
     })
   }
 
@@ -141,6 +142,7 @@ function ConvictionPositionCard({ team, deposit, eliminated, champion, principal
       abi: ConvictionVault_ABI,
       functionName: champion ? 'claimChampionPosition' : 'claimEliminatedPosition',
       args: [team.id],
+      gas: 300_000n,
     })
   }
 
@@ -215,6 +217,7 @@ function ChampionPoolSection({ address }) {
       abi: ChampionPool_ABI,
       functionName: 'claimChampionPool',
       args: [championTeamId],
+      gas: 300_000n,
     })
   }
 

@@ -89,6 +89,7 @@ export default function VAR() {
       abi: MockUSDC_ABI,
       functionName: 'approve',
       args: [ADDRESSES.varMarket, parsedAmount],
+      gas: 150_000n,
     })
   }
 
@@ -99,6 +100,7 @@ export default function VAR() {
       abi: VARMarket_ABI,
       functionName: 'placeBet',
       args: [BigInt(selectedMatchId), selectedMarket, selectedOutcome, parsedAmount],
+      gas: 400_000n,
     })
   }
 
@@ -411,6 +413,7 @@ function ClaimSection({ matchId, marketType, address }) {
       abi: VARMarket_ABI,
       functionName: 'claimVAR',
       args: [BigInt(matchId), marketType],
+      gas: 300_000n,
     })
   }
 

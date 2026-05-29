@@ -82,7 +82,7 @@ export default function Conviction() {
     : WORLD_CUP_TEAMS.filter(t => t.group === filterGroup)
 
   function handleFaucet() {
-    writeFaucet({ address: ADDRESSES.mockUSDC, abi: MockUSDC_ABI, functionName: 'faucet' })
+    writeFaucet({ address: ADDRESSES.mockUSDC, abi: MockUSDC_ABI, functionName: 'faucet', gas: 200_000n })
   }
 
   function handleSelectTeam(team) {
@@ -363,6 +363,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
       abi: MockUSDC_ABI,
       functionName: 'approve',
       args: [ADDRESSES.convictionVault, parsedAmount],
+      gas: 150_000n,
     })
   }
 
@@ -373,6 +374,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
       abi: ConvictionVault_ABI,
       functionName: 'depositConviction',
       args: [team.id, parsedAmount],
+      gas: 400_000n,
     })
   }
 
@@ -382,6 +384,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
       abi: ConvictionVault_ABI,
       functionName: 'claimEliminatedPosition',
       args: [team.id],
+      gas: 300_000n,
     })
   }
 
@@ -391,6 +394,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
       abi: ConvictionVault_ABI,
       functionName: 'claimChampionPosition',
       args: [team.id],
+      gas: 300_000n,
     })
   }
 
@@ -401,6 +405,7 @@ function DepositForm({ team, usdcBalance, userAddress, convictionOpen }) {
       abi: ConvictionVault_ABI,
       functionName: 'withdrawConviction',
       args: [team.id, parsedWithdraw],
+      gas: 300_000n,
     })
   }
 
@@ -624,6 +629,7 @@ function UserPositions({ address }) {
       address: ADDRESSES.convictionVault,
       abi: ConvictionVault_ABI,
       functionName: 'claimYield',
+      gas: 300_000n,
     })
   }
 
