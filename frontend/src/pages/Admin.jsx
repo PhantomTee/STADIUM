@@ -259,6 +259,7 @@ function ManageMatchesTab() {
                 matchId={id}
                 onOpenVAR={handleOpenVAR}
                 onStart={handleStart}
+                txPending={isLoading}
               />
             ))}
           </div>
@@ -268,7 +269,7 @@ function ManageMatchesTab() {
   )
 }
 
-function MatchAdminRow({ matchId, onOpenVAR, onStart }) {
+function MatchAdminRow({ matchId, onOpenVAR, onStart, txPending }) {
   const { data: match } = useMatch(matchId)
   if (!match) return null
 
@@ -286,10 +287,22 @@ function MatchAdminRow({ matchId, onOpenVAR, onStart }) {
       </div>
       <div className="flex gap-2">
         {!match.varOpen && !match.varClosed && !match.settled && (
-          <button onClick={() => onOpenVAR(matchId)} className="btn-secondary text-xs py-1 px-3">Open VAR</button>
+          <button
+            onClick={() => onOpenVAR(matchId)}
+            disabled={txPending}
+            className="btn-secondary text-xs py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {txPending ? '⏳' : 'Open VAR'}
+          </button>
         )}
         {match.varOpen && (
-          <button onClick={() => onStart(matchId)} className="btn-secondary text-xs py-1 px-3">Start Match</button>
+          <button
+            onClick={() => onStart(matchId)}
+            disabled={txPending}
+            className="btn-secondary text-xs py-1 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {txPending ? '⏳' : 'Start Match'}
+          </button>
         )}
       </div>
     </div>
