@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
+import {ModifyLiquidityParams} from "@uniswap/v4-core/types/PoolOperation.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {Currency} from "@uniswap/v4-core/types/Currency.sol";
@@ -21,7 +22,7 @@ contract StadiumLiquidityRouter {
     struct CallbackData {
         address sender;
         PoolKey key;
-        IPoolManager.ModifyLiquidityParams params;
+        ModifyLiquidityParams params;
     }
 
     error NotManager();
@@ -58,7 +59,7 @@ contract StadiumLiquidityRouter {
             abi.encode(CallbackData({
                 sender: msg.sender,
                 key:    key,
-                params: IPoolManager.ModifyLiquidityParams({
+                params: ModifyLiquidityParams({
                     tickLower:      tickLower,
                     tickUpper:      tickUpper,
                     liquidityDelta: liquidityDelta,
