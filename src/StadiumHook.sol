@@ -305,7 +305,7 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
 
     /// @dev Block adding liquidity to eliminated team pools.
     function beforeAddLiquidity(
-        address sender,
+        address,
         PoolKey calldata key,
         ModifyLiquidityParams calldata,
         bytes calldata
@@ -329,17 +329,15 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
             } catch {}
         }
 
-        emit TeamLiquidityAdded(sender, ps.teamId, 0);
-
         return BaseHook.beforeAddLiquidity.selector;
     }
 
-    /// @dev Update stats after liquidity is added.
+    /// @dev Emit TeamLiquidityAdded with actual USDC amount after liquidity is confirmed added.
     function afterAddLiquidity(
-        address,
-        PoolKey calldata,
+        address sender,
+        PoolKey calldata key,
         ModifyLiquidityParams calldata,
-        BalanceDelta,
+        BalanceDelta delta,
         BalanceDelta,
         bytes calldata
     )
@@ -348,7 +346,22 @@ contract StadiumHook is BaseHook, Ownable, ReentrancyGuard {
         onlyPoolManager
         returns (bytes4, BalanceDelta)
     {
-        // No additional logic needed; stats are updated in beforeAddLiquidity
+        bytes32 pid = PoolId.unwrap(key.toId());
+        PoolState storage ps = poolState[pid];
+
+        if (ps.registered) {
+            int256 usdcAmt;
+            if (usdc == address(0)) {
+                usdcAmt = delta.amount0();
+            } else if (Currency.unwrap(key.currency0) == usdc) {
+                usdcAmt = delta.amount0();
+            } else {
+                usdcAmt = delta.amount1();
+            }
+            uint256 absAmt = usdcAmt < 0 ? uint256(-usdcAmt) : uint256(usdcAmt);
+            emit TeamLiquidityAdded(sender, ps.teamId, absAmt);
+        }
+
         return (BaseHook.afterAddLiquidity.selector, BalanceDelta.wrap(0));
     }
 
