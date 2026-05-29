@@ -25,6 +25,13 @@ interface IMockUSDC {
 
 interface IStadiumHook {
     function registerPool(PoolKey calldata key, uint16 teamId) external;
+    function poolState(bytes32 poolId) external view returns (
+        uint16  teamId,
+        bool    registered,
+        bool    active,
+        uint256 totalVolumeUSDC,
+        uint256 feeRoutedToChampPool
+    );
 }
 
 /// @notice Seeds initial full-range liquidity for every registered team pool.
@@ -105,13 +112,15 @@ contract SeedLiquidity is Script {
                 hooks:       IHooks(hookAddr)
             });
 
-            // Register pool in hook so beforeAddLiquidity/beforeSwap don't revert
-            // PoolNotRegistered. Silently skip if already registered or access denied.
-            try IStadiumHook(hookAddr).registerPool(key, teamId) {
+            // Check registration status before calling registerPool.
+            // forge --broadcast sends try/catch'd reverts on-chain causing exit code 1,
+            // so we guard with a view call instead of relying on try/catch.
+            bytes32 pid = keccak256(abi.encode(key));
+            (, bool alreadyRegistered, , ,) = IStadiumHook(hookAddr).poolState(pid);
+            if (!alreadyRegistered) {
+                IStadiumHook(hookAddr).registerPool(key, teamId);
                 registered++;
                 console.log("Registered pool in hook for team", teamId);
-            } catch {
-                // Already registered or not owner - continue
             }
 
             // At sqrtPrice 1:1 (raw units), a full-range position with LIQUIDITY_DELTA
