@@ -31,6 +31,6 @@ contract SetHookUsdc is Script {
         vm.broadcast(key);
         hook.setUsdc(usdc);
 
-        console.log("Done — hook.usdc() =", hook.usdc());
+        console.log("Done - hook.usdc() =", hook.usdc());
     }
 }
