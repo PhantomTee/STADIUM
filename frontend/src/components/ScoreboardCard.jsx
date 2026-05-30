@@ -96,7 +96,7 @@ export default function ScoreboardCard({ match, hookState }) {
         <div className="flex-1 flex flex-col items-center justify-center py-6 px-3 gap-2">
           <div
             className="font-black text-stadium-text uppercase tracking-tight leading-none"
-            style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(32px, 8vw, 56px)', letterSpacing: '-0.02em' }}
+            style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(32px, 8vw, 56px)', letterSpacing: '-0.02em' }}
           >
             {teamAAbbr}
           </div>
@@ -118,14 +118,14 @@ export default function ScoreboardCard({ match, hookState }) {
           <div className="flex items-baseline gap-2">
             <span
               className={`font-black leading-none ${isLive ? 'text-white' : isFinished ? 'text-stadium-muted' : 'text-stadium-border'}`}
-              style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(42px, 10vw, 72px)', letterSpacing: '-0.04em' }}
+              style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(42px, 10vw, 72px)', letterSpacing: '-0.04em' }}
             >
               {isLive || isFinished || status === 'halftime' ? teamAScore : '–'}
             </span>
             <span className="text-stadium-border font-mono text-2xl pb-1">:</span>
             <span
               className={`font-black leading-none ${isLive ? 'text-white' : isFinished ? 'text-stadium-muted' : 'text-stadium-border'}`}
-              style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(42px, 10vw, 72px)', letterSpacing: '-0.04em' }}
+              style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(42px, 10vw, 72px)', letterSpacing: '-0.04em' }}
             >
               {isLive || isFinished || status === 'halftime' ? teamBScore : '–'}
             </span>
@@ -139,7 +139,7 @@ export default function ScoreboardCard({ match, hookState }) {
         <div className="flex-1 flex flex-col items-center justify-center py-6 px-3 gap-2">
           <div
             className="font-black text-stadium-text uppercase tracking-tight leading-none"
-            style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(32px, 8vw, 56px)', letterSpacing: '-0.02em' }}
+            style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(32px, 8vw, 56px)', letterSpacing: '-0.02em' }}
           >
             {teamBAbbr}
           </div>

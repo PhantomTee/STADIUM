@@ -85,7 +85,7 @@ export default function V4HookEngine() {
             </div>
             <div
               className="font-black text-stadium-text uppercase leading-none mb-3"
-              style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(28px, 5vw, 48px)' }}
+              style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(28px, 5vw, 48px)' }}
             >
               StadiumHook
             </div>

@@ -119,7 +119,7 @@ export default function Layout({ children }) {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group flex-shrink-0">
             <BallIcon />
-            <span className="group-hover:text-stadium-green transition-colors" style={{ fontFamily: "'Anton', sans-serif", fontSize: 24, letterSpacing: '-0.02em', color: '#ffffff' }}>
+            <span className="group-hover:text-stadium-green transition-colors" style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 24, letterSpacing: '-0.02em', color: '#ffffff' }}>
               11°
             </span>
           </Link>
@@ -210,7 +210,7 @@ export default function Layout({ children }) {
                     }`}
                   >
                     <span
-                      style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(22px, 6vw, 32px)', letterSpacing: '-0.02em' }}
+                      style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(22px, 6vw, 32px)', letterSpacing: '-0.02em' }}
                     >
                       {label}
                     </span>
@@ -248,7 +248,7 @@ export default function Layout({ children }) {
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <BallIcon />
-            <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 20, letterSpacing: '-0.02em', color: '#ffffff' }}>11°</span>
+            <span style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 20, letterSpacing: '-0.02em', color: '#ffffff' }}>11°</span>
             <span className="text-stadium-muted text-xs font-mono ml-2">— Back Your Team. Trade The Match. Win The Cup.</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-stadium-muted font-mono">

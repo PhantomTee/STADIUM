@@ -55,7 +55,7 @@ html.light {
 
   body {
     @apply text-stadium-text;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Motiva Sans', 'DM Sans', sans-serif;
     min-height: 100vh;
     background: transparent;
     transition: color 0.2s;
@@ -121,7 +121,7 @@ html.light {
 
   .section-title {
     @apply text-2xl font-black text-stadium-text mb-1 uppercase tracking-tight;
-    font-family: 'Anton', sans-serif;
+    font-family: 'Motiva Sans', 'DM Sans', sans-serif;
   }
 
   .section-subtitle {
@@ -139,7 +139,7 @@ html.light {
 
 /* ─── Display typography ─────────────────────────────────────────────────── */
 .text-display {
-  font-family: 'Anton', sans-serif;
+  font-family: 'Motiva Sans', 'DM Sans', sans-serif;
   font-size: clamp(3.5rem, 10vw, 9.5rem);
   font-weight: 900;
   line-height: 0.92;

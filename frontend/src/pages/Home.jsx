@@ -89,7 +89,7 @@ export default function Home() {
               <div className="text-xs font-mono text-stadium-green uppercase tracking-widest mb-4">Long-term strategy</div>
               <div
                 className="font-black text-stadium-text uppercase leading-none mb-6"
-                style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(36px, 8vw, 60px)' }}
+                style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(36px, 8vw, 60px)' }}
               >
                 CONVICTION
               </div>
@@ -121,7 +121,7 @@ export default function Home() {
               <div className="text-xs font-mono text-blue-400 uppercase tracking-widest mb-4">Match-by-match action</div>
               <div
                 className="font-black text-stadium-text uppercase leading-none mb-6"
-                style={{ fontFamily: "'Anton', sans-serif", fontSize: 'clamp(36px, 8vw, 60px)' }}
+                style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif", fontSize: 'clamp(36px, 8vw, 60px)' }}
               >
                 VAR
               </div>

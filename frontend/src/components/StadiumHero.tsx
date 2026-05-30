@@ -61,7 +61,7 @@ export default function StadiumHero() {
               flexShrink: 0,
             }} />
             <span style={{
-              fontFamily: 'Inter, sans-serif',
+              fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: '0.2em',
@@ -76,7 +76,7 @@ export default function StadiumHero() {
         {/* Mega headline */}
         <h1
           style={{
-            fontFamily: "'Anton', sans-serif",
+            fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
             fontSize: 'clamp(52px, min(10vw, 11.5vh), 120px)',
             lineHeight: 0.9,
             letterSpacing: '-0.025em',
@@ -99,7 +99,7 @@ export default function StadiumHero() {
           {/* Left: description + buttons */}
           <div style={{ flex: '1 1 280px', minWidth: 0 }}>
             <p style={{
-              fontFamily: 'Inter, sans-serif',
+              fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
               fontSize: 'clamp(13px, 1.3vw, 15px)',
               lineHeight: 1.7,
               color: cDesc,
@@ -117,7 +117,7 @@ export default function StadiumHero() {
                 <>
                   <Link to="/conviction" style={{ textDecoration: 'none' }}>
                     <button style={{
-                      fontFamily: 'Inter, sans-serif',
+                      fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: '0.18em',
@@ -138,7 +138,7 @@ export default function StadiumHero() {
                   </Link>
                   <Link to="/var" style={{ textDecoration: 'none' }}>
                     <button style={{
-                      fontFamily: 'Inter, sans-serif',
+                      fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: '0.18em',
@@ -168,7 +168,7 @@ export default function StadiumHero() {
             ].map(({ value, label }) => (
               <div key={label} style={{ textAlign: 'center' }}>
                 <div style={{
-                  fontFamily: "'Anton', sans-serif",
+                  fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
                   fontSize: 'clamp(32px, 4.5vw, 64px)',
                   color: cText,
                   lineHeight: 1,
@@ -177,7 +177,7 @@ export default function StadiumHero() {
                   {value}
                 </div>
                 <div style={{
-                  fontFamily: 'Inter, sans-serif',
+                  fontFamily: "'Motiva Sans', 'DM Sans', sans-serif",
                   fontSize: 9,
                   fontWeight: 700,
                   letterSpacing: '0.22em',

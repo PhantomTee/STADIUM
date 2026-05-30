@@ -19,9 +19,9 @@ export default {
         }
       },
       fontFamily: {
-        display: ['Anton', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        display: ['Motiva Sans', 'DM Sans', 'sans-serif'],
+        body:    ['Motiva Sans', 'DM Sans', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

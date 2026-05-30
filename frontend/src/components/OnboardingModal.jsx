@@ -83,7 +83,7 @@ export default function OnboardingModal() {
         <div className="px-5 pb-7 flex-1">
           <h2
             className="text-2xl font-black uppercase tracking-tight text-white mb-3"
-            style={{ fontFamily: "'Anton', sans-serif" }}
+            style={{ fontFamily: "'Motiva Sans', 'DM Sans', sans-serif" }}
           >
             {current.title}
           </h2>
