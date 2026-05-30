@@ -62,7 +62,7 @@ contract DeployHook is Script {
             hook.setUsdc(usdcAddr);
             console.log("setUsdc:", usdcAddr);
         } else {
-            console.log("WARNING: MOCK_USDC_ADDRESS not set — momentum will use demo fallback (amt0).");
+            console.log("WARNING: MOCK_USDC_ADDRESS not set - momentum will use demo fallback (amt0).");
             console.log("         Run SetHookUsdc.s.sol to fix this before any swaps.");
         }
 
