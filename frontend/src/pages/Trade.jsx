@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
 import {
@@ -9,6 +9,7 @@ import {
 } from '../hooks/useContracts'
 import {
   StadiumRouter_ABI, MockUSDC_ABI, TeamToken_ABI, TeamFactory_ABI,
+  StadiumHook_ABI, ConvictionVault_ABI,
 } from '../abis/index.js'
 import { useToast } from '../components/Toast'
 import ShareButton from '../components/ShareButton'
@@ -139,39 +140,101 @@ function HookStatus() {
   )
 }
 
+const SORT_OPTIONS = [
+  { key: 'momentum', label: 'Momentum' },
+  { key: 'locked',   label: 'Locked'   },
+  { key: 'name',     label: 'A–Z'      },
+]
+
 function TeamPoolGrid({ onSelect, selectedId }) {
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('momentum')
+
+  // Batch-read momentum and locked for all 48 teams so we can sort without
+  // waiting for per-row lazy fetches
+  const { data: momentumData } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.map(t => ({
+      address: ADDRESSES.stadiumHook,
+      abi: StadiumHook_ABI,
+      functionName: 'teamMomentum',
+      args: [t.id],
+    })),
+    query: { refetchInterval: 20_000 },
+  })
+  const { data: lockedData } = useReadContracts({
+    contracts: WORLD_CUP_TEAMS.map(t => ({
+      address: ADDRESSES.convictionVault,
+      abi: ConvictionVault_ABI,
+      functionName: 'teamTotalDeposit',
+      args: [t.id],
+    })),
+    query: { refetchInterval: 20_000 },
+  })
+
+  const momentumMap = Object.fromEntries(
+    WORLD_CUP_TEAMS.map((t, i) => [t.id, momentumData?.[i]?.result ?? 0n])
+  )
+  const lockedMap = Object.fromEntries(
+    WORLD_CUP_TEAMS.map((t, i) => [t.id, lockedData?.[i]?.result ?? 0n])
+  )
+
   const filtered = WORLD_CUP_TEAMS.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.group === search.toUpperCase()
   )
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'momentum') return momentumMap[b.id] > momentumMap[a.id] ? 1 : momentumMap[b.id] < momentumMap[a.id] ? -1 : 0
+    if (sortBy === 'locked')   return lockedMap[b.id]   > lockedMap[a.id]   ? 1 : lockedMap[b.id]   < lockedMap[a.id]   ? -1 : 0
+    return a.name.localeCompare(b.name)
+  })
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h2 className="font-semibold text-stadium-text text-sm uppercase tracking-widest">Team Pools</h2>
-        <input
-          type="text"
-          placeholder="Search team or group…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="bg-stadium-dark border border-stadium-border text-stadium-text text-xs px-3 py-1.5 font-mono w-44 focus:outline-none focus:border-stadium-green"
-        />
+        <div className="flex items-center gap-2">
+          {/* Sort buttons */}
+          <div className="flex gap-px bg-stadium-border">
+            {SORT_OPTIONS.map(s => (
+              <button
+                key={s.key}
+                onClick={() => setSortBy(s.key)}
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition-colors ${
+                  sortBy === s.key
+                    ? 'bg-stadium-green/10 text-stadium-green'
+                    : 'bg-stadium-card text-stadium-muted hover:text-stadium-text'
+                }`}
+              >
+                {s.label}{sortBy === s.key ? ' ↓' : ''}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            placeholder="Search…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="bg-stadium-dark border border-stadium-border text-stadium-text text-xs px-3 py-1.5 font-mono w-28 focus:outline-none focus:border-stadium-green"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-mono text-stadium-muted uppercase tracking-widest border-b border-stadium-border mb-px">
         <div className="col-span-5">Team</div>
-        <div className="col-span-3 text-right">Momentum</div>
-        <div className="col-span-2 text-right">Locked</div>
+        <button onClick={() => setSortBy('momentum')} className={`col-span-3 text-right transition-colors ${sortBy === 'momentum' ? 'text-stadium-green' : 'hover:text-stadium-text'}`}>Momentum</button>
+        <button onClick={() => setSortBy('locked')}   className={`col-span-2 text-right transition-colors ${sortBy === 'locked'   ? 'text-stadium-green' : 'hover:text-stadium-text'}`}>Locked</button>
         <div className="col-span-2 text-right">Pool</div>
       </div>
 
       <div className="space-y-px bg-stadium-border max-h-[600px] overflow-y-auto">
-        {filtered.map(team => (
+        {sorted.map(team => (
           <TeamPoolRow
             key={team.id}
             team={team}
             selected={selectedId === team.id}
             onClick={() => onSelect(team.id === selectedId ? null : team.id)}
+            momentum={momentumMap[team.id]}
+            locked={lockedMap[team.id]}
           />
         ))}
       </div>
@@ -179,10 +242,8 @@ function TeamPoolGrid({ onSelect, selectedId }) {
   )
 }
 
-function TeamPoolRow({ team, selected, onClick }) {
-  const { data: momentum }   = useTeamMomentum(team.id)
+function TeamPoolRow({ team, selected, onClick, momentum, locked }) {
   const { data: eliminated } = useTeamEliminated(team.id)
-  const { data: locked }     = useTeamTotalDeposit(team.id)
   const { data: poolId }     = useFactoryTeamPoolId(team.id)
 
   const hasPool = poolId && poolId !== '0x0000000000000000000000000000000000000000000000000000000000000000'
@@ -206,9 +267,7 @@ function TeamPoolRow({ team, selected, onClick }) {
         </div>
       </div>
       <div className="col-span-3 text-right">
-        <div className="text-xs font-mono text-stadium-green font-bold">
-          {momentum ? formatUSDC(momentum) : '0.00'}
-        </div>
+        <div className="text-xs font-mono text-stadium-green font-bold">{formatUSDC(momentum)}</div>
         <div className="text-xs text-stadium-muted font-mono">vol</div>
       </div>
       <div className="col-span-2 text-right">

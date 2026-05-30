@@ -255,12 +255,24 @@ export default function Layout({ children }) {
             <span>X Layer Testnet · Chain ID 1952</span>
             <span className="h-3 w-px bg-stadium-border" />
             <a
+              href="https://x.com/11onXlayer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:text-stadium-green transition-colors uppercase tracking-widest"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              @11onXlayer
+            </a>
+            <span className="h-3 w-px bg-stadium-border" />
+            <a
               href="https://web3.okx.com/explorer/xlayer-test"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-stadium-green transition-colors uppercase tracking-widest"
             >
-              Block Explorer ↗
+              Explorer ↗
             </a>
           </div>
         </div>
