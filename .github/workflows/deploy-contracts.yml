@@ -110,6 +110,7 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
             --skip-simulation \
             --private-key $PRIVATE_KEY
@@ -131,7 +132,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Fix hook USDC address on existing deployment ────────────────
@@ -148,7 +151,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Reset a team's momentum score on an existing hook ─────────
@@ -167,7 +172,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed MatchOracle + ConvictionVault teams (must run before CreatePools) ──
@@ -184,7 +191,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Register teams + create V4 pools ─────────────────────────────
@@ -199,7 +208,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed initial liquidity into V4 pools ─────────────────────────
@@ -219,7 +230,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Deploy StadiumRouter (V4 swap router) ─────────────────────
@@ -233,7 +246,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Step: Seed match fixtures (manual only — not part of 'all') ──────
@@ -249,7 +264,9 @@ jobs:
             --rpc-url $RPC_URL \
             --broadcast \
             --slow \
+            --legacy \
             --non-interactive \
+            --skip-simulation \
             --private-key $PRIVATE_KEY
 
       # ── Merge router address into deployments.json ─────────────────────
