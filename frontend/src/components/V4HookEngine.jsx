@@ -14,14 +14,6 @@ const HOOK_PERMISSIONS = [
   { flag: 'afterAddLiquidity',   desc: 'Records liquidity stats' },
 ]
 
-const DEMO_POOL = {
-  teamId: 37,
-  teamName: 'Argentina',
-  currency0: 'USDC',
-  currency1: 'ARG',
-  fee: 'DYNAMIC',
-  tickSpacing: 60,
-}
 
 function AddrLink({ addr, label }) {
   const isZero = !addr || addr === '0x0000000000000000000000000000000000000000'
@@ -66,7 +58,6 @@ export default function V4HookEngine() {
   const isDeployed = hook && hook !== '0x0000000000000000000000000000000000000000'
 
   const [dynamicFee]   = useState('3000')   // 0.30% group stage
-  const [momentum]     = useState('48 200') // notional
   const [teamStatus]   = useState('ACTIVE')
 
   return (
@@ -160,36 +151,6 @@ export default function V4HookEngine() {
           </div>
         </div>
 
-        {/* Live V4 Pool */}
-        <div className="bg-stadium-card p-6">
-          <div className="text-xs font-mono text-stadium-muted uppercase tracking-widest mb-4">
-            Live V4 Pool
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between text-xs">
-              <span className="text-stadium-muted">Pair</span>
-              <span className="font-mono text-stadium-text">
-                {DEMO_POOL.currency0}/{DEMO_POOL.currency1}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-stadium-muted">Fee</span>
-              <span className="font-mono text-stadium-green">Dynamic (Hook)</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-stadium-muted">Tick Spacing</span>
-              <span className="font-mono text-stadium-text">{DEMO_POOL.tickSpacing}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-stadium-muted">Hook</span>
-              <span className="font-mono text-stadium-green text-xs">IHooks(stadiumHook)</span>
-            </div>
-            <div className="border-t border-stadium-border pt-3">
-              <div className="text-stadium-muted text-xs mb-1">Team Momentum</div>
-              <div className="font-mono text-stadium-text text-sm font-bold">{momentum} USDC vol</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Demo flow */}
