@@ -1,8 +1,10 @@
-import React, { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useState, useCallback } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import OnboardingModal from './components/OnboardingModal'
+import Preloader from './components/Preloader'
 import { ToastProvider } from './components/Toast'
+
 import Home from './pages/Home'
 import Conviction from './pages/Conviction'
 import VAR from './pages/VAR'
@@ -12,6 +14,7 @@ import NFTs from './pages/NFTs'
 import LiveScores from './pages/LiveScores'
 import Activity from './pages/Activity'
 import About from './pages/About'
+const SESSION_KEY = 'stadium-intro-seen'
 const Trade = lazy(() => import('./pages/Trade'))
 const Admin = lazy(() => import('./pages/Admin'))
 
@@ -22,7 +25,17 @@ const Lazy = ({ children }) => (
 )
 
 export default function App() {
+  const [preloaderDone, setPreloaderDone] = useState(
+    () => typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem(SESSION_KEY)
+  )
+  const handleDone = useCallback(() => {
+    sessionStorage.setItem(SESSION_KEY, '1')
+    setPreloaderDone(true)
+  }, [])
+
   return (
+    <>
+      {!preloaderDone && <Preloader onDone={handleDone} />}
     <ToastProvider>
       <Layout>
         <OnboardingModal />
@@ -41,5 +54,6 @@ export default function App() {
         </Routes>
       </Layout>
     </ToastProvider>
+    </>
   )
 }

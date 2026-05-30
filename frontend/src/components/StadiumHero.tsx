@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ArrowRight } from 'lucide-react'
+import FootballBall from './FootballBall'
 
 function useLightMode() {
   const [isLight, setIsLight] = useState(() =>
@@ -47,6 +48,22 @@ export default function StadiumHero() {
         transition: 'background 0.2s ease',
       }}
     >
+      {/* Abstract 3D ball — right side, desktop only */}
+      <div style={{
+        position: 'absolute',
+        right: 'clamp(32px, 7vw, 100px)',
+        top: '50%',
+        transform: 'translateY(-54%)',
+        zIndex: 0,
+        display: 'var(--ball-display, flex)',
+        pointerEvents: 'none',
+        opacity: 0.92,
+      }}
+        className="hero-ball"
+      >
+        <FootballBall size={320} />
+      </div>
+
       <div style={{ position: 'relative', zIndex: 1 }}>
 
         {/* Green rule + badge */}

@@ -180,6 +180,10 @@ input:focus, textarea:focus, select:focus {
   100% { background-position:  200% center; }
 }
 
+/* ─── Hero ball: hidden on small screens ────────────────────────────────── */
+.hero-ball { display: none; }
+@media (min-width: 900px) { .hero-ball { display: flex; } }
+
 /* ─── Pitch line overlay (used in hero) ─────────────────────────────────── */
 .pitch-lines-overlay {
   background-image:
