@@ -42,6 +42,14 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
 
   let from = await getCursor(t.key)
 
+  // If INDEXER_START_BLOCK is configured and ahead of the stored cursor,
+  // jump forward — avoids scanning millions of empty pre-deployment blocks.
+  const startBlock = config.indexerStartBlock
+  if (startBlock > 0n && from < startBlock) {
+    from = startBlock
+    console.log(`[indexer] ${t.type}: jumping to INDEXER_START_BLOCK ${startBlock}`)
+  }
+
   while (from < current) {
     const to = from + CHUNK <= current ? from + CHUNK : current
 
