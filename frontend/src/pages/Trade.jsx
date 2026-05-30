@@ -120,19 +120,19 @@ function HookStatus() {
       </div>
       <div className="card">
         <div className="stat-value text-sm text-stadium-text font-mono">
-          {feeConfig ? `${(feeConfig.groupStageFee / 10000 * 100).toFixed(2)}%` : '—'}
+          {feeConfig ? `${(feeConfig.groupStageFee / 10000).toFixed(2)}%` : '—'}
         </div>
         <div className="stat-label">Group Stage Fee</div>
       </div>
       <div className="card">
         <div className="stat-value text-sm text-stadium-text font-mono">
-          {feeConfig ? `${(feeConfig.knockoutFee / 10000 * 100).toFixed(2)}%` : '—'}
+          {feeConfig ? `${(feeConfig.knockoutFee / 10000).toFixed(2)}%` : '—'}
         </div>
         <div className="stat-label">Knockout Fee</div>
       </div>
       <div className="card">
         <div className="stat-value text-sm text-stadium-gold font-mono">
-          {feeConfig ? `-${(feeConfig.convictionDiscount / 10000 * 100).toFixed(2)}%` : '—'}
+          {feeConfig ? `-${(feeConfig.convictionDiscount / 10000).toFixed(2)}%` : '—'}
         </div>
         <div className="stat-label">Conviction Discount</div>
       </div>

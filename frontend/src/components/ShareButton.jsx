@@ -34,14 +34,8 @@ export default function ShareButton({ text }) {
 
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
-  async function handleShare() {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: '11° — World Cup DeFi', text, url: siteUrl })
-        return
-      } catch {}
-    }
-    const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(siteUrl)}`
+  function handleShare() {
+    const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text + ' ' + siteUrl)}`
     window.open(tw, '_blank', 'noopener,noreferrer,width=560,height=420')
   }
 
