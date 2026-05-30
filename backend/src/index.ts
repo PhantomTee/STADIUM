@@ -5,6 +5,8 @@ import { loadState } from './state'
 import { runKeeper, autoSetConvictionCloseTime } from './keeper'
 import { router } from './api'
 import { config } from './config'
+import { initDb, setupSchema } from './db'
+import { runIndexer } from './indexer'
 
 loadState()
 
@@ -31,3 +33,19 @@ autoSetConvictionCloseTime()
 cron.schedule('*/5 * * * *', () => {
   runKeeper().catch(console.error)
 })
+
+// Event indexer — only runs when DATABASE_URL is set
+if (config.databaseUrl) {
+  initDb(config.databaseUrl)
+  setupSchema()
+    .then(() => {
+      console.log('[indexer] starting initial catch-up…')
+      return runIndexer()
+    })
+    .catch(err => console.error('[indexer] startup failed:', err))
+
+  // Re-index every 15 seconds to stay current
+  setInterval(() => runIndexer().catch(console.error), 15_000)
+} else {
+  console.log('[indexer] DATABASE_URL not set — persistent event storage disabled')
+}

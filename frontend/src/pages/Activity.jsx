@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { usePublicClient, useWatchContractEvent } from 'wagmi'
 import { ADDRESSES, TEAM_BY_ID, formatUSDC } from '../utils/contracts'
 import { ConvictionVault_ABI, VARMarket_ABI, StadiumHook_ABI } from '../abis'
+import { API_BASE } from '../services/footballData'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
 const BLOCK_WINDOW = 2000n
@@ -25,6 +26,24 @@ function normaliseEvent(raw, type) {
     blockNumber:     raw.blockNumber     ?? 0n,
     transactionHash: raw.transactionHash ?? '',
     args: raw.args ?? {},
+  }
+}
+
+// Converts a DB row returned by GET /api/events into the same shape as normaliseEvent
+function normaliseApiRow(row) {
+  const args = {}
+  if (row.user_addr) args.user = row.user_addr
+  if (row.team_id  != null) args.teamId  = BigInt(row.team_id)
+  if (row.amount   != null) args.amount  = BigInt(row.amount)
+  if (row.amount0  != null) args.amount0 = BigInt(row.amount0)
+  if (row.amount1  != null) args.amount1 = BigInt(row.amount1)
+  if (row.match_id != null) args.matchId = BigInt(row.match_id)
+  return {
+    key:             `${row.event_type}-${row.block_number}-${row.tx_hash}-${row.log_index}`,
+    type:            row.event_type,
+    blockNumber:     BigInt(row.block_number),
+    transactionHash: row.tx_hash,
+    args,
   }
 }
 
@@ -126,10 +145,26 @@ export default function Activity() {
   const highWaterRef = useRef(0n)
 
   const fetchHistory = useCallback(async () => {
-    if (!publicClient) { setLoading(false); return }
     setLoading(true)
     setHistoryError(null)
 
+    // ── Try backend API first (has full history from block 0) ────────────────
+    try {
+      const res = await fetch(`${API_BASE}/api/events?limit=100`)
+      if (res.ok) {
+        const { events: rows } = await res.json()
+        const normalised = rows.map(normaliseApiRow)
+        setEvents(normalised)
+        setLastRefresh(Date.now())
+        setLoading(false)
+        return
+      }
+    } catch {
+      // API unreachable — fall through to on-chain
+    }
+
+    // ── Fall back: on-chain fetch (last 2000 blocks) ─────────────────────────
+    if (!publicClient) { setLoading(false); return }
     try {
       const currentBlock = await publicClient.getBlockNumber()
       highWaterRef.current = currentBlock
@@ -138,29 +173,20 @@ export default function Activity() {
       const [convictionLogs, betLogs, swapLogs] = await Promise.all([
         ADDRESSES.convictionVault !== ZERO
           ? publicClient.getContractEvents({
-              address:   ADDRESSES.convictionVault,
-              abi:       ConvictionVault_ABI,
-              eventName: 'ConvictionDeposited',
-              fromBlock,
-              toBlock:   currentBlock,
+              address: ADDRESSES.convictionVault, abi: ConvictionVault_ABI,
+              eventName: 'ConvictionDeposited', fromBlock, toBlock: currentBlock,
             }).catch(e => { console.warn('conviction fetch failed', e); return [] })
           : [],
         ADDRESSES.varMarket !== ZERO
           ? publicClient.getContractEvents({
-              address:   ADDRESSES.varMarket,
-              abi:       VARMarket_ABI,
-              eventName: 'BetPlaced',
-              fromBlock,
-              toBlock:   currentBlock,
+              address: ADDRESSES.varMarket, abi: VARMarket_ABI,
+              eventName: 'BetPlaced', fromBlock, toBlock: currentBlock,
             }).catch(e => { console.warn('bet fetch failed', e); return [] })
           : [],
         ADDRESSES.stadiumHook !== ZERO
           ? publicClient.getContractEvents({
-              address:   ADDRESSES.stadiumHook,
-              abi:       StadiumHook_ABI,
-              eventName: 'TeamSwap',
-              fromBlock,
-              toBlock:   currentBlock,
+              address: ADDRESSES.stadiumHook, abi: StadiumHook_ABI,
+              eventName: 'TeamSwap', fromBlock, toBlock: currentBlock,
             }).catch(e => { console.warn('swap fetch failed', e); return [] })
           : [],
       ])
@@ -176,7 +202,7 @@ export default function Activity() {
       setEvents(normalised.slice(0, 100))
       setLastRefresh(Date.now())
     } catch (err) {
-      console.warn('Activity: fetch failed', err)
+      console.warn('Activity: on-chain fetch failed', err)
       setHistoryError(err?.message || 'RPC error')
     } finally {
       setLoading(false)

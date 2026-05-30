@@ -109,7 +109,7 @@ export const CONVICTION_VAULT_ABI = [
   },
 ] as const
 
-// Used by getLogs for leaderboard indexing
+// Used by getLogs / indexer
 export const CONVICTION_DEPOSITED_EVENT = {
   anonymous: false,
   inputs: [
@@ -118,5 +118,30 @@ export const CONVICTION_DEPOSITED_EVENT = {
     { name: 'amount', type: 'uint256' },
   ],
   name: 'ConvictionDeposited',
+  type: 'event',
+} as const
+
+export const BET_PLACED_EVENT = {
+  anonymous: false,
+  inputs: [
+    { indexed: true,  name: 'matchId',    type: 'uint256' },
+    { name: 'marketType', type: 'uint8'   },
+    { indexed: true,  name: 'user',       type: 'address' },
+    { name: 'outcome',    type: 'uint8'   },
+    { name: 'amount',     type: 'uint256' },
+  ],
+  name: 'BetPlaced',
+  type: 'event',
+} as const
+
+export const TEAM_SWAP_EVENT = {
+  anonymous: false,
+  inputs: [
+    { indexed: true,  name: 'user',    type: 'address' },
+    { indexed: true,  name: 'teamId',  type: 'uint16'  },
+    { name: 'amount0', type: 'int256' },
+    { name: 'amount1', type: 'int256' },
+  ],
+  name: 'TeamSwap',
   type: 'event',
 } as const

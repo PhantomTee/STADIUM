@@ -5,6 +5,7 @@ import { config } from './config'
 import { getCachedMatches } from './football'
 import { footballRouter } from './footballRoutes'
 import { state } from './state'
+import { dbAvailable, queryEvents } from './db'
 
 export const router = Router()
 
@@ -49,16 +50,58 @@ router.get('/matches/:id', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/events
+// Returns indexed events from DB (or 404 if indexer not running)
+router.get('/events', async (req: Request, res: Response) => {
+  if (!dbAvailable()) {
+    return res.status(503).json({ error: 'Indexer not configured — set DATABASE_URL to enable' })
+  }
+  try {
+    const type   = (req.query.type  as string) || 'all'
+    const limit  = parseInt(req.query.limit  as string) || 100
+    const offset = parseInt(req.query.offset as string) || 0
+    const result = await queryEvents({ type, limit, offset })
+    res.json(result)
+  } catch (e: any) {
+    console.error('/api/events error:', e)
+    res.status(500).json({ error: e?.message ?? 'Query failed' })
+  }
+})
+
 // GET /api/leaderboard
-// Scans ConvictionDeposited events and returns top 50 depositors
+// Scans ConvictionDeposited events — uses DB when available, batched on-chain otherwise
 router.get('/leaderboard', async (_req: Request, res: Response) => {
   try {
-    const logs = await publicClient.getLogs({
-      address:   config.convictionVaultAddress,
-      event:     CONVICTION_DEPOSITED_EVENT,
-      fromBlock: 0n,
-      toBlock:   'latest',
-    })
+    let logs: any[]
+
+    if (dbAvailable()) {
+      // Pull all conviction events from DB
+      const { events } = await queryEvents({ type: 'conviction', limit: 10000 })
+      logs = events.map(r => ({
+        args: {
+          user:   r.user_addr,
+          teamId: BigInt(r.team_id ?? 0),
+          amount: BigInt(r.amount ?? '0'),
+        },
+      }))
+    } else {
+      // Batch through blocks in 2000-block chunks to avoid X Layer getLogs limit
+      const current = await publicClient.getBlockNumber()
+      const CHUNK   = 2000n
+      logs = []
+      let from = 0n
+      while (from < current) {
+        const to = from + CHUNK <= current ? from + CHUNK : current
+        const batch = await publicClient.getLogs({
+          address:   config.convictionVaultAddress,
+          event:     CONVICTION_DEPOSITED_EVENT,
+          fromBlock: from,
+          toBlock:   to,
+        }).catch(() => [])
+        logs.push(...batch)
+        from = to + 1n
+      }
+    }
 
     const totals: Record<string, bigint> = {}
     const byTeam:  Record<string, Record<number, bigint>> = {}
