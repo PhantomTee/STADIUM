@@ -1,187 +1,182 @@
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 
-// Pure CSS/SVG abstract 3D football — no external assets, no copyright risk.
-// Uses:
-//   • Radial-gradient sphere shading (fixed layer, gives 3D depth)
-//   • Rotating seam pattern (pentagon + 5 radiating curves + outer ring arcs)
-//   • Floating animation
-//   • Stadium-green glow
+// 3D-rotating football — canvas with proper sphere projection math.
+// Great circles are defined on the unit sphere, rotated around Y axis each frame,
+// and projected to 2D. Lines fade as they cross to the back hemisphere,
+// giving a true Earth-rotation illusion.
 export default function FootballBall({ size = 320 }) {
-  const s  = size
-  const c  = s / 2
-  const r  = s * 0.455   // ball radius within viewBox
-  const pr = r * 0.30    // pentagon inner radius
-  const n  = 5
-  const startDeg = -90   // top vertex
+  const canvasRef = useRef(null)
 
-  // Pentagon vertices
-  const pentVerts = Array.from({ length: n }, (_, i) => {
-    const a = (startDeg + i * 72) * (Math.PI / 180)
-    return { x: c + pr * Math.cos(a), y: c + pr * Math.sin(a), a }
-  })
+  useEffect(() => {
+    const cvs = canvasRef.current
+    if (!cvs) return
+    const ctx = cvs.getContext('2d')
 
-  // Seam curves: pentagon vertex → ball edge (same angle)
-  const seams = pentVerts.map(({ x, y, a }) => {
-    const ex = c + r * Math.cos(a)
-    const ey = c + r * Math.sin(a)
-    // Control point: midpoint pushed ~12px outward from center
-    const mx = (x + ex) / 2
-    const my = (y + ey) / 2
-    const perp = a + Math.PI / 2
-    const qx = mx + 10 * Math.cos(perp)
-    const qy = my + 10 * Math.sin(perp)
-    return `M ${x.toFixed(2)},${y.toFixed(2)} Q ${qx.toFixed(2)},${qy.toFixed(2)} ${ex.toFixed(2)},${ey.toFixed(2)}`
-  })
+    // Hi-DPI
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    cvs.width  = size * dpr
+    cvs.height = size * dpr
+    ctx.scale(dpr, dpr)
 
-  // Outer ring arcs: connect adjacent edge-end-points at r=72%
-  // Junction points sit between each pair of seam arms at offset angles, at intermediate radius
-  const jR  = r * 0.72
-  const junctions = Array.from({ length: n }, (_, i) => {
-    const a = (startDeg + 36 + i * 72) * (Math.PI / 180)
-    return { x: c + jR * Math.cos(a), y: c + jR * Math.sin(a) }
-  })
+    const R  = size * 0.44   // sphere radius in CSS px
+    const cx = size / 2
+    const cy = size / 2
 
-  const outerArcs = junctions.map((j, i) => {
-    const prev = pentVerts[i]
-    const next = pentVerts[(i + 1) % n]
-    // From pentagon vertex to junction: simulates hexagon top edge
-    const ax = c + r * Math.cos(prev.a)
-    const ay = c + r * Math.sin(prev.a)
-    // mid control toward ball center slightly
-    const mx1 = (ax + j.x) / 2 + (c - (ax + j.x) / 2) * 0.08
-    const my1 = (ay + j.y) / 2 + (c - (ay + j.y) / 2) * 0.08
-    return `M ${j.x.toFixed(2)},${j.y.toFixed(2)} Q ${mx1.toFixed(2)},${my1.toFixed(2)} ${ax.toFixed(2)},${ay.toFixed(2)}`
-  })
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function len([x, y, z]) { return Math.sqrt(x*x + y*y + z*z) }
+    function norm(v) { const l = len(v); return v.map(x => x / l) }
+    function cross([ax,ay,az], [bx,by,bz]) {
+      return [ay*bz-az*by, az*bx-ax*bz, ax*by-ay*bx]
+    }
 
-  const pentagonPath = pentVerts.map((v, i) =>
-    `${i === 0 ? 'M' : 'L'} ${v.x.toFixed(2)},${v.y.toFixed(2)}`
-  ).join(' ') + ' Z'
+    // Two orthonormal vectors spanning a great circle with given normal
+    function gcBasis(n) {
+      // pick any vector not parallel to n for the first basis vector
+      const ref = Math.abs(n[0]) < 0.9 ? [1,0,0] : [0,1,0]
+      const u = norm(cross(n, ref))
+      const v = norm(cross(n, u))
+      return [u, v]
+    }
 
-  const uid = 'fb'
+    // ── Football seam great circles ───────────────────────────────────────────
+    // The 90 edges of a truncated icosahedron lie on exactly 6 great circles.
+    // Their normals correspond to the icosahedral symmetry (golden ratio φ):
+    const φ = (1 + Math.sqrt(5)) / 2
+    const gcNormals = [
+      [ 1,  φ,  0],
+      [ 0,  1,  φ],
+      [ φ,  0,  1],
+      [-1,  φ,  0],
+      [ 0, -1,  φ],
+      [-φ,  0,  1],
+    ].map(norm)
+
+    // Pre-sample each great circle on the unit sphere (128 points)
+    const STEPS = 128
+    const circles = gcNormals.map(n => {
+      const [u, v] = gcBasis(n)
+      return Array.from({ length: STEPS }, (_, i) => {
+        const t = (i / STEPS) * Math.PI * 2
+        const c = Math.cos(t), s = Math.sin(t)
+        return [u[0]*c + v[0]*s, u[1]*c + v[1]*s, u[2]*c + v[2]*s]
+      })
+    })
+
+    let rotY  = 0
+    let prevTs = 0
+    let animId
+
+    function draw() {
+      ctx.clearRect(0, 0, size, size)
+
+      // ── Sphere background ───────────────────────────────────────────────────
+      const sg = ctx.createRadialGradient(cx-R*0.3, cy-R*0.28, R*0.02, cx, cy, R)
+      sg.addColorStop(0,    '#1e4030')
+      sg.addColorStop(0.35, '#0c2014')
+      sg.addColorStop(0.72, '#050d06')
+      sg.addColorStop(1,    '#010201')
+      ctx.beginPath()
+      ctx.arc(cx, cy, R, 0, Math.PI*2)
+      ctx.fillStyle = sg
+      ctx.fill()
+
+      // ── Seam lines (clipped to sphere circle) ──────────────────────────────
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(cx, cy, R, 0, Math.PI*2)
+      ctx.clip()
+
+      const cosY = Math.cos(rotY)
+      const sinY = Math.sin(rotY)
+
+      circles.forEach(pts => {
+        for (let i = 0; i < pts.length; i++) {
+          const [x0, y0, z0] = pts[i]
+          const [x1, y1, z1] = pts[(i + 1) % pts.length]
+
+          // Rotate both endpoints around the Y axis
+          const rx0 = x0*cosY - z0*sinY,  rz0 = x0*sinY + z0*cosY
+          const rx1 = x1*cosY - z1*sinY,  rz1 = x1*sinY + z1*cosY
+
+          // Skip fully back-facing segments (rz < 0 means behind the sphere)
+          if (rz0 < -0.06 && rz1 < -0.06) continue
+
+          // Alpha fades as the segment moves from front (rz≈1) to edge (rz≈0)
+          const avgZ = (Math.max(0, rz0) + Math.max(0, rz1)) / 2
+          const alpha = avgZ * 0.78 + 0.04
+          if (alpha < 0.05) continue
+
+          ctx.beginPath()
+          ctx.moveTo(cx + rx0 * R, cy - y0 * R)
+          ctx.lineTo(cx + rx1 * R, cy - y1 * R)
+          ctx.strokeStyle = `rgba(0,255,135,${alpha.toFixed(3)})`
+          ctx.lineWidth = 1.7
+          ctx.stroke()
+        }
+      })
+
+      ctx.restore()
+
+      // ── Specular highlight (top-left, static) ─────────────────────────────
+      const sp = ctx.createRadialGradient(cx-R*0.28, cy-R*0.28, 0, cx-R*0.15, cy-R*0.15, R*0.5)
+      sp.addColorStop(0,   'rgba(0,255,135,0.22)')
+      sp.addColorStop(0.5, 'rgba(0,255,135,0.05)')
+      sp.addColorStop(1,   'rgba(0,0,0,0)')
+      ctx.beginPath()
+      ctx.arc(cx, cy, R, 0, Math.PI*2)
+      ctx.fillStyle = sp
+      ctx.fill()
+
+      // ── Rim ───────────────────────────────────────────────────────────────
+      ctx.beginPath()
+      ctx.arc(cx, cy, R - 0.5, 0, Math.PI*2)
+      ctx.strokeStyle = 'rgba(0,255,135,0.18)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+
+    function loop(ts) {
+      if (prevTs === 0) prevTs = ts
+      const dt = Math.min(ts - prevTs, 50)  // cap at 50ms so tab-blur doesn't jump
+      prevTs = ts
+      rotY += 0.00048 * dt  // ≈ 1 full rotation every 13 seconds
+      draw()
+      animId = requestAnimationFrame(loop)
+    }
+
+    animId = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(animId)
+  }, [size])
 
   return (
-    <div style={{ position: 'relative', width: s, height: s, flexShrink: 0 }}>
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <style>{`
-        @keyframes ${uid}-float {
-          0%,100% { transform: translateY(0px) rotate(-2deg); }
-          50%      { transform: translateY(-18px) rotate(2deg); }
+        @keyframes fb-float {
+          0%,100% { transform: translateY(0px); }
+          50%      { transform: translateY(-16px); }
         }
-        @keyframes ${uid}-spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        @keyframes ${uid}-pulse {
-          0%,100% { opacity: 0.12; }
-          50%      { opacity: 0.22; }
+        @keyframes fb-glow {
+          0%,100% { opacity: 0.13; }
+          50%      { opacity: 0.26; }
         }
       `}</style>
 
-      {/* Outer ambient glow */}
+      {/* Ambient glow ring */}
       <div style={{
         position: 'absolute',
-        inset: -s * 0.18,
+        inset: -size * 0.18,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(0,255,135,0.13) 30%, transparent 70%)',
-        animation: `${uid}-pulse 3s ease-in-out infinite`,
+        background: 'radial-gradient(circle, rgba(0,255,135,0.15) 25%, transparent 70%)',
+        animation: 'fb-glow 3s ease-in-out infinite',
         pointerEvents: 'none',
       }} />
 
       {/* Floating wrapper */}
-      <div style={{
-        width: s, height: s,
-        animation: `${uid}-float 4.5s ease-in-out infinite`,
-      }}>
-        <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} overflow="visible">
-          <defs>
-            {/* 3D sphere shading: light from upper-left */}
-            <radialGradient id={`${uid}-sphere`} cx="34%" cy="26%" r="68%">
-              <stop offset="0%"   stopColor="#224433" />
-              <stop offset="38%"  stopColor="#0e2018" />
-              <stop offset="72%"  stopColor="#050e07" />
-              <stop offset="100%" stopColor="#010401" />
-            </radialGradient>
-
-            {/* Soft specular */}
-            <radialGradient id={`${uid}-spec`} cx="36%" cy="28%" r="38%">
-              <stop offset="0%"   stopColor="rgba(0,255,135,0.18)" />
-              <stop offset="60%"  stopColor="rgba(0,255,135,0.04)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-            </radialGradient>
-
-            {/* Clip to circle */}
-            <clipPath id={`${uid}-clip`}>
-              <circle cx={c} cy={c} r={r} />
-            </clipPath>
-
-            {/* Seam glow filter */}
-            <filter id={`${uid}-glow`} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          {/* ── Sphere base ── */}
-          <circle cx={c} cy={c} r={r} fill={`url(#${uid}-sphere)`} />
-
-          {/* ── Rotating seam layer ── */}
-          <g clipPath={`url(#${uid}-clip)`}>
-            <g
-              style={{
-                transformOrigin: `${c}px ${c}px`,
-                animation: `${uid}-spin 14s linear infinite`,
-              }}
-              stroke="#00ff87"
-              strokeWidth="1.6"
-              fill="none"
-              strokeLinecap="round"
-              filter={`url(#${uid}-glow)`}
-              opacity="0.6"
-            >
-              {/* Central pentagon outline */}
-              <path d={pentagonPath} />
-
-              {/* 5 seam arms to ball edge */}
-              {seams.map((d, i) => <path key={`s${i}`} d={d} />)}
-
-              {/* 5 outer junction arcs */}
-              {outerArcs.map((d, i) => <path key={`a${i}`} d={d} />)}
-            </g>
-
-            {/* Pentagon face fill (dim green) */}
-            <path
-              d={pentagonPath}
-              fill="rgba(0,255,135,0.07)"
-              stroke="none"
-              style={{
-                transformOrigin: `${c}px ${c}px`,
-                animation: `${uid}-spin 14s linear infinite`,
-              }}
-            />
-          </g>
-
-          {/* ── Specular highlight (static, on top) ── */}
-          <circle cx={c} cy={c} r={r} fill={`url(#${uid}-spec)`} />
-
-          {/* ── Rim shadow for depth ── */}
-          <circle
-            cx={c} cy={c} r={r}
-            fill="none"
-            stroke="rgba(0,0,0,0.55)"
-            strokeWidth={r * 0.12}
-            clipPath={`url(#${uid}-clip)`}
-          />
-
-          {/* ── Thin bright rim ── */}
-          <circle
-            cx={c} cy={c} r={r - 0.8}
-            fill="none"
-            stroke="rgba(0,255,135,0.12)"
-            strokeWidth="1"
-          />
-        </svg>
+      <div style={{ animation: 'fb-float 4.5s ease-in-out infinite' }}>
+        <canvas
+          ref={canvasRef}
+          style={{ display: 'block', width: size, height: size }}
+        />
       </div>
     </div>
   )
