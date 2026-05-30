@@ -5,7 +5,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
 import {
   useTeamMomentum, useTeamEliminated, useTeamTotalDeposit,
-  useHookPaused, useHookFeeConfig, useFactoryTeamPoolId, useFactoryTeamToken,
+  useFactoryTeamPoolId, useFactoryTeamToken,
 } from '../hooks/useContracts'
 import {
   StadiumRouter_ABI, MockUSDC_ABI, TeamToken_ABI, TeamFactory_ABI,
@@ -92,8 +92,6 @@ export default function Trade() {
         </div>
       )}
 
-      <HookStatus />
-
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <TeamPoolGrid onSelect={handleSelectTeam} selectedId={selectedTeamId} />
@@ -101,40 +99,6 @@ export default function Trade() {
         <div ref={swapPanelRef}>
           <SwapPanel teamId={selectedTeamId} isConnected={isConnected} />
         </div>
-      </div>
-    </div>
-  )
-}
-
-function HookStatus() {
-  const { data: paused }    = useHookPaused()
-  const { data: feeConfig } = useHookFeeConfig()
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div className="card">
-        <div className={`stat-value text-sm ${paused ? 'text-red-400' : 'text-stadium-green'}`}>
-          {paused === undefined ? '—' : paused ? 'PAUSED' : 'ACTIVE'}
-        </div>
-        <div className="stat-label">Hook Status</div>
-      </div>
-      <div className="card">
-        <div className="stat-value text-sm text-stadium-text font-mono">
-          {feeConfig ? `${(feeConfig.groupStageFee / 10000).toFixed(2)}%` : '—'}
-        </div>
-        <div className="stat-label">Group Stage Fee</div>
-      </div>
-      <div className="card">
-        <div className="stat-value text-sm text-stadium-text font-mono">
-          {feeConfig ? `${(feeConfig.knockoutFee / 10000).toFixed(2)}%` : '—'}
-        </div>
-        <div className="stat-label">Knockout Fee</div>
-      </div>
-      <div className="card">
-        <div className="stat-value text-sm text-stadium-gold font-mono">
-          {feeConfig ? `-${(feeConfig.convictionDiscount / 10000).toFixed(2)}%` : '—'}
-        </div>
-        <div className="stat-label">Conviction Discount</div>
       </div>
     </div>
   )
@@ -223,7 +187,6 @@ function TeamPoolGrid({ onSelect, selectedId }) {
         <div className="col-span-5">Team</div>
         <button onClick={() => setSortBy('momentum')} className={`col-span-3 text-right transition-colors ${sortBy === 'momentum' ? 'text-stadium-green' : 'hover:text-stadium-text'}`}>Momentum</button>
         <button onClick={() => setSortBy('locked')}   className={`col-span-2 text-right transition-colors ${sortBy === 'locked'   ? 'text-stadium-green' : 'hover:text-stadium-text'}`}>Locked</button>
-        <div className="col-span-2 text-right">Pool</div>
       </div>
 
       <div className="space-y-px bg-stadium-border max-h-[600px] overflow-y-auto">
@@ -244,9 +207,6 @@ function TeamPoolGrid({ onSelect, selectedId }) {
 
 function TeamPoolRow({ team, selected, onClick, momentum, locked }) {
   const { data: eliminated } = useTeamEliminated(team.id)
-  const { data: poolId }     = useFactoryTeamPoolId(team.id)
-
-  const hasPool = poolId && poolId !== '0x0000000000000000000000000000000000000000000000000000000000000000'
 
   return (
     <div
@@ -272,13 +232,6 @@ function TeamPoolRow({ team, selected, onClick, momentum, locked }) {
       </div>
       <div className="col-span-2 text-right">
         <div className="text-xs font-mono text-stadium-text">${formatUSDC(locked)}</div>
-      </div>
-      <div className="col-span-2 text-right">
-        {hasPool ? (
-          <span className="text-xs text-stadium-green font-mono">LIVE</span>
-        ) : (
-          <span className="text-xs text-stadium-muted font-mono">–</span>
-        )}
       </div>
     </div>
   )
@@ -496,7 +449,6 @@ VITE_STADIUM_ROUTER_ADDRESS=0x...`}
           amountIn={amountIn} setAmountIn={setAmountIn}
           inputIsUSDC={inputIsUSDC} usdcBal={usdcBal} tokenBal={tokenBal}
           setMax={setMax} disabled={true}
-          currency0={currency0} currency1={currency1}
         />
       </div>
     )
@@ -512,7 +464,6 @@ VITE_STADIUM_ROUTER_ADDRESS=0x...`}
         amountIn={amountIn} setAmountIn={setAmountIn}
         inputIsUSDC={inputIsUSDC} usdcBal={usdcBal} tokenBal={tokenBal}
         setMax={setMax} disabled={false}
-        currency0={currency0} currency1={currency1}
       />
 
       {/* Action button */}
@@ -571,9 +522,8 @@ VITE_STADIUM_ROUTER_ADDRESS=0x...`}
 
 // Pure presentational sub-component for the form UI (shared between router-deployed and not)
 function SwapFormUI({ team, direction, setDirection, amountIn, setAmountIn,
-                      inputIsUSDC, usdcBal, tokenBal, setMax, disabled, currency0, currency1 }) {
+                      inputIsUSDC, usdcBal, tokenBal, setMax, disabled }) {
 
-  const shortAddr = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—'
   const balLabel  = inputIsUSDC ? 'USDC' : team.name.split(' ')[0]
   const balance   = inputIsUSDC
     ? (usdcBal !== undefined ? formatUSDC(usdcBal) : '—')
@@ -624,29 +574,6 @@ function SwapFormUI({ team, direction, setDirection, amountIn, setAmountIn,
         />
       </div>
 
-      {/* Pool info */}
-      <div className="bg-stadium-dark border border-stadium-border p-3 text-xs font-mono space-y-1">
-        <div className="flex justify-between text-stadium-muted">
-          <span>Currency 0</span>
-          <span className="text-stadium-text">{shortAddr(currency0)}</span>
-        </div>
-        <div className="flex justify-between text-stadium-muted">
-          <span>Currency 1</span>
-          <span className="text-stadium-text">{shortAddr(currency1)}</span>
-        </div>
-        <div className="flex justify-between text-stadium-muted">
-          <span>Hook</span>
-          <span className="text-stadium-green">StadiumHook</span>
-        </div>
-        <div className="flex justify-between text-stadium-muted">
-          <span>Fee</span>
-          <span className="text-stadium-text">Dynamic (V4 hook)</span>
-        </div>
-        <div className="flex justify-between text-stadium-muted">
-          <span>Tick Spacing</span>
-          <span className="text-stadium-text">{TICK_SPACING}</span>
-        </div>
-      </div>
     </div>
   )
 }
