@@ -43,8 +43,8 @@ jobs:
       - name: Fetch and process fixtures
         env:
           API_FOOTBALL_KEY:  ${{ secrets.API_FOOTBALL_KEY }}
-          ORACLE_PRIVATE_KEY: ${{ secrets.ORACLE_PRIVATE_KEY }}
-          XLAYER_RPC_URL:    ${{ secrets.XLAYER_RPC_URL }}
+          ORACLE_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          XLAYER_RPC_URL:    ${{ secrets.XLAYER_TESTNET_RPC_URL }}
           MATCH_ORACLE_ADDR: ${{ secrets.MATCH_ORACLE_ADDRESS }}
           FORCE_FIXTURE_ID:  ${{ github.event.inputs.fixture_id }}
           DRY_RUN:           ${{ github.event.inputs.dry_run || 'false' }}
