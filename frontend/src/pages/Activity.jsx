@@ -4,16 +4,35 @@ import { ADDRESSES, TEAM_BY_ID, formatUSDC } from '../utils/contracts'
 import { ConvictionVault_ABI, VARMarket_ABI, StadiumHook_ABI } from '../abis'
 import { API_BASE } from '../services/footballData'
 
-const ZERO = '0x0000000000000000000000000000000000000000'
-const BLOCK_WINDOW = 2000n
+const ZERO            = '0x0000000000000000000000000000000000000000'
+const BLOCK_WINDOW    = 2000n
 const AUTO_REFRESH_MS = 30_000
+const LS_KEY          = 'stadium-activity-v1'
+
+// ── localStorage cache (BigInt-safe) ─────────────────────────────────────────
+
+function eventsToJSON(events) {
+  return JSON.stringify(events, (_, v) => typeof v === 'bigint' ? `__bi:${v}` : v)
+}
+function eventsFromJSON(str) {
+  return JSON.parse(str, (_, v) =>
+    typeof v === 'string' && v.startsWith('__bi:') ? BigInt(v.slice(5)) : v
+  )
+}
+function loadCache() {
+  try { return eventsFromJSON(localStorage.getItem(LS_KEY) ?? '[]') } catch { return [] }
+}
+function saveCache(events) {
+  try { localStorage.setItem(LS_KEY, eventsToJSON(events)) } catch {}
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function shortAddr(addr) {
   if (!addr) return '—'
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
-// Safe abs for BigInt or undefined
 function absBig(n) {
   if (typeof n !== 'bigint') return 0n
   return n < 0n ? -n : n
@@ -21,18 +40,17 @@ function absBig(n) {
 
 function normaliseEvent(raw, type) {
   return {
-    key:  `${type}-${raw.blockNumber ?? 0}-${raw.transactionHash ?? ''}-${raw.logIndex ?? 0}`,
+    key:             `${type}-${raw.blockNumber ?? 0}-${raw.transactionHash ?? ''}-${raw.logIndex ?? 0}`,
     type,
     blockNumber:     raw.blockNumber     ?? 0n,
     transactionHash: raw.transactionHash ?? '',
-    args: raw.args ?? {},
+    args:            raw.args ?? {},
   }
 }
 
-// Converts a DB row returned by GET /api/events into the same shape as normaliseEvent
 function normaliseApiRow(row) {
   const args = {}
-  if (row.user_addr) args.user = row.user_addr
+  if (row.user_addr)      args.user    = row.user_addr
   if (row.team_id  != null) args.teamId  = BigInt(row.team_id)
   if (row.amount   != null) args.amount  = BigInt(row.amount)
   if (row.amount0  != null) args.amount0 = BigInt(row.amount0)
@@ -67,9 +85,9 @@ const TYPE_CONFIG = {
 }
 
 function EventRow({ event }) {
-  const cfg    = TYPE_CONFIG[event.type] || TYPE_CONFIG.conviction
-  const txUrl  = `https://web3.okx.com/explorer/xlayer-test/tx/${event.transactionHash}`
-  const args   = event.args || {}
+  const cfg  = TYPE_CONFIG[event.type] || TYPE_CONFIG.conviction
+  const txUrl = `https://web3.okx.com/explorer/xlayer-test/tx/${event.transactionHash}`
+  const args  = event.args || {}
 
   let body = null
 
@@ -91,10 +109,9 @@ function EventRow({ event }) {
       </>
     )
   } else if (event.type === 'swap') {
-    const team    = TEAM_BY_ID[Number(args.teamId)]
-    const a0      = absBig(args.amount0)
-    const a1      = absBig(args.amount1)
-    // USDC is 6-decimal, team token is 18-decimal — pick the smaller raw value
+    const team   = TEAM_BY_ID[Number(args.teamId)]
+    const a0     = absBig(args.amount0)
+    const a1     = absBig(args.amount1)
     const usdcVol = (a0 > 0n && a1 > 0n) ? (a0 < a1 ? a0 : a1) : (a0 || a1)
     body = (
       <>
@@ -135,35 +152,42 @@ const FILTER_OPTIONS = [
 export default function Activity() {
   const publicClient = usePublicClient()
 
-  const [events,       setEvents]       = useState([])
+  // Initialise from localStorage — returning users see history instantly
+  const [events,       setEvents]       = useState(() => loadCache())
   const [loading,      setLoading]      = useState(false)
   const [historyError, setHistoryError] = useState(null)
   const [lastRefresh,  setLastRefresh]  = useState(null)
   const [filter,       setFilter]       = useState('all')
 
-  // Track the highest block we've fetched up to so live-watch knows where to start
   const highWaterRef = useRef(0n)
+
+  // Update state + write through to localStorage
+  const commitEvents = useCallback((evs) => {
+    setEvents(evs)
+    saveCache(evs)
+  }, [])
 
   const fetchHistory = useCallback(async () => {
     setLoading(true)
     setHistoryError(null)
 
-    // ── Try backend API first (has full history from block 0) ────────────────
+    // ── Try backend API first (full history from indexed DB) ─────────────────
     try {
       const res = await fetch(`${API_BASE}/api/events?limit=100`)
       if (res.ok) {
         const { events: rows } = await res.json()
-        const normalised = rows.map(normaliseApiRow)
-        setEvents(normalised)
-        setLastRefresh(Date.now())
-        setLoading(false)
-        return
+        if (Array.isArray(rows)) {
+          commitEvents(rows.map(normaliseApiRow))
+          setLastRefresh(Date.now())
+          setLoading(false)
+          return
+        }
       }
     } catch {
       // API unreachable — fall through to on-chain
     }
 
-    // ── Fall back: on-chain fetch (last 2000 blocks) ─────────────────────────
+    // ── Fall back: on-chain fetch (last 2000 blocks) ──────────────────────────
     if (!publicClient) { setLoading(false); return }
     try {
       const currentBlock = await publicClient.getBlockNumber()
@@ -191,15 +215,24 @@ export default function Activity() {
           : [],
       ])
 
-      const normalised = [
+      const fresh = [
         ...convictionLogs.map(e => normaliseEvent(e, 'conviction')),
         ...betLogs.map(e => normaliseEvent(e, 'bet')),
         ...swapLogs.map(e => normaliseEvent(e, 'swap')),
       ]
-      normalised.sort((a, b) =>
+      fresh.sort((a, b) =>
         b.blockNumber > a.blockNumber ? 1 : b.blockNumber < a.blockNumber ? -1 : 0
       )
-      setEvents(normalised.slice(0, 100))
+
+      if (fresh.length > 0) {
+        // Merge fresh on-chain events with whatever is already cached
+        setEvents(prev => {
+          const keys = new Set(fresh.map(e => e.key))
+          const merged = [...fresh, ...prev.filter(e => !keys.has(e.key))].slice(0, 100)
+          saveCache(merged)
+          return merged
+        })
+      }
       setLastRefresh(Date.now())
     } catch (err) {
       console.warn('Activity: on-chain fetch failed', err)
@@ -207,7 +240,7 @@ export default function Activity() {
     } finally {
       setLoading(false)
     }
-  }, [publicClient])
+  }, [publicClient, commitEvents])
 
   // Initial fetch + auto-refresh every 30s
   useEffect(() => {
@@ -216,25 +249,26 @@ export default function Activity() {
     return () => clearInterval(id)
   }, [fetchHistory])
 
-  // Prepend live events (avoids duplicates via key)
+  // Prepend live events — write through to localStorage
   const prependEvent = useCallback((raw, type) => {
     const ev = normaliseEvent(raw, type)
     setEvents(prev => {
       if (prev.some(e => e.key === ev.key)) return prev
-      return [ev, ...prev].slice(0, 100)
+      const next = [ev, ...prev].slice(0, 100)
+      saveCache(next)
+      return next
     })
   }, [])
 
-  // Live watchers — only enabled when addresses are set and not ZERO
-  // pollingInterval keeps X Layer's eth_getLogs range from exploding
+  // Live watchers
   useWatchContractEvent({
     address:         ADDRESSES.convictionVault,
     abi:             ConvictionVault_ABI,
     eventName:       'ConvictionDeposited',
     enabled:         ADDRESSES.convictionVault !== ZERO,
     pollingInterval: 8_000,
-    onLogs: logs => logs.forEach(log => prependEvent(log, 'conviction')),
-    onError: err => console.warn('conviction watch error', err),
+    onLogs:  logs => logs.forEach(log => prependEvent(log, 'conviction')),
+    onError: err  => console.warn('conviction watch error', err),
   })
   useWatchContractEvent({
     address:         ADDRESSES.varMarket,
@@ -242,8 +276,8 @@ export default function Activity() {
     eventName:       'BetPlaced',
     enabled:         ADDRESSES.varMarket !== ZERO,
     pollingInterval: 8_000,
-    onLogs: logs => logs.forEach(log => prependEvent(log, 'bet')),
-    onError: err => console.warn('bet watch error', err),
+    onLogs:  logs => logs.forEach(log => prependEvent(log, 'bet')),
+    onError: err  => console.warn('bet watch error', err),
   })
   useWatchContractEvent({
     address:         ADDRESSES.stadiumHook,
@@ -251,8 +285,8 @@ export default function Activity() {
     eventName:       'TeamSwap',
     enabled:         ADDRESSES.stadiumHook !== ZERO,
     pollingInterval: 8_000,
-    onLogs: logs => logs.forEach(log => prependEvent(log, 'swap')),
-    onError: err => console.warn('swap watch error', err),
+    onLogs:  logs => logs.forEach(log => prependEvent(log, 'swap')),
+    onError: err  => console.warn('swap watch error', err),
   })
 
   const visible = filter === 'all' ? events : events.filter(e => e.type === filter)
@@ -284,7 +318,7 @@ export default function Activity() {
 
       {historyError && (
         <div className="bg-red-500/10 border border-red-500/20 px-4 py-3 text-xs font-mono text-red-400">
-          Fetch error: {historyError} — showing cached events only
+          Fetch error: {historyError} — showing cached events
         </div>
       )}
 
@@ -327,7 +361,7 @@ export default function Activity() {
       ) : visible.length === 0 ? (
         <div className="bg-stadium-card border border-stadium-border px-4 py-12 text-center space-y-3">
           <div className="text-stadium-muted font-mono text-sm">
-            No {filter === 'all' ? '' : filter + ' '}activity in the last {BLOCK_WINDOW.toString()} blocks
+            No {filter === 'all' ? '' : filter + ' '}activity recorded yet
           </div>
           <div className="text-stadium-border font-mono text-xs">
             Events appear here live as users swap, deposit conviction, and place VAR bets
