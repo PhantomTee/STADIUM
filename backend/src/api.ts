@@ -5,7 +5,7 @@ import { config } from './config'
 import { getCachedMatches } from './football'
 import { footballRouter } from './footballRoutes'
 import { state } from './state'
-import { dbAvailable, queryEvents } from './db'
+import { dbAvailable, queryEvents, getCursor } from './db'
 
 export const router = Router()
 
@@ -50,8 +50,41 @@ router.get('/matches/:id', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/indexer-status
+// Shows cursor positions and config so you can diagnose indexing without reading logs
+router.get('/indexer-status', async (_req: Request, res: Response) => {
+  if (!dbAvailable()) {
+    return res.json({ db: false, message: 'DATABASE_URL not set' })
+  }
+  try {
+    const [convictionCursor, betCursor, swapCursor, currentBlock] = await Promise.all([
+      getCursor('conviction'),
+      getCursor('bet'),
+      getCursor('swap'),
+      publicClient.getBlockNumber().catch(() => 0n),
+    ])
+    res.json({
+      db:                true,
+      currentBlock:      currentBlock.toString(),
+      indexerStartBlock: config.indexerStartBlock.toString(),
+      cursors: {
+        conviction: convictionCursor.toString(),
+        bet:        betCursor.toString(),
+        swap:       swapCursor.toString(),
+      },
+      addresses: {
+        convictionVault: config.convictionVaultAddress,
+        varMarket:       config.varMarketAddress  || '(not set)',
+        stadiumHook:     config.stadiumHookAddress || '(not set)',
+      },
+    })
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message })
+  }
+})
+
 // GET /api/events
-// Returns indexed events from DB (or 404 if indexer not running)
+// Returns indexed events from DB (or 503 if indexer not running)
 router.get('/events', async (req: Request, res: Response) => {
   if (!dbAvailable()) {
     return res.status(503).json({ error: 'Indexer not configured — set DATABASE_URL to enable' })
