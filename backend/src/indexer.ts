@@ -33,18 +33,26 @@ const TARGETS: ContractTarget[] = [
   { key: 'swap',       address: config.stadiumHookAddress,     event: TEAM_SWAP_EVENT,            type: 'swap',       topic0: computeTopic0(TEAM_SWAP_EVENT)            },
 ]
 
+let _running = false
+
 export async function runIndexer(): Promise<void> {
   if (!dbAvailable()) return
+  if (_running) return   // skip tick if previous run hasn't finished
 
-  let current: bigint
+  _running = true
   try {
-    current = await publicClient.getBlockNumber()
-  } catch (err) {
-    console.warn('[indexer] getBlockNumber failed:', err)
-    return
-  }
+    let current: bigint
+    try {
+      current = await publicClient.getBlockNumber()
+    } catch (err) {
+      console.warn('[indexer] getBlockNumber failed:', err)
+      return
+    }
 
-  await Promise.all(TARGETS.map(t => indexTarget(t, current)))
+    await Promise.all(TARGETS.map(t => indexTarget(t, current)))
+  } finally {
+    _running = false
+  }
 }
 
 async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {

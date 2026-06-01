@@ -44,8 +44,9 @@ if (config.databaseUrl) {
     })
     .catch(err => console.error('[indexer] startup failed:', err))
 
-  // Re-index every 15 seconds to stay current
-  setInterval(() => runIndexer().catch(console.error), 15_000)
+  // Re-index every 60 seconds. runIndexer() guards against concurrent runs so
+  // this just reschedules after each completed scan.
+  setInterval(() => runIndexer().catch(console.error), 60_000)
 } else {
   console.log('[indexer] DATABASE_URL not set — persistent event storage disabled')
 }
