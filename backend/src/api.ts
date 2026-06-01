@@ -200,6 +200,42 @@ router.get('/stats', async (_req: Request, res: Response) => {
   }
 })
 
+// GET /api/admin/scan?from=31649960&to=31650100
+// One-shot getLogs for all three event types in the given block range.
+// Returns raw logs so you can verify the RPC is finding events at all.
+router.get('/admin/scan', async (req: Request, res: Response) => {
+  const adminKey = process.env.ADMIN_KEY
+  if (adminKey && req.query.key !== adminKey) {
+    return res.status(401).json({ error: 'Unauthorized — pass ?key=ADMIN_KEY' })
+  }
+  try {
+    const from = BigInt((req.query.from as string) || config.indexerStartBlock.toString() || '31649960')
+    const to   = BigInt((req.query.to   as string) || (from + 2000n).toString())
+
+    const toStr = (v: any) => typeof v === 'bigint' ? v.toString() : v
+
+    const [convLogs, betLogs, swapLogs] = await Promise.all([
+      publicClient.getLogs({
+        address: config.convictionVaultAddress, event: CONVICTION_DEPOSITED_EVENT as any,
+        fromBlock: from, toBlock: to,
+      }).catch((e: any) => ({ error: String(e) })),
+      config.varMarketAddress
+        ? publicClient.getLogs({ address: config.varMarketAddress as `0x${string}`, fromBlock: from, toBlock: to }).catch((e: any) => ({ error: String(e) }))
+        : [],
+      config.stadiumHookAddress
+        ? publicClient.getLogs({ address: config.stadiumHookAddress as `0x${string}`, fromBlock: from, toBlock: to }).catch((e: any) => ({ error: String(e) }))
+        : [],
+    ])
+
+    res.json(JSON.parse(JSON.stringify(
+      { from: from.toString(), to: to.toString(), conviction: convLogs, bet: betLogs, swap: swapLogs },
+      (_k, v) => typeof v === 'bigint' ? v.toString() : v
+    )))
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message })
+  }
+})
+
 // POST /api/admin/sync
 // Manually trigger a keeper cycle (oracle sync + settlement). Guarded by ADMIN_KEY.
 router.post('/admin/sync', async (req: Request, res: Response) => {
