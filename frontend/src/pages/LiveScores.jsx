@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { getFixtures, getGroupStandings, getProviderStatus } from '../services/footballData'
+import { getFixtures, getGroupStandings } from '../services/footballData'
 import ScoreboardCard from '../components/ScoreboardCard'
 import { useChampionPoolBalance } from '../hooks/useContracts'
 import { formatUSDC } from '../utils/contracts'
@@ -103,31 +103,6 @@ function StandingsTable({ groups }) {
   )
 }
 
-function ProviderPanel({ status }) {
-  const isLive = status?.provider === 'football-data.org'
-  return (
-    <div className="border border-stadium-border bg-stadium-dark p-4 font-mono text-xs">
-      <div className="text-stadium-muted uppercase tracking-widest mb-3">Data Source</div>
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isLive ? 'bg-stadium-green' : 'bg-stadium-gold'}`} />
-        <span className={isLive ? 'text-stadium-green' : 'text-stadium-gold'}>
-          {isLive ? 'football-data.org' : 'Mock data'}
-        </span>
-      </div>
-      <div className="text-stadium-muted leading-relaxed">
-        {isLive
-          ? 'Trusted sports-data relayer · Results posted to MatchOracle by keeper'
-          : 'Set FOOTBALL_API_KEY on the backend to enable live scores'}
-      </div>
-      {status?.lastFetch > 0 && (
-        <div className="text-stadium-muted mt-2">
-          {status.matchCount} fixtures · last fetch {new Date(status.lastFetch).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      )}
-      <div className="text-stadium-muted mt-3">Auto-refreshes every 30 s</div>
-    </div>
-  )
-}
 
 export default function LiveScores() {
   const [fixtures,    setFixtures]    = useState([])
@@ -138,18 +113,15 @@ export default function LiveScores() {
   const [error,       setError]       = useState(null)
 
   const { data: champPoolTotal } = useChampionPoolBalance()
-  const [status,      setStatus]      = useState(null)
 
   const load = useCallback(async () => {
     try {
-      const [fix, grps, prov] = await Promise.all([
+      const [fix, grps] = await Promise.all([
         getFixtures(),
         getGroupStandings(),
-        getProviderStatus(),
       ])
       setFixtures(fix)
       setGroups(grps)
-      setStatus(prov)
       setLastUpdate(new Date())
       setError(null)
     } catch (e) {
@@ -245,10 +217,9 @@ export default function LiveScores() {
             )}
           </div>
 
-          {/* Right: Standings + Provider */}
+          {/* Right: Standings */}
           <div className="space-y-6">
             <StandingsTable groups={groups} />
-            <ProviderPanel status={status} />
           </div>
         </div>
       )}
