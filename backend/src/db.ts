@@ -58,6 +58,16 @@ export async function setCursor(key: string, block: bigint) {
   )
 }
 
+export async function resetCursor(key: string) {
+  if (!pool) return
+  await pool.query('DELETE FROM indexer_cursors WHERE key=$1', [key])
+}
+
+export async function deleteEventsByType(type: string) {
+  if (!pool) return
+  await pool.query('DELETE FROM events WHERE event_type=$1', [type])
+}
+
 // ── Event insert (bulk, idempotent) ───────────────────────────────────────────
 
 export interface EventRow {
@@ -83,7 +93,12 @@ export async function insertEvents(rows: EventRow[]): Promise<void> {
         `INSERT INTO events
            (event_type,block_number,tx_hash,log_index,user_addr,team_id,amount,amount0,amount1,match_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         ON CONFLICT(tx_hash,log_index) DO NOTHING`,
+         ON CONFLICT(tx_hash,log_index) DO UPDATE SET
+           user_addr = COALESCE(EXCLUDED.user_addr, events.user_addr),
+           team_id   = COALESCE(EXCLUDED.team_id,   events.team_id),
+           amount    = COALESCE(EXCLUDED.amount,     events.amount),
+           amount0   = COALESCE(EXCLUDED.amount0,    events.amount0),
+           amount1   = COALESCE(EXCLUDED.amount1,    events.amount1)`,
         [r.eventType, r.blockNumber.toString(), r.txHash, r.logIndex,
          r.userAddr, r.teamId, r.amount, r.amount0, r.amount1, r.matchId]
       )

@@ -5,7 +5,7 @@ import { config } from './config'
 import { getCachedMatches } from './football'
 import { footballRouter } from './footballRoutes'
 import { state } from './state'
-import { dbAvailable, queryEvents, getCursor } from './db'
+import { dbAvailable, queryEvents, getCursor, resetCursor, deleteEventsByType } from './db'
 
 export const router = Router()
 
@@ -249,5 +249,23 @@ router.post('/admin/sync', async (req: Request, res: Response) => {
     res.json({ ok: true, message: 'Keeper sync triggered', ts: Date.now() })
   } catch (e: any) {
     res.status(500).json({ error: e?.message ?? 'Sync failed' })
+  }
+})
+
+// POST /api/admin/reindex-swaps
+// Clears all swap events and resets the swap cursor so the indexer re-processes from scratch.
+// Call once after deploying the swap-decode fix to repair events stored with null team_id.
+router.post('/admin/reindex-swaps', async (req: Request, res: Response) => {
+  const adminKey = process.env.ADMIN_KEY
+  if (adminKey && req.headers['x-admin-key'] !== adminKey) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  if (!dbAvailable()) return res.status(503).json({ error: 'DB not configured' })
+  try {
+    await deleteEventsByType('swap')
+    await resetCursor('swap')
+    res.json({ ok: true, message: 'Swap events cleared and cursor reset — indexer will re-process on next tick' })
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message })
   }
 })

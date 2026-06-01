@@ -1,4 +1,4 @@
-import { decodeEventLog, keccak256, toHex } from 'viem'
+import { decodeEventLog, decodeAbiParameters, keccak256, toHex } from 'viem'
 import { publicClient } from './chain'
 import { config } from './config'
 import { getCursor, setCursor, insertEvents, EventRow, dbAvailable } from './db'
@@ -72,6 +72,7 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
 
       // Decode event args from raw logs
       const logs = (rawLogs as any[]).map((raw: any) => {
+        if (t.type === 'swap') return { ...raw, args: decodeSwapArgs(raw) }
         try {
           const decoded: any = decodeEventLog({
             abi:    [t.event] as any,
@@ -98,6 +99,39 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
 
     from = to
   }
+}
+
+// TeamSwap decoder — handles both indexed and non-indexed teamId layouts:
+//   3 topics → teamId in topics[2]; data = abi(amount0:int256, amount1:int256)
+//   2 topics → teamId non-indexed;  data = abi(teamId:uint16, amount0:int256, amount1:int256)
+function decodeSwapArgs(raw: any): Record<string, any> {
+  const topics = (raw.topics ?? []) as string[]
+  const user   = topics[1] ? ('0x' + topics[1].slice(-40)).toLowerCase() : null
+  let teamId: number | null = null
+  let amount0: bigint | null = null
+  let amount1: bigint | null = null
+
+  try {
+    if (topics.length >= 3) {
+      teamId = Number(BigInt(topics[2]))
+      const p = decodeAbiParameters(
+        [{ name: 'amount0', type: 'int256' }, { name: 'amount1', type: 'int256' }] as const,
+        raw.data as `0x${string}`,
+      )
+      amount0 = p[0] as bigint
+      amount1 = p[1] as bigint
+    } else if (raw.data && raw.data !== '0x') {
+      const p = decodeAbiParameters(
+        [{ name: 'teamId', type: 'uint16' }, { name: 'amount0', type: 'int256' }, { name: 'amount1', type: 'int256' }] as const,
+        raw.data as `0x${string}`,
+      )
+      teamId = Number(p[0])
+      amount0 = p[1] as bigint
+      amount1 = p[2] as bigint
+    }
+  } catch {}
+
+  return { user, teamId, amount0, amount1 }
 }
 
 function parseLog(type: string, log: any): EventRow {
