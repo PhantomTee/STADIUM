@@ -92,7 +92,12 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
         await Promise.all(uniqueBlocks.map(async (bn: bigint) => {
           try {
             const block = await publicClient.getBlock({ blockNumber: bn })
-            blockTimestamps.set(bn, Number(block.timestamp))
+            const ts = block.timestamp
+            // Guard against non-standard RPC values: timestamps must be plausible Unix seconds
+            // (between 2009-01-01 and 2100-01-01, i.e. fits in a 32-bit uint)
+            if (typeof ts === 'bigint' && ts > 1_230_000_000n && ts < 4_102_444_800n) {
+              blockTimestamps.set(bn, Number(ts))
+            }
           } catch {}
         }))
       }
