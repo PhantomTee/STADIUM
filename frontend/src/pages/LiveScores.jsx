@@ -41,7 +41,7 @@ function StandingsTable({ groups }) {
       {groups.length > 1 && (
         <div className="flex overflow-x-auto bg-stadium-dark border-b border-stadium-border">
           {groups.map((g, i) => {
-            const label = g.group.replace('GROUP_', '')
+            const label = g.group.replace(/^GROUP_/, '') || String(i + 1)
             return (
               <button
                 key={g.group}

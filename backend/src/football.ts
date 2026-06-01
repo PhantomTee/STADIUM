@@ -191,8 +191,8 @@ export async function fetchStandings(force = false): Promise<StandingGroup[]> {
       params: { season: config.wcSeason },
     })
     const groups = (res.data.standings ?? []) as any[]
-    _standingsCache = groups.map((g: any): StandingGroup => ({
-      group: g.group ?? g.stage ?? 'GROUP',
+    _standingsCache = groups.map((g: any, i: number): StandingGroup => ({
+      group: g.group ?? `GROUP_${String.fromCharCode(65 + i)}`,
       table: (g.table ?? []).map((row: any, i: number): NormalizedStanding => ({
         position:     row.position ?? i + 1,
         teamId:       resolveTeamId(row.team?.name) ?? null,
