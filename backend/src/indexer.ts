@@ -1,3 +1,4 @@
+import { decodeEventLog, keccak256, toHex } from 'viem'
 import { publicClient } from './chain'
 import { config } from './config'
 import { getCursor, setCursor, insertEvents, EventRow, dbAvailable } from './db'
@@ -7,7 +8,7 @@ import {
   TEAM_SWAP_EVENT,
 } from './abis'
 
-const CHUNK     = 1999n   // stay just under X Layer's 2000-block eth_getLogs limit
+const CHUNK     = 1999n
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
 interface ContractTarget {
@@ -15,12 +16,21 @@ interface ContractTarget {
   address: `0x${string}` | undefined
   event:   typeof CONVICTION_DEPOSITED_EVENT | typeof BET_PLACED_EVENT | typeof TEAM_SWAP_EVENT
   type:    'conviction' | 'bet' | 'swap'
+  topic0:  `0x${string}`
+}
+
+// X Layer's RPC rejects topics arrays that contain null values (which viem inserts
+// when you pass `event` with no args filter). Compute topic0 manually and send
+// topics: [topic0] — clean, no nulls. Decode args from raw logs afterwards.
+function computeTopic0(event: { name: string; inputs: readonly { type: string }[] }): `0x${string}` {
+  const sig = `${event.name}(${event.inputs.map(i => i.type).join(',')})`
+  return keccak256(toHex(sig))
 }
 
 const TARGETS: ContractTarget[] = [
-  { key: 'conviction', address: config.convictionVaultAddress, event: CONVICTION_DEPOSITED_EVENT, type: 'conviction' },
-  { key: 'bet',        address: config.varMarketAddress,       event: BET_PLACED_EVENT,           type: 'bet'        },
-  { key: 'swap',       address: config.stadiumHookAddress,     event: TEAM_SWAP_EVENT,            type: 'swap'       },
+  { key: 'conviction', address: config.convictionVaultAddress, event: CONVICTION_DEPOSITED_EVENT, type: 'conviction', topic0: computeTopic0(CONVICTION_DEPOSITED_EVENT) },
+  { key: 'bet',        address: config.varMarketAddress,       event: BET_PLACED_EVENT,           type: 'bet',        topic0: computeTopic0(BET_PLACED_EVENT)           },
+  { key: 'swap',       address: config.stadiumHookAddress,     event: TEAM_SWAP_EVENT,            type: 'swap',       topic0: computeTopic0(TEAM_SWAP_EVENT)            },
 ]
 
 export async function runIndexer(): Promise<void> {
@@ -42,8 +52,6 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
 
   let from = await getCursor(t.key)
 
-  // If INDEXER_START_BLOCK is configured and ahead of the stored cursor,
-  // jump forward — avoids scanning millions of empty pre-deployment blocks.
   const startBlock = config.indexerStartBlock
   if (startBlock > 0n && from < startBlock) {
     from = startBlock
@@ -54,14 +62,29 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
     const to = from + CHUNK <= current ? from + CHUNK : current
 
     try {
-      const logs = await publicClient.getLogs({
+      // Use raw topics filter (no nulls) — X Layer RPC rejects null topic entries
+      const rawLogs = await (publicClient.getLogs as any)({
         address:   t.address,
-        event:     t.event as any,
+        topics:    [t.topic0],
         fromBlock: from + 1n,
         toBlock:   to,
       })
 
-      const rows: EventRow[] = logs.map(log => parseLog(t.type, log))
+      // Decode event args from raw logs
+      const logs = (rawLogs as any[]).map((raw: any) => {
+        try {
+          const decoded: any = decodeEventLog({
+            abi:    [t.event] as any,
+            data:   raw.data,
+            topics: raw.topics as any,
+          })
+          return { ...raw, args: decoded.args ?? {} }
+        } catch {
+          return { ...raw, args: {} }
+        }
+      })
+
+      const rows: EventRow[] = (logs as any[]).map((log: any) => parseLog(t.type, log))
       await insertEvents(rows)
       await setCursor(t.key, to)
 
@@ -70,7 +93,7 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
       }
     } catch (err: any) {
       console.error(`[indexer] ${t.type} getLogs FAILED ${from+1n}–${to}: ${err?.shortMessage ?? err?.message ?? String(err)}`)
-      break   // retry next cycle
+      break
     }
 
     from = to
@@ -81,9 +104,9 @@ function parseLog(type: string, log: any): EventRow {
   const a = log.args ?? {}
   return {
     eventType:   type,
-    blockNumber: log.blockNumber   ?? 0n,
-    txHash:      log.transactionHash ?? '',
-    logIndex:    log.logIndex       ?? 0,
+    blockNumber: log.blockNumber      ?? 0n,
+    txHash:      log.transactionHash  ?? '',
+    logIndex:    log.logIndex         ?? 0,
     userAddr:    a.user     ? String(a.user).toLowerCase()  : null,
     teamId:      a.teamId   != null ? Number(a.teamId)      : null,
     amount:      a.amount   != null ? String(a.amount)      : null,
