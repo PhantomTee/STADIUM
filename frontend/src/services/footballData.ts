@@ -5,10 +5,10 @@
  * The backend proxies football-data.org using a server-side API key.
  *
  * SECURITY: No API keys live in frontend code or VITE_ environment variables.
- * Set VITE_API_BASE_URL to point at the backend (defaults to localhost:3001 in dev).
+ * Set VITE_API_BASE_URL to override (e.g. http://localhost:3001 in dev).
  */
 
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? 'https://stadium-production-7c50.up.railway.app').replace(/\/$/, '')
 
 // ── Public types (consumed by components) ────────────────────────────────────
 
