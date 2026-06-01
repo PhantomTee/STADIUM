@@ -5,6 +5,9 @@ import { ConvictionVault_ABI, VARMarket_ABI, StadiumHook_ABI } from '../abis'
 import { API_BASE } from '../services/footballData'
 
 const ZERO            = '0x0000000000000000000000000000000000000000'
+// Uniswap V4 PoolManager / hook callbacks during pool init have near-zero "user" addresses
+// (e.g. precompile addresses 0x01–0x25). Filter these out — they aren't real user activity.
+const MIN_USER_ADDR   = 0x10000n   // anything below this is a system/precompile address
 const BLOCK_WINDOW    = 2000n
 const AUTO_REFRESH_MS = 30_000
 const LS_KEY          = 'stadium-activity-v1'
@@ -54,10 +57,10 @@ function formatEventTime(blockTimestamp) {
   const date = new Date(blockTimestamp * 1000)
   const now  = Date.now()
   const diff = now - date.getTime()
-  if (diff < 60_000)   return 'just now'
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 60_000)    return 'just now'
+  if (diff < 3600_000)  return `${Math.floor(diff / 60_000)}m ago`
   if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function normaliseApiRow(row) {
@@ -146,7 +149,7 @@ function EventRow({ event }) {
         {cfg.label}
       </span>
       {body}
-      <span className="font-mono text-xs text-stadium-muted ml-auto text-right">
+      <span className="font-mono text-xs text-stadium-text/60 ml-auto text-right whitespace-nowrap">
         {formatEventTime(event.blockTimestamp) ?? `#${event.blockNumber.toString()}`}
       </span>
     </a>
@@ -302,9 +305,15 @@ export default function Activity() {
     onError: err  => console.warn('swap watch error', err),
   })
 
-  const visible = filter === 'all' ? events : events.filter(e => e.type === filter)
+  // Strip pool-init artifacts before display and counting
+  const realEvents = events.filter(e => {
+    const user = e.args?.user
+    if (!user) return true   // no user field — keep (bet events etc.)
+    try { return BigInt(user) >= MIN_USER_ADDR } catch { return true }
+  })
+  const visible = filter === 'all' ? realEvents : realEvents.filter(e => e.type === filter)
   const counts  = { swap: 0, conviction: 0, bet: 0 }
-  events.forEach(e => { if (counts[e.type] !== undefined) counts[e.type]++ })
+  realEvents.forEach(e => { if (counts[e.type] !== undefined) counts[e.type]++ })
 
   return (
     <div className="space-y-8">
