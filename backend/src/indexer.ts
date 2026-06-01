@@ -68,8 +68,8 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
       if (logs.length > 0) {
         console.log(`[indexer] ${t.type}: stored ${logs.length} events (blocks ${from+1n}–${to})`)
       }
-    } catch (err) {
-      console.warn(`[indexer] ${t.type} failed for ${from+1n}–${to}:`, err)
+    } catch (err: any) {
+      console.error(`[indexer] ${t.type} getLogs FAILED ${from+1n}–${to}: ${err?.shortMessage ?? err?.message ?? String(err)}`)
       break   // retry next cycle
     }
 
