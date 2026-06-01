@@ -53,6 +53,7 @@ export async function syncMatches(): Promise<void> {
     const extId = String(m.id)
     if (state.syncedMatches[extId]) continue
 
+    if (!m.homeTeam.name || !m.awayTeam.name) continue  // TBD knockout slot
     const homeId = resolveTeamId(m.homeTeam.name)
     const awayId = resolveTeamId(m.awayTeam.name)
     if (!homeId || !awayId) {

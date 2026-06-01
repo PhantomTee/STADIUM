@@ -8,7 +8,7 @@ export const TEAM_ID_BY_NAME: Record<string, number> = {
   'Czechia': 4, 'Czech Republic': 4,
   // Group B
   'Canada': 5,
-  'Bosnia and Herzegovina': 6, 'Bosnia & Herz.': 6, 'Bosnia': 6,
+  'Bosnia and Herzegovina': 6, 'Bosnia & Herz.': 6, 'Bosnia': 6, 'Bosnia-Herzegovina': 6,
   'Qatar': 7,
   'Switzerland': 8,
   // Group C
@@ -38,7 +38,7 @@ export const TEAM_ID_BY_NAME: Record<string, number> = {
   'New Zealand': 28,
   // Group H
   'Spain': 29,
-  'Cape Verde': 30, 'Cabo Verde': 30,
+  'Cape Verde': 30, 'Cabo Verde': 30, 'Cape Verde Islands': 30,
   'Saudi Arabia': 31,
   'Uruguay': 32,
   // Group I
