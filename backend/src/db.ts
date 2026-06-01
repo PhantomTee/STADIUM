@@ -17,19 +17,21 @@ export async function setupSchema() {
   if (!pool) return
   await pool.query(`
     CREATE TABLE IF NOT EXISTS events (
-      id           BIGSERIAL PRIMARY KEY,
-      event_type   TEXT    NOT NULL,
-      block_number BIGINT  NOT NULL,
-      tx_hash      TEXT    NOT NULL,
-      log_index    INT     NOT NULL,
-      user_addr    TEXT,
-      team_id      INT,
-      amount       TEXT,
-      amount0      TEXT,
-      amount1      TEXT,
-      match_id     TEXT,
+      id              BIGSERIAL PRIMARY KEY,
+      event_type      TEXT    NOT NULL,
+      block_number    BIGINT  NOT NULL,
+      block_timestamp BIGINT,
+      tx_hash         TEXT    NOT NULL,
+      log_index       INT     NOT NULL,
+      user_addr       TEXT,
+      team_id         INT,
+      amount          TEXT,
+      amount0         TEXT,
+      amount1         TEXT,
+      match_id        TEXT,
       UNIQUE(tx_hash, log_index)
     );
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS block_timestamp BIGINT;
     CREATE INDEX IF NOT EXISTS idx_events_block ON events(block_number DESC);
     CREATE INDEX IF NOT EXISTS idx_events_type  ON events(event_type);
 
@@ -71,16 +73,17 @@ export async function deleteEventsByType(type: string) {
 // ── Event insert (bulk, idempotent) ───────────────────────────────────────────
 
 export interface EventRow {
-  eventType:   string
-  blockNumber: bigint
-  txHash:      string
-  logIndex:    number
-  userAddr:    string | null
-  teamId:      number | null
-  amount:      string | null
-  amount0:     string | null
-  amount1:     string | null
-  matchId:     string | null
+  eventType:      string
+  blockNumber:    bigint
+  blockTimestamp: number | null
+  txHash:         string
+  logIndex:       number
+  userAddr:       string | null
+  teamId:         number | null
+  amount:         string | null
+  amount0:        string | null
+  amount1:        string | null
+  matchId:        string | null
 }
 
 export async function insertEvents(rows: EventRow[]): Promise<void> {
@@ -91,15 +94,16 @@ export async function insertEvents(rows: EventRow[]): Promise<void> {
     for (const r of rows) {
       await client.query(
         `INSERT INTO events
-           (event_type,block_number,tx_hash,log_index,user_addr,team_id,amount,amount0,amount1,match_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           (event_type,block_number,block_timestamp,tx_hash,log_index,user_addr,team_id,amount,amount0,amount1,match_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          ON CONFLICT(tx_hash,log_index) DO UPDATE SET
-           user_addr = COALESCE(EXCLUDED.user_addr, events.user_addr),
-           team_id   = COALESCE(EXCLUDED.team_id,   events.team_id),
-           amount    = COALESCE(EXCLUDED.amount,     events.amount),
-           amount0   = COALESCE(EXCLUDED.amount0,    events.amount0),
-           amount1   = COALESCE(EXCLUDED.amount1,    events.amount1)`,
-        [r.eventType, r.blockNumber.toString(), r.txHash, r.logIndex,
+           block_timestamp = COALESCE(EXCLUDED.block_timestamp, events.block_timestamp),
+           user_addr       = COALESCE(EXCLUDED.user_addr,       events.user_addr),
+           team_id         = COALESCE(EXCLUDED.team_id,         events.team_id),
+           amount          = COALESCE(EXCLUDED.amount,          events.amount),
+           amount0         = COALESCE(EXCLUDED.amount0,         events.amount0),
+           amount1         = COALESCE(EXCLUDED.amount1,         events.amount1)`,
+        [r.eventType, r.blockNumber.toString(), r.blockTimestamp, r.txHash, r.logIndex,
          r.userAddr, r.teamId, r.amount, r.amount0, r.amount1, r.matchId]
       )
     }

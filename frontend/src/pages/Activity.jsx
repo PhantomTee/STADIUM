@@ -43,9 +43,21 @@ function normaliseEvent(raw, type) {
     key:             `${type}-${raw.blockNumber ?? 0}-${raw.transactionHash ?? ''}-${raw.logIndex ?? 0}`,
     type,
     blockNumber:     raw.blockNumber     ?? 0n,
+    blockTimestamp:  Math.floor(Date.now() / 1000),
     transactionHash: raw.transactionHash ?? '',
     args:            raw.args ?? {},
   }
+}
+
+function formatEventTime(blockTimestamp) {
+  if (!blockTimestamp) return null
+  const date = new Date(blockTimestamp * 1000)
+  const now  = Date.now()
+  const diff = now - date.getTime()
+  if (diff < 60_000)   return 'just now'
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 function normaliseApiRow(row) {
@@ -60,6 +72,7 @@ function normaliseApiRow(row) {
     key:             `${row.event_type}-${row.block_number}-${row.tx_hash}-${row.log_index}`,
     type:            row.event_type,
     blockNumber:     BigInt(row.block_number),
+    blockTimestamp:  row.block_timestamp ? Number(row.block_timestamp) : null,
     transactionHash: row.tx_hash,
     args,
   }
@@ -133,8 +146,8 @@ function EventRow({ event }) {
         {cfg.label}
       </span>
       {body}
-      <span className="font-mono text-xs text-stadium-muted ml-auto">
-        #{event.blockNumber.toString()}
+      <span className="font-mono text-xs text-stadium-muted ml-auto text-right">
+        {formatEventTime(event.blockTimestamp) ?? `#${event.blockNumber.toString()}`}
       </span>
     </a>
   )

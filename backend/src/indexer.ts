@@ -85,7 +85,21 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
         }
       })
 
-      const rows: EventRow[] = (logs as any[]).map((log: any) => parseLog(t.type, log))
+      // Fetch block timestamps for blocks that contain events
+      const blockTimestamps = new Map<bigint, number>()
+      if (logs.length > 0) {
+        const uniqueBlocks = [...new Set((logs as any[]).map((l: any) => l.blockNumber as bigint))]
+        await Promise.all(uniqueBlocks.map(async (bn: bigint) => {
+          try {
+            const block = await publicClient.getBlock({ blockNumber: bn })
+            blockTimestamps.set(bn, Number(block.timestamp))
+          } catch {}
+        }))
+      }
+
+      const rows: EventRow[] = (logs as any[]).map((log: any) =>
+        parseLog(t.type, log, blockTimestamps.get(log.blockNumber) ?? null)
+      )
       await insertEvents(rows)
       await setCursor(t.key, to)
 
@@ -134,18 +148,19 @@ function decodeSwapArgs(raw: any): Record<string, any> {
   return { user, teamId, amount0, amount1 }
 }
 
-function parseLog(type: string, log: any): EventRow {
+function parseLog(type: string, log: any, blockTimestamp: number | null = null): EventRow {
   const a = log.args ?? {}
   return {
-    eventType:   type,
-    blockNumber: log.blockNumber      ?? 0n,
-    txHash:      log.transactionHash  ?? '',
-    logIndex:    log.logIndex         ?? 0,
-    userAddr:    a.user     ? String(a.user).toLowerCase()  : null,
-    teamId:      a.teamId   != null ? Number(a.teamId)      : null,
-    amount:      a.amount   != null ? String(a.amount)      : null,
-    amount0:     a.amount0  != null ? String(a.amount0)     : null,
-    amount1:     a.amount1  != null ? String(a.amount1)     : null,
-    matchId:     a.matchId  != null ? String(a.matchId)     : null,
+    eventType:      type,
+    blockNumber:    log.blockNumber      ?? 0n,
+    blockTimestamp,
+    txHash:         log.transactionHash  ?? '',
+    logIndex:       log.logIndex         ?? 0,
+    userAddr:       a.user     ? String(a.user).toLowerCase()  : null,
+    teamId:         a.teamId   != null ? Number(a.teamId)      : null,
+    amount:         a.amount   != null ? String(a.amount)      : null,
+    amount0:        a.amount0  != null ? String(a.amount0)     : null,
+    amount1:        a.amount1  != null ? String(a.amount1)     : null,
+    matchId:        a.matchId  != null ? String(a.matchId)     : null,
   }
 }
