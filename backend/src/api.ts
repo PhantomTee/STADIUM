@@ -254,7 +254,6 @@ router.post('/admin/sync', async (req: Request, res: Response) => {
 
 // POST /api/admin/reindex-swaps
 // Clears all swap events and resets the swap cursor so the indexer re-processes from scratch.
-// Call once after deploying the swap-decode fix to repair events stored with null team_id.
 router.post('/admin/reindex-swaps', async (req: Request, res: Response) => {
   const adminKey = process.env.ADMIN_KEY
   if (adminKey && req.headers['x-admin-key'] !== adminKey) {
@@ -265,6 +264,24 @@ router.post('/admin/reindex-swaps', async (req: Request, res: Response) => {
     await deleteEventsByType('swap')
     await resetCursor('swap')
     res.json({ ok: true, message: 'Swap events cleared and cursor reset — indexer will re-process on next tick' })
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message })
+  }
+})
+
+// POST /api/admin/reindex-conviction
+// Clears all conviction events and resets the cursor so the indexer re-processes from scratch.
+// Call once after deploying the conviction-decode fix to repair events stored with null team_id.
+router.post('/admin/reindex-conviction', async (req: Request, res: Response) => {
+  const adminKey = process.env.ADMIN_KEY
+  if (adminKey && req.headers['x-admin-key'] !== adminKey) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  if (!dbAvailable()) return res.status(503).json({ error: 'DB not configured' })
+  try {
+    await deleteEventsByType('conviction')
+    await resetCursor('conviction')
+    res.json({ ok: true, message: 'Conviction events cleared and cursor reset — indexer will re-process on next tick' })
   } catch (e: any) {
     res.status(500).json({ error: e?.message })
   }

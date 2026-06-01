@@ -72,7 +72,8 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
 
       // Decode event args from raw logs
       const logs = (rawLogs as any[]).map((raw: any) => {
-        if (t.type === 'swap') return { ...raw, args: decodeSwapArgs(raw) }
+        if (t.type === 'swap')       return { ...raw, args: decodeSwapArgs(raw) }
+        if (t.type === 'conviction') return { ...raw, args: decodeConvictionArgs(raw) }
         try {
           const decoded: any = decodeEventLog({
             abi:    [t.event] as any,
@@ -118,6 +119,41 @@ async function indexTarget(t: ContractTarget, current: bigint): Promise<void> {
 
     from = to
   }
+}
+
+// ConvictionDeposited decoder — two on-chain layouts:
+//   A) topics[1]=user (address), topics[2]=teamId (uint16), data=abi(amount)  ← current contract
+//   B) topics[1]=teamId (uint16), topics[2]=user (address), data=abi(amount)  ← old contract
+//
+// Detection: if topics[2] > 0xFFFF it must be an address, not a teamId → Layout B.
+function decodeConvictionArgs(raw: any): Record<string, any> {
+  const topics = (raw.topics ?? []) as string[]
+  let user:   string | null = null
+  let teamId: number | null = null
+  let amount: bigint | null = null
+
+  try {
+    if (topics.length >= 3) {
+      const t1 = BigInt(topics[1])
+      const t2 = BigInt(topics[2])
+      if (t2 > 0xFFFFn) {
+        // Layout B — teamId in topics[1], user in topics[2]
+        teamId = t1 <= 0xFFFFn ? Number(t1) : null
+        user   = ('0x' + topics[2].slice(-40)).toLowerCase()
+      } else {
+        // Layout A — user in topics[1], teamId in topics[2]
+        user   = ('0x' + topics[1].slice(-40)).toLowerCase()
+        teamId = Number(t2)
+      }
+      const p = decodeAbiParameters(
+        [{ name: 'amount', type: 'uint256' }] as const,
+        raw.data as `0x${string}`,
+      )
+      amount = p[0] as bigint
+    }
+  } catch {}
+
+  return { user, teamId, amount }
 }
 
 // TeamSwap decoder — three on-chain layouts observed across contract versions:
