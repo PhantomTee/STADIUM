@@ -8,7 +8,7 @@ import {
   TEAM_SWAP_EVENT,
 } from './abis'
 
-const CHUNK     = 1999n
+const CHUNK     = 99n    // X Layer testnet caps eth_getLogs at 100 blocks
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
 interface ContractTarget {
