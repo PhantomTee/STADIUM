@@ -1,6 +1,7 @@
 import React from 'react'
 import ShareButton from '../components/ShareButton'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContracts } from 'wagmi'
+
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { WORLD_CUP_TEAMS, formatUSDC, ADDRESSES } from '../utils/contracts'
 import {
@@ -120,7 +121,7 @@ function ConvictionPositions({ address }) {
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {positions.map(p => (
-            <ConvictionPositionCard key={p.team.id} {...p} />
+            <ConvictionPositionCard key={p.team.id} {...p} wallet={address} />
           ))}
         </div>
       )}
@@ -128,7 +129,7 @@ function ConvictionPositions({ address }) {
   )
 }
 
-function ConvictionPositionCard({ team, deposit, eliminated, champion, principalClaimed, multiplier }) {
+function ConvictionPositionCard({ team, deposit, eliminated, champion, principalClaimed, multiplier, wallet }) {
   const { writeContract, data: txHash, isPending: txSubmitting } = useWriteContract()
   const { isLoading: txConfirming } = useWaitForTransactionReceipt({ hash: txHash })
   const isLoading = txSubmitting || txConfirming
@@ -196,6 +197,7 @@ function ConvictionPositionCard({ team, deposit, eliminated, champion, principal
         <div className="mt-3 pt-3 border-t border-stadium-border/40">
           <ShareButton
             text={`I have $${formatUSDC(deposit)} USDC riding on ${team.flag} ${team.name} to win the 2026 World Cup 🏆\n\nConviction is locked on 11° — earning survivor yield every time a rival nation gets knocked out 🔒\n\nBuilt on @Uniswap V4 · X Layer\n\n#WorldCup2026 #DeFi #UniswapV4`}
+            cardData={{ team, amount: deposit, wallet }}
           />
         </div>
       )}

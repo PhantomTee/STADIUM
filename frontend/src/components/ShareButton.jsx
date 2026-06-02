@@ -29,13 +29,26 @@ function CheckIcon() {
   )
 }
 
-export default function ShareButton({ text }) {
-  const [copied, setCopied] = useState(false)
+function DownloadIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  )
+}
+
+// cardData: { team: { flag, name }, amount: BigInt, wallet: string }
+export default function ShareButton({ text, cardData }) {
+  const [copied,     setCopied]     = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
   function handleShare() {
-    const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text + ' ' + siteUrl)}`
+    const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text + '\n\n' + siteUrl)}`
     window.open(tw, '_blank', 'noopener,noreferrer,width=560,height=420')
   }
 
@@ -47,8 +60,37 @@ export default function ShareButton({ text }) {
     } catch {}
   }
 
+  async function handleDownload() {
+    if (!cardData) return
+    setGenerating(true)
+    try {
+      const { generateShareCard } = await import('../utils/shareCard')
+      const dataUrl = await generateShareCard(cardData)
+      const a = document.createElement('a')
+      a.href     = dataUrl
+      a.download = `11deg-${cardData.team.name.toLowerCase().replace(/\s+/g, '-')}.png`
+      a.click()
+    } catch (err) {
+      console.error('[ShareButton] card generation failed', err)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   return (
     <div className="flex items-center gap-1">
+      {cardData && (
+        <button
+          onClick={handleDownload}
+          disabled={generating}
+          title="Download share card"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-widest text-stadium-gold hover:text-stadium-text border border-stadium-gold/30 hover:border-stadium-gold/60 disabled:opacity-40 transition-colors"
+          style={{ borderRadius: 2 }}
+        >
+          <DownloadIcon />
+          {generating ? 'Building…' : 'Card'}
+        </button>
+      )}
       <button
         onClick={handleShare}
         className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-widest text-stadium-muted hover:text-stadium-green border border-stadium-border/60 hover:border-stadium-green/40 transition-colors"
