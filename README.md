@@ -1,4 +1,4 @@
-# 11° — World Cup DeFi Protocol
+# 11°: World Cup DeFi Protocol
 
 > **Back your team. Earn while they win.**
 
@@ -7,9 +7,9 @@
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange?style=flat-square)](https://book.getfoundry.sh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-11° is a conviction-based DeFi protocol built for the 2026 FIFA World Cup, deployed on X Layer — OKX's EVM L2. Lock USDC behind a team, earn survivor yield every time a rival is eliminated, predict match outcomes through VAR markets, and share the Champion Pool if your team lifts the trophy.
+11° is a conviction-based DeFi protocol built for the 2026 FIFA World Cup, deployed on X Layer (OKX's EVM L2). Lock USDC behind a team, earn survivor yield every time a rival is eliminated, predict match outcomes through VAR markets, and share the Champion Pool if your team lifts the trophy.
 
-The entire protocol is orchestrated through a **Uniswap V4 Hook** as its core on-chain primitive.
+The protocol runs through a **Uniswap V4 Hook** as its core on-chain primitive.
 
 ---
 
@@ -18,7 +18,7 @@ The entire protocol is orchestrated through a **Uniswap V4 Hook** as its core on
 | | |
 |---|---|
 | **Frontend** | [e11even-men.vercel.app](https://e11even-men.vercel.app) |
-| **Network** | X Layer Testnet — Chain ID `1952` |
+| **Network** | X Layer Testnet, Chain ID `1952` |
 | **Explorer** | [web3.okx.com/explorer/xlayer-test](https://web3.okx.com/explorer/xlayer-test) |
 
 ---
@@ -62,16 +62,16 @@ User deposits USDC
 
 | Feature | How |
 |---|---|
-| **Survivor Yield** | Every elimination auto-accrues yield to alive backers via MasterChef accumulator — O(1), no loops |
-| **Champion Pool** | Grows throughout the tournament; snapshotted at final whistle; proportional to stake |
+| **Survivor Yield** | Every elimination auto-accrues yield to alive backers via MasterChef accumulator (O(1), no loops) |
+| **Champion Pool** | Grows throughout the tournament, snapshotted at the final whistle, proportional to stake |
 | **VAR Markets** | 4 prediction markets per match; conviction holders earn 1.5× bonus on correct calls |
 | **Dynamic Fees** | V4 Hook sets swap fees by tournament stage: Group 0.30% → Knockout 0.50% → Final 1.00% |
-| **Swap Blocking** | Hook reverts swaps for eliminated team pools — provable on-chain market termination |
-| **Momentum Tracking** | Hook tracks team swap volume; drives "hot team" UI indicators |
+| **Swap Blocking** | Hook reverts swaps for eliminated team pools, giving provable on-chain market termination |
+| **Momentum Tracking** | Hook tracks team swap volume and drives "hot team" UI indicators |
 
 ---
 
-## StadiumHook — The V4 Core
+## StadiumHook: The V4 Core
 
 `src/StadiumHook.sol` is the technical heart of the protocol. It is a Uniswap V4 `BaseHook` that manages all per-team pool state.
 
@@ -79,8 +79,8 @@ User deposits USDC
 
 | Hook | Purpose |
 |---|---|
-| `beforeSwap` | Validates pool is active; rejects swaps on eliminated teams; returns dynamic fee |
-| `afterSwap` | Tracks notional fee accrual, updates `teamMomentum`, emits `ChampionFeeRouted`; no real USDC transfer from hook (ChampionPool funded via ConvictionVault/VARMarket settlement) |
+| `beforeSwap` | Validates pool is active, rejects swaps on eliminated teams, returns dynamic fee |
+| `afterSwap` | Tracks notional fee accrual, updates `teamMomentum`, emits `ChampionFeeRouted`. No real USDC transfer from hook (ChampionPool is funded via ConvictionVault/VARMarket settlement) |
 | `beforeAddLiquidity` | Blocks new liquidity on eliminated team pools |
 | `afterAddLiquidity` | Records liquidity stats per team |
 
@@ -209,11 +209,11 @@ ChampionPool
 
 ### Prerequisites
 
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) — `foundryup`
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`foundryup`)
 - Node.js 18+
 - An X Layer Testnet wallet with OKB for gas
 
-### 1. Clone & install
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/phantomtee/stadium
@@ -242,10 +242,10 @@ cp backend/.env.example backend/.env
 ### 3. Run locally
 
 ```bash
-# Terminal 1 — backend API proxy
+# Terminal 1: backend API proxy
 cd backend && npm run dev
 
-# Terminal 2 — frontend dev server
+# Terminal 2: frontend dev server
 cd frontend && npm run dev
 ```
 
@@ -286,12 +286,12 @@ forge test --match-path test/StadiumHook.t.sol -vv
 
 The `.github/workflows/oracle-relayer.yml` GitHub Actions workflow runs every 10 minutes:
 
-1. Fetches fixtures + results from football-data.org
+1. Fetches fixtures and results from football-data.org
 2. Calls `MatchOracle.createOrUpdateMatch()` for upcoming matches
 3. During live matches: calls `openVARWindow` → `startMatch` → `postResult`
 4. After confirmed results: calls `postElimination` or `postChampion`
 
-The API key is **server-side only** — never in frontend code or git history.
+The API key is server-side only and never goes in frontend code or git history.
 
 Required GitHub secrets: `FOOTBALL_DATA_API_KEY`, `ORACLE_PRIVATE_KEY`, `XLAYER_RPC_URL`
 
@@ -299,27 +299,27 @@ Required GitHub secrets: `FOOTBALL_DATA_API_KEY`, `ORACLE_PRIVATE_KEY`, `XLAYER_
 
 ## Security
 
-- **CEI pattern** — state changes always precede external calls
-- **Reentrancy guards** — `nonReentrant` on all user-facing write functions
-- **Pull-based payouts** — no push loops; all claims require user transaction
-- **No admin backdoors** — owner can only post match results; cannot move user funds
-- **Oracle trust model** — `MatchOracle` is admin-controlled; described as a *trusted sports-data relayer*, not a decentralized oracle
-- **Hook address verification** — V4 hook address must encode permission bits, verified at deploy time
-- **API key isolation** — football-data.org key read only from server env; frontend calls own backend proxy
+- **CEI pattern**: state changes always precede external calls
+- **Reentrancy guards**: `nonReentrant` on all user-facing write functions
+- **Pull-based payouts**: no push loops, all claims require a user transaction
+- **No admin backdoors**: owner can only post match results, cannot move user funds
+- **Oracle trust model**: `MatchOracle` is admin-controlled and described as a trusted sports-data relayer, not a decentralized oracle
+- **Hook address verification**: V4 hook address must encode permission bits, verified at deploy time
+- **API key isolation**: football-data.org key is read only from server env; the frontend calls its own backend proxy
 
 ---
 
-## Hackathon Submission — XLayer Build-X 2026
+## Hackathon Submission: XLayer Build-X 2026
 
 ### Hook Requirements Checklist
 
 - [x] `StadiumHook.sol` inherits `BaseHook` (official Uniswap V4 interface)
-- [x] `beforeSwap` — validates pool, returns dynamic fee, reverts on eliminated teams
-- [x] `afterSwap` — tracks notional fee accrual, updates `teamMomentum`, emits `ChampionFeeRouted` (no real USDC transfer from hook)
-- [x] `beforeAddLiquidity` — blocks liquidity on eliminated pools
-- [x] `afterAddLiquidity` — records per-team liquidity stats
+- [x] `beforeSwap`: validates pool, returns dynamic fee, reverts on eliminated teams
+- [x] `afterSwap`: tracks notional fee accrual, updates `teamMomentum`, emits `ChampionFeeRouted` (no real USDC transfer from hook)
+- [x] `beforeAddLiquidity`: blocks liquidity on eliminated pools
+- [x] `afterAddLiquidity`: records per-team liquidity stats
 - [x] `PoolKey` uses `hooks: IHooks(address(stadiumHook))` + `DYNAMIC_FEE_FLAG`
-- [x] `DeployHook.s.sol` mines CREATE2 salt via `HookMiner.find()` — address encodes permission bits
+- [x] `DeployHook.s.sol` mines CREATE2 salt via `HookMiner.find()`, address encodes permission bits
 - [x] Deployment verifies `address(hook) == hookAddress` at runtime
 - [x] Hook emits: `PoolRegistered`, `TeamSwap`, `TeamMomentumUpdated`, `ChampionFeeRouted`, `SwapBlocked`
 - [x] Deployed on X Layer Testnet (Chain ID 1952) with verifiable addresses
@@ -327,10 +327,10 @@ Required GitHub secrets: `FOOTBALL_DATA_API_KEY`, `ORACLE_PRIVATE_KEY`, `XLAYER_
 ### Protocol Requirements Checklist
 
 - [x] 48 WC 2026 teams registered in MatchOracle + ConvictionVault
-- [x] MasterChef O(1) survivor yield — no per-user loops at settlement
-- [x] VAR markets — 4 types, conviction multiplier, gas-safe settlement
-- [x] Champion Pool — accumulates from eliminations + VAR, proportional claim
-- [x] Pull-based CEI — every payout requires explicit user claim
+- [x] MasterChef O(1) survivor yield, no per-user loops at settlement
+- [x] VAR markets: 4 types, conviction multiplier, gas-safe settlement
+- [x] Champion Pool: accumulates from eliminations + VAR, proportional claim
+- [x] Pull-based CEI: every payout requires an explicit user claim
 - [x] Dynamic fees by tournament stage (Group/Knockout/Final)
 - [x] ERC20 TeamTokens (one per team) via `TeamFactory`
 - [x] V4 pool per team via `TeamFactory.createTeamPool()`
@@ -341,8 +341,8 @@ Required GitHub secrets: `FOOTBALL_DATA_API_KEY`, `ORACLE_PRIVATE_KEY`, `XLAYER_
 
 - [x] Live leaderboard (sorted by conviction locked / backers)
 - [x] Live scores + group standings (football-data.org proxied via backend)
-- [x] Portfolio page — user positions, pending yield, elimination claims
-- [x] Activity feed — real-time on-chain event stream
+- [x] Portfolio page: user positions, pending yield, elimination claims
+- [x] Activity feed: real-time on-chain event stream
 - [x] VAR betting UI per match
 - [x] Countdown to conviction close (tournament kickoff)
 - [x] Onboarding modal (first-visit tour)
@@ -354,9 +354,9 @@ Required GitHub secrets: `FOOTBALL_DATA_API_KEY`, `ORACLE_PRIVATE_KEY`, `XLAYER_
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT. See [LICENSE](LICENSE)
 
 ---
 
-*Built for the XLayer Build-X Hackathon 2026 · Uniswap V4 Hook Arena Track*
+*Built for the XLayer Build-X Hackathon 2026 · Uniswap V4 Hook Arena Track*  
 *In collaboration with [@XLayerOfficial](https://x.com/XLayerOfficial) · [@Uniswap](https://x.com/Uniswap) · [@flapdotsh](https://x.com/flapdotsh)*
