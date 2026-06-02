@@ -1,69 +1,92 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#060c06"/>
-      <stop offset="100%" stop-color="#0a180a"/>
-    </linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#00ff87" stop-opacity="0.15"/>
+    <!-- Radial glow behind wordmark -->
+    <radialGradient id="glow-left" cx="12%" cy="35%" r="40%">
+      <stop offset="0%" stop-color="#00ff87" stop-opacity="0.1"/>
       <stop offset="100%" stop-color="#00ff87" stop-opacity="0"/>
-    </linearGradient>
+    </radialGradient>
+    <!-- Clip everything to card bounds -->
+    <clipPath id="card">
+      <rect x="24" y="24" width="1152" height="582"/>
+    </clipPath>
   </defs>
 
-  <!-- Background -->
-  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Outer background -->
+  <rect width="1200" height="630" fill="#080e08"/>
 
-  <!-- Pitch stripes -->
-  <rect x="0"    y="0" width="110" height="630" fill="#00ff87" fill-opacity="0.018"/>
-  <rect x="220"  y="0" width="110" height="630" fill="#00ff87" fill-opacity="0.018"/>
-  <rect x="440"  y="0" width="110" height="630" fill="#00ff87" fill-opacity="0.018"/>
-  <rect x="660"  y="0" width="110" height="630" fill="#00ff87" fill-opacity="0.018"/>
-  <rect x="880"  y="0" width="110" height="630" fill="#00ff87" fill-opacity="0.018"/>
-  <rect x="1100" y="0" width="110" height="630" fill="#00ff87" fill-opacity="0.018"/>
+  <!-- Card fill -->
+  <rect x="24" y="24" width="1152" height="582" fill="#0d160d"/>
 
-  <!-- Top glow band -->
-  <rect x="0" y="0" width="1200" height="300" fill="url(#glow)"/>
+  <!-- Card border -->
+  <rect x="24" y="24" width="1152" height="582" fill="none" stroke="#1c2c1c" stroke-width="1"/>
 
-  <!-- Left green accent bar -->
-  <rect x="0" y="0" width="6" height="630" fill="#00ff87"/>
+  <!-- Left accent bar -->
+  <rect x="24" y="24" width="4" height="582" fill="#00ff87"/>
 
-  <!-- Large background "11°" watermark -->
-  <text x="580" y="460" font-family="Arial Black, sans-serif" font-size="420" font-weight="900"
-        fill="#00ff87" fill-opacity="0.035" text-anchor="middle" letter-spacing="-20">11°</text>
+  <!-- Clipped group: everything that should stay inside the card -->
+  <g clip-path="url(#card)">
 
-  <!-- Wordmark -->
-  <text x="100" y="182" font-family="Arial Black, sans-serif" font-size="120" font-weight="900"
-        fill="#ffffff" letter-spacing="-4">11°</text>
+    <!-- Pitch stripe pattern (very subtle) -->
+    <rect x="0"    y="0" width="100" height="630" fill="#00ff87" fill-opacity="0.014"/>
+    <rect x="200"  y="0" width="100" height="630" fill="#00ff87" fill-opacity="0.014"/>
+    <rect x="400"  y="0" width="100" height="630" fill="#00ff87" fill-opacity="0.014"/>
+    <rect x="600"  y="0" width="100" height="630" fill="#00ff87" fill-opacity="0.014"/>
+    <rect x="800"  y="0" width="100" height="630" fill="#00ff87" fill-opacity="0.014"/>
+    <rect x="1000" y="0" width="100" height="630" fill="#00ff87" fill-opacity="0.014"/>
 
-  <!-- Subtitle rule + label -->
-  <rect x="100" y="210" width="48" height="3" fill="#00ff87"/>
-  <text x="162" y="226" font-family="monospace" font-size="22" fill="#00ff87" letter-spacing="4" font-weight="700">WORLD CUP DEFI</text>
+    <!-- Left glow -->
+    <rect x="24" y="24" width="1152" height="582" fill="url(#glow-left)"/>
 
-  <!-- Tagline -->
-  <text x="100" y="310" font-family="Arial Black, sans-serif" font-size="52" font-weight="900"
-        fill="#ffffff" letter-spacing="-1">Back Your Team.</text>
-  <text x="100" y="376" font-family="Arial Black, sans-serif" font-size="52" font-weight="900"
-        fill="#ffffff" letter-spacing="-1">Trade The Match.</text>
-  <text x="100" y="442" font-family="Arial Black, sans-serif" font-size="52" font-weight="900"
-        fill="#00ff87" letter-spacing="-1">Win The Cup.</text>
+    <!-- Giant watermark "11°" -->
+    <text x="600" y="500" font-family="Arial Black, Arial, sans-serif" font-size="440"
+          font-weight="900" fill="#00ff87" fill-opacity="0.028"
+          text-anchor="middle" letter-spacing="-20">11°</text>
 
-  <!-- Bottom strip -->
-  <rect x="0" y="555" width="1200" height="75" fill="#00ff87" fill-opacity="0.06"/>
-  <rect x="0" y="555" width="1200" height="2" fill="#00ff87" fill-opacity="0.25"/>
+    <!-- Football (right side) -->
+    <!-- Outer circle -->
+    <circle cx="970" cy="300" r="172" fill="none" stroke="#00ff87" stroke-width="2" stroke-opacity="0.22"/>
+    <circle cx="970" cy="300" r="172" fill="#00ff87" fill-opacity="0.03"/>
+    <!-- Inner glow -->
+    <circle cx="970" cy="300" r="90" fill="none" stroke="#00ff87" stroke-width="1" stroke-opacity="0.1"/>
+    <!-- Center pentagon (simplified football pattern) -->
+    <polygon points="970,254 1010,283 995,330 945,330 930,283"
+             fill="none" stroke="#00ff87" stroke-width="2.5" stroke-opacity="0.55"/>
+    <!-- Seam lines: center pentagon to outer circle -->
+    <line x1="970" y1="128" x2="970" y2="254" stroke="#00ff87" stroke-width="1.5" stroke-opacity="0.22"/>
+    <line x1="1126" y1="218" x2="1010" y2="283" stroke="#00ff87" stroke-width="1.5" stroke-opacity="0.22"/>
+    <line x1="1072" y1="445" x2="995"  y2="330" stroke="#00ff87" stroke-width="1.5" stroke-opacity="0.22"/>
+    <line x1="868"  y1="445" x2="945"  y2="330" stroke="#00ff87" stroke-width="1.5" stroke-opacity="0.22"/>
+    <line x1="814"  y1="218" x2="930"  y2="283" stroke="#00ff87" stroke-width="1.5" stroke-opacity="0.22"/>
 
-  <!-- Bottom details -->
-  <text x="100" y="603" font-family="monospace" font-size="20" fill="#00ff87" letter-spacing="2">X LAYER TESTNET · CHAIN ID 1952</text>
-  <text x="1100" y="603" font-family="monospace" font-size="20" fill="#ffffff" fill-opacity="0.4" text-anchor="end" letter-spacing="1">11DEG.XYZ</text>
+    <!-- Wordmark: 11° -->
+    <text x="80" y="200" font-family="Arial Black, Arial, sans-serif"
+          font-size="128" font-weight="900" fill="#ffffff" letter-spacing="-4">11°</text>
 
-  <!-- Ball icon (right side) -->
-  <circle cx="960" cy="295" r="165" fill="none" stroke="#00ff87" stroke-width="3" stroke-opacity="0.35"/>
-  <circle cx="960" cy="295" r="165" fill="#00ff87" fill-opacity="0.04"/>
-  <!-- Pentagon center -->
-  <polygon points="960,252 998,278 984,323 936,323 922,278" fill="none" stroke="#00ff87" stroke-width="2.5" stroke-opacity="0.7"/>
-  <!-- Seam lines -->
-  <line x1="960" y1="130" x2="960" y2="252" stroke="#00ff87" stroke-width="2" stroke-opacity="0.35"/>
-  <line x1="1108" y1="222" x2="998" y2="278" stroke="#00ff87" stroke-width="2" stroke-opacity="0.35"/>
-  <line x1="1055" y1="432" x2="984" y2="323" stroke="#00ff87" stroke-width="2" stroke-opacity="0.35"/>
-  <line x1="865"  y1="432" x2="936" y2="323" stroke="#00ff87" stroke-width="2" stroke-opacity="0.35"/>
-  <line x1="812"  y1="222" x2="922" y2="278" stroke="#00ff87" stroke-width="2" stroke-opacity="0.35"/>
+    <!-- Green underline + "WORLD CUP DEFI" label -->
+    <rect x="80" y="222" width="44" height="3" fill="#00ff87"/>
+    <text x="140" y="237" font-family="'Courier New', Courier, monospace"
+          font-size="20" font-weight="700" fill="#00ff87" letter-spacing="4">WORLD CUP DEFI</text>
+
+    <!-- Tagline -->
+    <text x="80" y="318" font-family="Arial Black, Arial, sans-serif"
+          font-size="52" font-weight="900" fill="#dce4dc" letter-spacing="-1">Back Your Team.</text>
+    <text x="80" y="384" font-family="Arial Black, Arial, sans-serif"
+          font-size="52" font-weight="900" fill="#dce4dc" letter-spacing="-1">Trade The Match.</text>
+    <text x="80" y="450" font-family="Arial Black, Arial, sans-serif"
+          font-size="52" font-weight="900" fill="#00ff87" letter-spacing="-1">Win The Cup.</text>
+
+    <!-- Bottom strip -->
+    <rect x="24" y="556" width="1152" height="50" fill="#00ff87" fill-opacity="0.05"/>
+    <rect x="24" y="556" width="1152" height="1" fill="#1c2c1c"/>
+
+    <!-- Bottom left: network info -->
+    <text x="80" y="590" font-family="'Courier New', Courier, monospace"
+          font-size="16" fill="#5a735a" letter-spacing="2">UNISWAP V4 · X LAYER TESTNET · CHAIN ID 1952</text>
+
+    <!-- Bottom right: URL -->
+    <text x="1120" y="590" font-family="'Courier New', Courier, monospace"
+          font-size="16" fill="#dce4dc" fill-opacity="0.5"
+          text-anchor="end" letter-spacing="1">e11even-men.vercel.app</text>
+
+  </g>
 </svg>
