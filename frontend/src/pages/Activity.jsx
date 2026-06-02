@@ -309,7 +309,14 @@ export default function Activity() {
   const realEvents = events.filter(e => {
     const user = e.args?.user
     if (!user) return true   // no user field — keep (bet events etc.)
-    try { return BigInt(user) >= MIN_USER_ADDR } catch { return true }
+    try { if (BigInt(user) < MIN_USER_ADDR) return false } catch {}
+    // Hide zero-volume swaps (pool initialisation touches, not real trades)
+    if (e.type === 'swap') {
+      const a0 = absBig(e.args?.amount0)
+      const a1 = absBig(e.args?.amount1)
+      if (a0 === 0n && a1 === 0n) return false
+    }
+    return true
   })
   const visible = filter === 'all' ? realEvents : realEvents.filter(e => e.type === filter)
   const counts  = { swap: 0, conviction: 0, bet: 0 }
